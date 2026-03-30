@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SimLife — Build Your Dream Life</title>
+  <meta name="description" content="A deep life simulation game. Build your home, grow your career, make friends, and leave a legacy. Featuring autonomous AI, moodlets, and radial pie menus.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>">
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<!-- Welcome Screen -->
+<div id="welcome-screen">
+  <div class="welcome-content">
+    <h1>🏡 SimLife</h1>
+    <p>Build your dream home, grow your career, make friends, and leave a lasting legacy.</p>
+    <p style="font-size:12px;color:var(--text-dim);">
+      🤖 Your Sim now thinks autonomously!<br>
+      🎯 Click furniture for pie menus<br>
+      ⇧ Shift+Click to queue actions<br>
+      Q to toggle autonomy
+    </p>
+    <button id="start-btn">▶ Start Your Life</button>
+  </div>
+</div>
+
+<div class="game-container">
+
+  <!-- Canvas Area -->
+  <div class="canvas-area">
+    <canvas id="game-canvas"></canvas>
+  </div>
+
+  <!-- Status Panel (Right Side) -->
+  <div class="status-panel" id="status-panel">
+    <div class="status-header">
+      <h2>SimLife</h2>
+      <span id="time-display">Day 1 — 6:00 AM</span>
+    </div>
+
+    <!-- Money, Mood, Activity Row -->
+    <div class="status-row">
+      <span id="money-display">$500</span>
+      <span id="mood-display">😊 Happy</span>
+      <span id="autonomy-indicator" title="Autonomy (Q to toggle)">🤖</span>
+    </div>
+
+    <div id="activity-display">💤 Idle</div>
+
+    <!-- Speed Controls -->
+    <div class="speed-controls">
+      <button class="speed-btn" data-speed="0">⏸</button>
+      <button class="speed-btn active" data-speed="1">1×</button>
+      <button class="speed-btn" data-speed="3">3×</button>
+      <button class="speed-btn" data-speed="10">10×</button>
+      <span id="pause-label"></span>
+    </div>
+
+    <!-- Need Bars -->
+    <div class="needs-section" id="needs-bars"></div>
+
+    <!-- Moodlet Bar (populated dynamically) -->
+    <div id="moodlet-bar" class="moodlet-bar"></div>
+
+    <!-- Action Queue Bar (populated dynamically) -->
+    <div id="queue-bar" class="queue-bar"></div>
+
+    <!-- Panel Buttons -->
+    <div class="panel-buttons">
+      <button class="panel-btn" data-panel="build">🏗️ Build</button>
+      <button class="panel-btn" data-panel="activities">🎯 Do</button>
+      <button class="panel-btn" data-panel="career">💼 Career</button>
+      <button class="panel-btn" data-panel="social">💬 Social</button>
+      <button class="panel-btn" data-panel="skills">📚 Skills</button>
+      <button class="panel-btn" data-panel="legacy">🌟 Legacy</button>
+    </div>
+
+    <!-- Side Panel Content -->
+    <div id="side-panel"></div>
+  </div>
+</div>
+
+<!-- Scripts in dependency order -->
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/character.js"></script>
+<script src="js/economy.js"></script>
+<script src="js/house.js"></script>
+<script src="js/social.js"></script>
+<script src="js/events.js"></script>
+<script src="js/prestige.js"></script>
+<script src="js/renderer.js"></script>
+<script src="js/autonomy.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+
+</body>
+</html>
