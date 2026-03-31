@@ -35,6 +35,8 @@ Game.House = (function() {
     house.rooms.push({ id, type, x, y, w, h });
     Game.State.get().stats.buildingsBuilt++;
     Game.UI && Game.UI.showNotification(`🏗️ Built ${roomCfg.label}! (-$${cost})`);
+    if (Game.Renderer && Game.Renderer.setBgDirty) Game.Renderer.setBgDirty();
+    if (Game.Renderer && Game.Renderer.spawnParticles) Game.Renderer.spawnParticles(x + w/2, y + h/2, '#FFFFFF', 30);
     return true;
   }
 
@@ -54,7 +56,11 @@ Game.House = (function() {
       Game.Economy.addMoney(refund);
       Game.UI && Game.UI.showNotification(`🗑️ Demolished ${roomCfg.label}. Refund: $${refund}`);
     }
+    if (Game.Renderer && Game.Renderer.spawnParticles) {
+      Game.Renderer.spawnParticles(room.x + room.w/2, room.y + room.h/2, '#AAAAAA', 25);
+    }
     house.rooms.splice(idx, 1);
+    if (Game.Renderer && Game.Renderer.setBgDirty) Game.Renderer.setBgDirty();
     return true;
   }
 
@@ -89,6 +95,9 @@ Game.House = (function() {
     house.furniture.push({ id, type: furnitureType, roomId, x: gridX, y: gridY });
     Game.State.get().stats.furnitureBought++;
     Game.UI && Game.UI.showNotification(`🛒 Bought ${furnCfg.label}! (-$${furnCfg.cost})`);
+    if (Game.Renderer && Game.Renderer.spawnParticles) {
+        Game.Renderer.spawnParticles(gridX + furnCfg.w/2, gridY + furnCfg.h/2, '#4CAF50', 20);
+    }
     return true;
   }
 
@@ -104,6 +113,9 @@ Game.House = (function() {
       const refund = Math.floor(furnCfg.cost * 0.5);
       Game.Economy.addMoney(refund);
       Game.UI && Game.UI.showNotification(`💸 Sold ${furnCfg.label}. Refund: $${refund}`);
+    }
+    if (Game.Renderer && Game.Renderer.spawnParticles) {
+      Game.Renderer.spawnParticles(furn.x + (furnCfg ? furnCfg.w/2 : 0.5), furn.y + (furnCfg ? furnCfg.h/2 : 0.5), '#AAAAAA', 20);
     }
     house.furniture.splice(idx, 1);
     return true;

@@ -402,6 +402,7 @@ Game.Main = (function() {
       if (success) {
         Game.Character.repairFurniture(furn.id);
         Game.Character.addSkillXp('handiness', 25);
+        if (Game.Renderer.spawnParticles) Game.Renderer.spawnParticles(furn.x, furn.y, '#4CAF50', 15);
         const fc = Game.Config.FURNITURE[furn.type];
         Game.UI.showNotification(`✅ ${fc ? fc.label : 'Item'} repaired!`);
         Game.Character.addMoodlet({ name: 'Handy', value: 4, duration: 120, icon: '🔧' });
