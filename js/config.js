@@ -9,9 +9,9 @@ Game.Config = {
   // ----------------------------------------------------------
   TIME: {
     START_HOUR: 6,
-    MINUTES_PER_SECOND: 1,
+    MINUTES_PER_SECOND: 1,    // 1 game minute = 1 real second at 1x
     SPEEDS: [0, 1, 2, 3],
-    DAY_LENGTH: 24,
+    DAY_LENGTH: 24,            // hours
     YOUNG_ADULT_DAYS: 30,
     ADULT_DAYS: 70,
     ELDER_DAYS: 100,
@@ -29,6 +29,9 @@ Game.Config = {
     comfort: { label: 'Comfort', icon: '🛋️', decayPerHour: 1.0, color: '#FB923C', criticalThreshold: 25 },
   },
 
+  // ----------------------------------------------------------
+  // Mood Thresholds
+  // ----------------------------------------------------------
   MOODS: [
     { min: 90, label: 'Ecstatic',  emoji: '🤩', color: '#22C55E', workBonus: 1.3, skillBonus: 1.4 },
     { min: 70, label: 'Happy',     emoji: '😊', color: '#4ADE80', workBonus: 1.1, skillBonus: 1.2 },
@@ -37,6 +40,9 @@ Game.Config = {
     { min: 0,  label: 'Miserable', emoji: '😫', color: '#EF4444', workBonus: 0.4, skillBonus: 0.4 },
   ],
 
+  // ----------------------------------------------------------
+  // Character Traits
+  // ----------------------------------------------------------
   TRAITS: {
     neat:      { label: 'Neat',      icon: '✨', desc: 'Hygiene decays slower, cleaning is faster', effects: { hygieneDecay: -0.3, cleanSpeed: 1.5 } },
     clumsy:    { label: 'Clumsy',    icon: '🤕', desc: 'Furniture breaks more often', effects: { breakMult: 2.0 } },
@@ -48,6 +54,9 @@ Game.Config = {
     glutton:   { label: 'Glutton',   icon: '🍕', desc: 'Hunger decays faster, cooking XP +20%', effects: { hungerDecay: 1.4, cookingXP: 1.2 } },
   },
 
+  // ----------------------------------------------------------
+  // Skills
+  // ----------------------------------------------------------
   SKILLS: {
     cooking:   { label: 'Cooking',   icon: '🍳', maxLevel: 10, xpPerLevel: 100 },
     fitness:   { label: 'Fitness',   icon: '💪', maxLevel: 10, xpPerLevel: 120 },
@@ -59,6 +68,9 @@ Game.Config = {
     handiness: { label: 'Handiness', icon: '🔧', maxLevel: 10, xpPerLevel: 100 },
   },
 
+  // ----------------------------------------------------------
+  // Room Types
+  // ----------------------------------------------------------
   ROOMS: {
     bedroom:    { label: 'Bedroom',    icon: '🛏️', minW: 2, minH: 2, maxW: 4, maxH: 4, baseCost: 800,  floorColor: '#C9B496', wallColor: '#8B7355' },
     kitchen:    { label: 'Kitchen',    icon: '🍳', minW: 2, minH: 2, maxW: 3, maxH: 3, baseCost: 1000, floorColor: '#D4C5A9', wallColor: '#9B8B6B' },
@@ -75,7 +87,11 @@ Game.Config = {
     workshop:   { label: 'Workshop',   icon: '🛠️', minW: 2, minH: 2, maxW: 4, maxH: 4, baseCost: 1200, floorColor: '#9E9E9E', wallColor: '#616161' },
   },
 
+  // ----------------------------------------------------------
+  // Furniture Items
+  // ----------------------------------------------------------
   FURNITURE: {
+    // Bedroom
     basic_bed:     { label: 'Simple Bed',     icon: '🛏️', room: 'bedroom', cost: 150,  quality: 1, needBonus: { energy: 8 },  comfort: 1, w: 1, h: 2 },
     good_bed:      { label: 'Comfy Bed',      icon: '🛏️', room: 'bedroom', cost: 400,  quality: 2, needBonus: { energy: 12 }, comfort: 3, w: 1, h: 2 },
     luxury_bed:    { label: 'Luxury Bed',     icon: '🛏️', room: 'bedroom', cost: 1200, quality: 3, needBonus: { energy: 18 }, comfort: 6, w: 2, h: 2 },
@@ -83,6 +99,8 @@ Game.Config = {
     lamp:          { label: 'Lamp',           icon: '💡', room: 'bedroom', cost: 50,   quality: 1, needBonus: {},             comfort: 2, w: 1, h: 1 },
     wardrobe:      { label: 'Wardrobe',       icon: '🚪', room: 'bedroom', cost: 250,  quality: 1, needBonus: {},             comfort: 0, w: 2, h: 1 },
     vanity:        { label: 'Vanity',         icon: '🎀', room: 'bedroom', cost: 180,  quality: 2, needBonus: { fun: 5 },     comfort: 1, w: 1, h: 1 },
+
+    // Kitchen
     basic_stove:   { label: 'Basic Stove',    icon: '🔥', room: 'kitchen', cost: 200,  quality: 1, needBonus: { hunger: 20 }, comfort: 0, w: 1, h: 1, skill: 'cooking', breakChance: 0.08 },
     good_stove:    { label: 'Gas Range',      icon: '🔥', room: 'kitchen', cost: 600,  quality: 2, needBonus: { hunger: 30 }, comfort: 0, w: 1, h: 1, skill: 'cooking', breakChance: 0.04 },
     fridge:        { label: 'Refrigerator',   icon: '🧊', room: 'kitchen', cost: 300,  quality: 1, needBonus: { hunger: 5 },  comfort: 1, w: 1, h: 1, breakChance: 0.03 },
@@ -91,10 +109,14 @@ Game.Config = {
     microwave:     { label: 'Microwave',      icon: '🍱', room: 'kitchen', cost: 150,  quality: 1, needBonus: { hunger: 15 }, comfort: 0, w: 1, h: 1, breakChance: 0.06 },
     espresso:      { label: 'Espresso Machine',icon:'☕', room: 'kitchen', cost: 400,  quality: 2, needBonus: { energy: 25 }, comfort: 0, w: 1, h: 1, breakChance: 0.05 },
     dishwasher:    { label: 'Dishwasher',     icon: '🍽️', room: 'kitchen', cost: 500,  quality: 2, needBonus: { hygiene: 20 },comfort: 0, w: 1, h: 1, breakChance: 0.06 },
+
+    // Bathroom
     toilet:        { label: 'Toilet',         icon: '🚽', room: 'bathroom', cost: 150,  quality: 1, needBonus: { hygiene: 10 }, comfort: 0, w: 1, h: 1, breakChance: 0.05 },
     basic_shower:  { label: 'Shower',         icon: '🚿', room: 'bathroom', cost: 250,  quality: 1, needBonus: { hygiene: 35 }, comfort: 1, w: 1, h: 1, breakChance: 0.04 },
     bathtub:       { label: 'Bathtub',        icon: '🛁', room: 'bathroom', cost: 600,  quality: 2, needBonus: { hygiene: 50, fun: 10 }, comfort: 3, w: 1, h: 2, breakChance: 0.03 },
     sink_b:        { label: 'Bathroom Sink',  icon: '🚰', room: 'bathroom', cost: 80,   quality: 1, needBonus: { hygiene: 8 },  comfort: 0, w: 1, h: 1, breakChance: 0.05 },
+
+    // Living Room
     basic_sofa:    { label: 'Basic Sofa',     icon: '🛋️', room: 'living', cost: 200,  quality: 1, needBonus: { comfort: 10, fun: 5 }, comfort: 3,  w: 2, h: 1 },
     nice_sofa:     { label: 'Sectional Sofa', icon: '🛋️', room: 'living', cost: 800,  quality: 2, needBonus: { comfort: 18, fun: 8 }, comfort: 6,  w: 2, h: 1 },
     basic_tv:      { label: 'Small TV',       icon: '📺', room: 'living', cost: 250,  quality: 1, needBonus: { fun: 15 },              comfort: 0,  w: 1, h: 1 },
@@ -104,18 +126,26 @@ Game.Config = {
     stereo:        { label: 'Stereo System',  icon: '📻', room: 'living', cost: 350,  quality: 1, needBonus: { fun: 20 },              comfort: 0,  w: 1, h: 1 },
     fireplace:     { label: 'Fireplace',      icon: '🔥', room: 'living', cost: 1200, quality: 3, needBonus: { comfort: 15 },          comfort: 5,  w: 2, h: 1 },
     recliner:      { label: 'Recliner',       icon: '💺', room: 'living', cost: 450,  quality: 2, needBonus: { comfort: 12, energy: 5},comfort: 5,  w: 1, h: 1 },
+
+    // Study
     basic_desk:    { label: 'Basic Desk',     icon: '🪑', room: 'study', cost: 200,  quality: 1, needBonus: {},             comfort: 1, w: 1, h: 1 },
     computer:      { label: 'Computer',       icon: '💻', room: 'study', cost: 500,  quality: 1, needBonus: { fun: 10 },    comfort: 0, w: 1, h: 1, skill: 'tech' },
     good_computer: { label: 'Gaming PC',      icon: '💻', room: 'study', cost: 1500, quality: 2, needBonus: { fun: 20 },    comfort: 0, w: 1, h: 1, skill: 'tech' },
     study_shelf:   { label: 'Study Bookshelf',icon: '📚', room: 'study', cost: 180,  quality: 1, needBonus: {},             comfort: 1, w: 1, h: 1, skill: 'logic' },
     globe:         { label: 'Globe',          icon: '🌍', room: 'library', cost: 150,  quality: 2, needBonus: {},             comfort: 0, w: 1, h: 1, skill: 'logic' },
     drafting_table:{ label: 'Drafting Table', icon: '📐', room: 'library', cost: 220,  quality: 2, needBonus: { fun: 10 },    comfort: 0, w: 2, h: 1, skill: 'creativity' },
+
+    // Gym
     treadmill:     { label: 'Treadmill',      icon: '🏃', room: 'gym', cost: 400,  quality: 1, needBonus: { fun: 5 },  comfort: 0, w: 1, h: 2, skill: 'fitness' },
     weights:       { label: 'Weight Bench',   icon: '🏋️', room: 'gym', cost: 350,  quality: 1, needBonus: {},          comfort: 0, w: 1, h: 1, skill: 'fitness' },
     yoga_mat:      { label: 'Yoga Mat',       icon: '🧘', room: 'gym', cost: 50,   quality: 1, needBonus: { fun: 8 },  comfort: 0, w: 1, h: 1, skill: 'fitness' },
+
+    // Game Room
     game_console:  { label: 'Game Console',   icon: '🎮', room: 'gameroom', cost: 400,  quality: 1, needBonus: { fun: 25 },            comfort: 0, w: 1, h: 1 },
     pool_table:    { label: 'Pool Table',     icon: '🎱', room: 'gameroom', cost: 700,  quality: 2, needBonus: { fun: 20, social: 10 }, comfort: 0, w: 2, h: 1 },
     dartboard:     { label: 'Dartboard',      icon: '🎯', room: 'gameroom', cost: 80,   quality: 1, needBonus: { fun: 12 },            comfort: 0, w: 1, h: 1 },
+
+    // Garden
     garden_plot:   { label: 'Garden Plot',    icon: '🌱', room: 'garden', cost: 50,  quality: 1, needBonus: {},          comfort: 0, w: 1, h: 1, skill: 'gardening' },
     garden_bench:  { label: 'Garden Bench',   icon: '🪑', room: 'garden', cost: 100, quality: 1, needBonus: { comfort: 8, fun: 5 }, comfort: 3, w: 2, h: 1 },
     fountain:      { label: 'Fountain',       icon: '⛲', room: 'garden', cost: 500, quality: 2, needBonus: { comfort: 15 },       comfort: 5, w: 1, h: 1 },
@@ -123,11 +153,17 @@ Game.Config = {
     hot_tub:       { label: 'Hot Tub',        icon: '🛁', room: 'patio',  cost: 1500,quality: 3, needBonus: { hygiene: 10, fun: 20, comfort: 15 }, comfort: 5, w: 2, h: 2 },
     hammock:       { label: 'Hammock',        icon: '🏕️', room: 'patio',  cost: 250, quality: 1, needBonus: { energy: 10, comfort: 10 }, comfort: 4, w: 2, h: 1 },
     telescope:     { label: 'Telescope',      icon: '🔭', room: 'patio',  cost: 800, quality: 2, needBonus: { fun: 15 },       comfort: 0, w: 1, h: 1, skill: 'logic' },
+
+    // Workshop
     workbench:     { label: 'Workbench',      icon: '🧰', room: 'workshop', cost: 300, quality: 1, needBonus: { fun: 10 },     comfort: 0, w: 2, h: 1, skill: 'handiness' },
     printer_3d:    { label: '3D Printer',     icon: '🖨️', room: 'workshop', cost: 1200,quality: 2, needBonus: { fun: 25 },     comfort: 0, w: 1, h: 1, skill: 'tech' },
+
+    // Dining
     dining_table:  { label: 'Dining Table',   icon: '🍽️', room: 'dining', cost: 300,  quality: 1, needBonus: { social: 10, comfort: 5 }, comfort: 2, w: 2, h: 1 },
     dining_chairs: { label: 'Dining Chairs',  icon: '🪑', room: 'dining', cost: 120,  quality: 1, needBonus: {},                        comfort: 1, w: 1, h: 1 },
-    china_cabinet: { label: 'China Cabinet',  icon: '🏳', room: 'dining', cost: 400,  quality: 2, needBonus: { comfort: 8 },            comfort: 3, w: 1, h: 1 },
+    china_cabinet: { label: 'China Cabinet',  icon: '🏺', room: 'dining', cost: 400,  quality: 2, needBonus: { comfort: 8 },            comfort: 3, w: 1, h: 1 },
+
+    // Multi-room decorations
     plant:         { label: 'House Plant',    icon: '🪴', room: '*', cost: 30,  quality: 1, needBonus: { comfort: 3 }, comfort: 2, w: 1, h: 1 },
     rug:           { label: 'Area Rug',       icon: '🟫', room: '*', cost: 80,  quality: 1, needBonus: { comfort: 5 }, comfort: 3, w: 2, h: 2 },
     painting:      { label: 'Wall Painting',  icon: '🖼️', room: '*', cost: 120, quality: 1, needBonus: { comfort: 4, fun: 2 }, comfort: 2, w: 1, h: 1 },
@@ -136,65 +172,95 @@ Game.Config = {
     indoor_tree:   { label: 'Indoor Tree',    icon: '🌲', room: '*', cost: 100, quality: 1, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2 },
   },
 
+  // ----------------------------------------------------------
+  // Careers
+  // ----------------------------------------------------------
   CAREERS: {
-    business: { label: 'Business', icon: '💼', keySkill: 'charisma', levels: [
-      { title: 'Mail Room Clerk', salary: 60, scheduleStart: 9, scheduleEnd: 17, skillReq: 0 },
-      { title: 'Office Assistant', salary: 100, scheduleStart: 9, scheduleEnd: 17, skillReq: 2 },
-      { title: 'Account Manager', salary: 180, scheduleStart: 9, scheduleEnd: 17, skillReq: 4 },
-      { title: 'Department Head', salary: 280, scheduleStart: 9, scheduleEnd: 17, skillReq: 6 },
-      { title: 'Vice President', salary: 450, scheduleStart: 9, scheduleEnd: 17, skillReq: 8 },
-    ]},
-    tech: { label: 'Tech', icon: '💻', keySkill: 'tech', levels: [
-      { title: 'QA Tester', salary: 70, scheduleStart: 10, scheduleEnd: 18, skillReq: 0 },
-      { title: 'Junior Developer', salary: 120, scheduleStart: 10, scheduleEnd: 18, skillReq: 2 },
-      { title: 'Senior Developer', salary: 220, scheduleStart: 10, scheduleEnd: 18, skillReq: 4 },
-      { title: 'Tech Lead', salary: 350, scheduleStart: 10, scheduleEnd: 18, skillReq: 6 },
-      { title: 'CTO', salary: 500, scheduleStart: 10, scheduleEnd: 18, skillReq: 8 },
-    ]},
-    culinary: { label: 'Culinary', icon: '🍳', keySkill: 'cooking', levels: [
-      { title: 'Dishwasher', salary: 45, scheduleStart: 8, scheduleEnd: 15, skillReq: 0 },
-      { title: 'Line Cook', salary: 80, scheduleStart: 8, scheduleEnd: 15, skillReq: 2 },
-      { title: 'Sous Chef', salary: 150, scheduleStart: 8, scheduleEnd: 15, skillReq: 4 },
-      { title: 'Head Chef', salary: 250, scheduleStart: 8, scheduleEnd: 15, skillReq: 6 },
-      { title: 'Executive Chef', salary: 400, scheduleStart: 8, scheduleEnd: 15, skillReq: 8 },
-    ]},
-    science: { label: 'Science', icon: '🔬', keySkill: 'logic', levels: [
-      { title: 'Lab Assistant', salary: 65, scheduleStart: 8, scheduleEnd: 16, skillReq: 0 },
-      { title: 'Research Associate', salary: 110, scheduleStart: 8, scheduleEnd: 16, skillReq: 2 },
-      { title: 'Scientist', salary: 200, scheduleStart: 8, scheduleEnd: 16, skillReq: 4 },
-      { title: 'Lead Researcher', salary: 320, scheduleStart: 8, scheduleEnd: 16, skillReq: 6 },
-      { title: 'Department Chair', salary: 480, scheduleStart: 8, scheduleEnd: 16, skillReq: 8 },
-    ]},
-    creative: { label: 'Creative', icon: '🎨', keySkill: 'creativity', levels: [
-      { title: 'Freelance Artist', salary: 40, scheduleStart: 10, scheduleEnd: 16, skillReq: 0 },
-      { title: 'Graphic Designer', salary: 90, scheduleStart: 10, scheduleEnd: 16, skillReq: 2 },
-      { title: 'Art Director', salary: 170, scheduleStart: 10, scheduleEnd: 16, skillReq: 4 },
-      { title: 'Creative Director', salary: 300, scheduleStart: 10, scheduleEnd: 16, skillReq: 6 },
-      { title: 'Studio Owner', salary: 550, scheduleStart: 10, scheduleEnd: 16, skillReq: 8 },
-    ]},
-    medicine: { label: 'Medicine', icon: '🩺', keySkill: 'logic', levels: [
-      { title: 'Orderly', salary: 50, scheduleStart: 8, scheduleEnd: 18, skillReq: 0 },
-      { title: 'EMT', salary: 100, scheduleStart: 8, scheduleEnd: 18, skillReq: 2 },
-      { title: 'Nurse', salary: 190, scheduleStart: 8, scheduleEnd: 18, skillReq: 4 },
-      { title: 'Doctor', salary: 320, scheduleStart: 8, scheduleEnd: 18, skillReq: 6 },
-      { title: 'Surgeon', salary: 550, scheduleStart: 8, scheduleEnd: 18, skillReq: 8 },
-    ]},
-    entertainment: { label: 'Entertainment', icon: '🎤', keySkill: 'charisma', levels: [
-      { title: 'Open Mic Comic', salary: 30, scheduleStart: 18, scheduleEnd: 23, skillReq: 0 },
-      { title: 'Standup Regular', salary: 80, scheduleStart: 18, scheduleEnd: 23, skillReq: 2 },
-      { title: 'Sitcom Star', salary: 200, scheduleStart: 10, scheduleEnd: 18, skillReq: 4 },
-      { title: 'Movie Star', salary: 450, scheduleStart: 8, scheduleEnd: 20, skillReq: 6 },
-      { title: 'Global Icon', salary: 800, scheduleStart: 12, scheduleEnd: 16, skillReq: 8 },
-    ]},
-    education: { label: 'Education', icon: '🍎', keySkill: 'logic', levels: [
-      { title: 'Substitute Teacher', salary: 40, scheduleStart: 8, scheduleEnd: 15, skillReq: 0 },
-      { title: 'Teacher', salary: 90, scheduleStart: 8, scheduleEnd: 15, skillReq: 2 },
-      { title: 'Vice Principal', salary: 160, scheduleStart: 8, scheduleEnd: 16, skillReq: 4 },
-      { title: 'Principal', salary: 260, scheduleStart: 8, scheduleEnd: 16, skillReq: 6 },
-      { title: 'Superintendent', salary: 420, scheduleStart: 9, scheduleEnd: 17, skillReq: 8 },
-    ]},
+    business: {
+      label: 'Business', icon: '💼', keySkill: 'charisma',
+      levels: [
+        { title: 'Mail Room Clerk',   salary: 60,  scheduleStart: 9, scheduleEnd: 17, skillReq: 0 },
+        { title: 'Office Assistant',   salary: 100, scheduleStart: 9, scheduleEnd: 17, skillReq: 2 },
+        { title: 'Account Manager',    salary: 180, scheduleStart: 9, scheduleEnd: 17, skillReq: 4 },
+        { title: 'Department Head',    salary: 280, scheduleStart: 9, scheduleEnd: 17, skillReq: 6 },
+        { title: 'Vice President',     salary: 450, scheduleStart: 9, scheduleEnd: 17, skillReq: 8 },
+      ],
+    },
+    tech: {
+      label: 'Tech', icon: '💻', keySkill: 'tech',
+      levels: [
+        { title: 'QA Tester',         salary: 70,  scheduleStart: 10, scheduleEnd: 18, skillReq: 0 },
+        { title: 'Junior Developer',   salary: 120, scheduleStart: 10, scheduleEnd: 18, skillReq: 2 },
+        { title: 'Senior Developer',   salary: 220, scheduleStart: 10, scheduleEnd: 18, skillReq: 4 },
+        { title: 'Tech Lead',          salary: 350, scheduleStart: 10, scheduleEnd: 18, skillReq: 6 },
+        { title: 'CTO',               salary: 500, scheduleStart: 10, scheduleEnd: 18, skillReq: 8 },
+      ],
+    },
+    culinary: {
+      label: 'Culinary', icon: '🍳', keySkill: 'cooking',
+      levels: [
+        { title: 'Dishwasher',        salary: 45,  scheduleStart: 8, scheduleEnd: 15, skillReq: 0 },
+        { title: 'Line Cook',          salary: 80,  scheduleStart: 8, scheduleEnd: 15, skillReq: 2 },
+        { title: 'Sous Chef',          salary: 150, scheduleStart: 8, scheduleEnd: 15, skillReq: 4 },
+        { title: 'Head Chef',          salary: 250, scheduleStart: 8, scheduleEnd: 15, skillReq: 6 },
+        { title: 'Executive Chef',     salary: 400, scheduleStart: 8, scheduleEnd: 15, skillReq: 8 },
+      ],
+    },
+    science: {
+      label: 'Science', icon: '🔬', keySkill: 'logic',
+      levels: [
+        { title: 'Lab Assistant',      salary: 65,  scheduleStart: 8, scheduleEnd: 16, skillReq: 0 },
+        { title: 'Research Associate',  salary: 110, scheduleStart: 8, scheduleEnd: 16, skillReq: 2 },
+        { title: 'Scientist',          salary: 200, scheduleStart: 8, scheduleEnd: 16, skillReq: 4 },
+        { title: 'Lead Researcher',    salary: 320, scheduleStart: 8, scheduleEnd: 16, skillReq: 6 },
+        { title: 'Department Chair',   salary: 480, scheduleStart: 8, scheduleEnd: 16, skillReq: 8 },
+      ],
+    },
+    creative: {
+      label: 'Creative', icon: '🎨', keySkill: 'creativity',
+      levels: [
+        { title: 'Freelance Artist',   salary: 40,  scheduleStart: 10, scheduleEnd: 16, skillReq: 0 },
+        { title: 'Graphic Designer',   salary: 90,  scheduleStart: 10, scheduleEnd: 16, skillReq: 2 },
+        { title: 'Art Director',       salary: 170, scheduleStart: 10, scheduleEnd: 16, skillReq: 4 },
+        { title: 'Creative Director',  salary: 300, scheduleStart: 10, scheduleEnd: 16, skillReq: 6 },
+        { title: 'Studio Owner',       salary: 550, scheduleStart: 10, scheduleEnd: 16, skillReq: 8 },
+      ],
+    },
+    medicine: {
+      label: 'Medicine', icon: '🩺', keySkill: 'logic',
+      levels: [
+        { title: 'Orderly',            salary: 50,  scheduleStart: 8, scheduleEnd: 18, skillReq: 0 },
+        { title: 'EMT',                salary: 100, scheduleStart: 8, scheduleEnd: 18, skillReq: 2 },
+        { title: 'Nurse',              salary: 190, scheduleStart: 8, scheduleEnd: 18, skillReq: 4 },
+        { title: 'Doctor',             salary: 320, scheduleStart: 8, scheduleEnd: 18, skillReq: 6 },
+        { title: 'Surgeon',            salary: 550, scheduleStart: 8, scheduleEnd: 18, skillReq: 8 },
+      ],
+    },
+    entertainment: {
+      label: 'Entertainment', icon: '🎤', keySkill: 'charisma',
+      levels: [
+        { title: 'Open Mic Comic',     salary: 30,  scheduleStart: 18, scheduleEnd: 23, skillReq: 0 },
+        { title: 'Standup Regular',    salary: 80,  scheduleStart: 18, scheduleEnd: 23, skillReq: 2 },
+        { title: 'Sitcom Star',        salary: 200, scheduleStart: 10, scheduleEnd: 18, skillReq: 4 },
+        { title: 'Movie Star',         salary: 450, scheduleStart: 8,  scheduleEnd: 20, skillReq: 6 },
+        { title: 'Global Icon',        salary: 800, scheduleStart: 12, scheduleEnd: 16, skillReq: 8 },
+      ],
+    },
+    education: {
+      label: 'Education', icon: '🍎', keySkill: 'logic',
+      levels: [
+        { title: 'Substitute Teacher', salary: 40,  scheduleStart: 8, scheduleEnd: 15, skillReq: 0 },
+        { title: 'Teacher',            salary: 90,  scheduleStart: 8, scheduleEnd: 15, skillReq: 2 },
+        { title: 'Vice Principal',     salary: 160, scheduleStart: 8, scheduleEnd: 16, skillReq: 4 },
+        { title: 'Principal',          salary: 260, scheduleStart: 8, scheduleEnd: 16, skillReq: 6 },
+        { title: 'Superintendent',     salary: 420, scheduleStart: 9, scheduleEnd: 17, skillReq: 8 },
+      ],
+    },
   },
 
+  // ----------------------------------------------------------
+  // NPCs
+  // ----------------------------------------------------------
   NPCS: [
     { id: 'npc_alex',   name: 'Alex Chen',     personality: 'friendly',   interests: ['tech', 'games'],     avatar: '👨', color: '#4FC3F7' },
     { id: 'npc_maya',   name: 'Maya Santos',    personality: 'creative',   interests: ['art', 'cooking'],    avatar: '👩', color: '#F06292' },
@@ -206,6 +272,9 @@ Game.Config = {
     { id: 'npc_taylor', name: 'Taylor Quinn',   personality: 'outgoing',   interests: ['charisma', 'fitness'], avatar: '🏃', color: '#FFA726' },
   ],
 
+  // ----------------------------------------------------------
+  // Social Interactions
+  // ----------------------------------------------------------
   INTERACTIONS: {
     small_talk:    { label: 'Small Talk',       relGain: [2, 5],   socialGain: 5,   time: 15, minRel: 0,  charismaReq: 0 },
     tell_joke:     { label: 'Tell Joke',        relGain: [3, 8],   socialGain: 8,   time: 10, minRel: 0,  charismaReq: 1 },
@@ -218,6 +287,9 @@ Game.Config = {
     propose:       { label: 'Propose! 💍',      relGain: [30, 30], socialGain: 30,  time: 30, minRel: 80, charismaReq: 5, romantic: true, cost: 500, marriage: true },
   },
 
+  // ----------------------------------------------------------
+  // Events
+  // ----------------------------------------------------------
   EVENTS: [
     { id: 'neighbor_cookies', type: 'opportunity', title: '🍪 Neighbor Visit', desc: 'Your neighbor brought homemade cookies!', choices: [
       { label: 'Accept warmly', effects: { hunger: 15, social: 10, fun: 5 } },
@@ -243,7 +315,7 @@ Game.Config = {
     { id: 'found_money', type: 'discovery', title: '💰 Lucky Find!', desc: 'You found some money in your old coat pocket!', choices: [
       { label: 'Sweet!', effects: { money: 50, fun: 10 } },
     ]},
-    { id: 'party_invite', type: 'social', title: '🎉 Party Invitation', desc: "You've been invited to a neighborhood party!", choices: [
+    { id: 'party_invite', type: 'social', title: '🎉 Party Invitation', desc: 'You\'ve been invited to a neighborhood party!', choices: [
       { label: 'Go and mingle', effects: { social: 25, fun: 15, energy: -15 } },
       { label: 'Stay home', effects: { comfort: 10 } },
     ]},
@@ -285,6 +357,9 @@ Game.Config = {
     ]},
   ],
 
+  // ----------------------------------------------------------
+  // Activities (things you can do with furniture/rooms)
+  // ----------------------------------------------------------
   ACTIVITIES: {
     sleep:        { label: 'Sleep',          duration: 480, needs: { energy: 80 },  room: 'bedroom',  furniture: 'bed',    icon: '💤', moodlet: { name: 'Well Rested', value: 8, duration: 240, icon: '😴' } },
     nap:          { label: 'Take a Nap',     duration: 120, needs: { energy: 30 },  room: 'bedroom',  furniture: 'bed',    icon: '😴', moodlet: { name: 'Refreshed', value: 4, duration: 120, icon: '💤' } },
@@ -313,6 +388,9 @@ Game.Config = {
     invite_over:   { label: 'Invite Friend',  duration: 60, needs: { social: 30, fun: 15 },  room: 'living',  furniture: null,           icon: '🏠', moodlet: { name: 'Good Company', value: 7, duration: 240, icon: '👥' } },
   },
 
+  // ----------------------------------------------------------
+  // Autonomy Need → Activity Mapping
+  // ----------------------------------------------------------
   AUTONOMY_MAP: [
     { need: 'energy',  threshold: 25, activity: 'sleep',   priority: 10 },
     { need: 'energy',  threshold: 50, activity: 'nap',     priority: 5 },
@@ -323,9 +401,12 @@ Game.Config = {
     { need: 'fun',     threshold: 35, activity: 'watch_tv',priority: 6 },
     { need: 'fun',     threshold: 50, activity: 'play_games', priority: 3 },
     { need: 'comfort', threshold: 35, activity: 'relax_sofa', priority: 4 },
-    { need: 'social',  threshold: 35, activity: null,      priority: 2 },
+    { need: 'social',  threshold: 35, activity: null,      priority: 2 }, // social triggers NPC interaction
   ],
 
+  // ----------------------------------------------------------
+  // Prestige Upgrades
+  // ----------------------------------------------------------
   PRESTIGE: {
     family_home:    { label: 'Family Home',    icon: '🏠', cost: 10, maxLevel: 1, desc: 'Keep 50% of house layout',      effect: { keepHouse: 0.5 } },
     inheritance:    { label: 'Inheritance',     icon: '💰', cost: 8,  maxLevel: 3, desc: 'Start with 30% of savings/lvl', effect: { keepMoney: 0.3 } },
@@ -337,6 +418,9 @@ Game.Config = {
     prodigy:        { label: 'Prodigy',          icon: '🌟', cost: 50, maxLevel: 1, desc: 'Heir starts with top skill @3', effect: { inheritSkill: 3 } },
   },
 
+  // ----------------------------------------------------------
+  // Starting State
+  // ----------------------------------------------------------
   STARTING_STATE: {
     money: 500,
     lotWidth: 8,

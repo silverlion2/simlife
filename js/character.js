@@ -37,7 +37,7 @@ Game.Character = (function() {
     const house = Game.State.get().house;
     let totalComfort = 0;
     for (const furn of house.furniture) {
-      if (isFurnitureBroken(furn.id)) continue;
+      if (isFurnitureBroken(furn.id)) continue; // Broken furniture gives no comfort
       const furnCfg = cfg.FURNITURE[furn.type];
       if (furnCfg) totalComfort += furnCfg.comfort;
     }
@@ -47,14 +47,16 @@ Game.Character = (function() {
   // ---- Moodlet System ----
   function addMoodlet(moodletDef) {
     const char = getState();
+    // Remove existing moodlet with same name (refresh it)
     char.moodlets = char.moodlets.filter(m => m.name !== moodletDef.name);
     char.moodlets.push({
       name: moodletDef.name,
       value: moodletDef.value,
       icon: moodletDef.icon,
-      remaining: moodletDef.duration,
+      remaining: moodletDef.duration, // in game minutes
       duration: moodletDef.duration,
     });
+    // Cap at 8 active moodlets
     if (char.moodlets.length > 8) char.moodlets.shift();
   }
 
@@ -84,8 +86,10 @@ Game.Character = (function() {
     for (const [key, weight] of Object.entries(weights)) {
       weightedSum += (needs[key] || 0) * weight;
     }
+    // Add moodlet bonus (each point ~= 1% mood, capped)
     const moodletBonus = getMoodletsBonus();
     weightedSum += moodletBonus;
+    // Remaining 8% weight reserved for moodlets headroom
     return Math.round(Math.max(0, Math.min(100, weightedSum)));
   }
 
@@ -107,6 +111,7 @@ Game.Character = (function() {
     const prestigeBonus = (Game.State.get().prestige.upgrades.family_wisdom || 0) * 0.15;
     let totalMultiplier = moodInfo.skillBonus * (1 + prestigeBonus);
 
+    // Trait-based XP bonuses
     const traitCfg = cfg.TRAITS[char.trait];
     if (traitCfg && traitCfg.effects) {
       const e = traitCfg.effects;
@@ -141,10 +146,10 @@ Game.Character = (function() {
 
   function processQueue() {
     const char = getState();
-    if (char.currentActivity) return;
+    if (char.currentActivity) return; // Still doing something
     if (char.actionQueue.length === 0) return false;
     const next = char.actionQueue.shift();
-    return startActivity(next, true);
+    return startActivity(next, true); // true = from queue
   }
 
   function clearQueue() {
@@ -157,17 +162,20 @@ Game.Character = (function() {
     const actCfg = cfg.ACTIVITIES[activityKey];
     if (!actCfg) return false;
 
+    // Check if we have the room
     if (actCfg.room) {
       const house = Game.State.get().house;
       const hasRoom = house.rooms.some(r => r.type === actCfg.room);
       if (!hasRoom) return false;
 
+      // Check furniture if needed
       if (actCfg.furniture) {
         const hasFurn = house.furniture.some(f => f.type.includes(actCfg.furniture));
         if (!hasFurn) return false;
       }
     }
 
+    // Check energy cost
     if (actCfg.energyCost && char.needs.energy < actCfg.energyCost) return false;
 
     char.currentActivity = {
@@ -179,9 +187,11 @@ Game.Character = (function() {
     };
     char.activityProgress = 0;
 
+    // Move to room
     if (actCfg.room) {
       const room = Game.State.get().house.rooms.find(r => r.type === actCfg.room);
       if (room) {
+        // Find the specific furniture if activity requires it
         if (actCfg.furniture) {
           const furn = Game.State.get().house.furniture.find(f => f.type.includes(actCfg.furniture));
           if (furn) {
@@ -200,6 +210,7 @@ Game.Character = (function() {
   function updateActivity(deltaMinutes) {
     const char = getState();
     if (!char.currentActivity) {
+      // Try to process queue
       processQueue();
       return;
     }
@@ -211,6 +222,7 @@ Game.Character = (function() {
     act.elapsed += deltaMinutes;
     char.activityProgress = Math.min(1, act.elapsed / act.duration);
 
+    // Activity complete
     if (act.elapsed >= act.duration) {
       completeActivity(act.type, actCfg);
       char.currentActivity = null;
@@ -221,6 +233,7 @@ Game.Character = (function() {
   function completeActivity(type, actCfg) {
     const char = getState();
 
+    // Apply need bonuses
     if (actCfg.needs) {
       for (const [need, value] of Object.entries(actCfg.needs)) {
         if (char.needs[need] !== undefined) {
@@ -229,22 +242,27 @@ Game.Character = (function() {
       }
     }
 
+    // Apply energy cost
     if (actCfg.energyCost) {
       char.needs.energy = Math.max(0, char.needs.energy - actCfg.energyCost);
     }
 
+    // Apply skill XP
     if (actCfg.skill && actCfg.xp) {
       addSkillXp(actCfg.skill, actCfg.xp);
     }
 
+    // Apply moodlet
     if (actCfg.moodlet) {
       addMoodlet(actCfg.moodlet);
     }
 
+    // Stats tracking
     if (type === 'cook') {
       Game.State.get().stats.mealsCooked++;
     }
 
+    // Furniture breakage roll
     if (actCfg.furniture) {
       const house = Game.State.get().house;
       const usedFurn = house.furniture.find(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id));
@@ -252,10 +270,12 @@ Game.Character = (function() {
         const fc = cfg.FURNITURE[usedFurn.type];
         if (fc && fc.breakChance) {
           let chance = fc.breakChance;
+          // Trait modifier
           const traitCfg = cfg.TRAITS[char.trait];
           if (traitCfg && traitCfg.effects && traitCfg.effects.breakMult) {
             chance *= traitCfg.effects.breakMult;
           }
+          // Higher handiness reduces break chance
           chance *= Math.max(0.2, 1 - char.skills.handiness * 0.08);
           if (Math.random() < chance) {
             breakFurniture(usedFurn.id);
@@ -282,6 +302,7 @@ Game.Character = (function() {
     if (actCfg.room) {
       if (!house.rooms.some(r => r.type === actCfg.room)) return false;
       if (actCfg.furniture) {
+        // Check for non-broken furniture
         if (!house.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
       }
     }
