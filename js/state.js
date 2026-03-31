@@ -20,6 +20,7 @@ Game.State = (function() {
         skillXp: { cooking: 0, fitness: 0, charisma: 0, tech: 0, creativity: 0, logic: 0, gardening: 0, handiness: 0 },
         career: null,
         lifeStage: 'young_adult',
+        trait: Object.keys(cfg.TRAITS || {})[Math.floor(Math.random() * Object.keys(cfg.TRAITS || {}).length)] || 'neat',
         currentActivity: null,
         activityProgress: 0,
         actionQueue: [],
@@ -41,6 +42,7 @@ Game.State = (function() {
         ],
         nextRoomId: 1,
         nextFurnId: 2,
+        brokenFurniture: [], // Array of furniture IDs that are broken
       },
       economy: {
         money: cfg.STARTING_STATE.money,
@@ -88,6 +90,7 @@ Game.State = (function() {
         cooldown: 300,  // 5 game-hours before first event
         history: [],
       },
+      npcWalkers: [], // Active NPC walker instances on the lot
     };
   }
 

@@ -26,48 +26,59 @@
 </div>
 
 <div class="game-container">
-
-  <!-- Canvas Area -->
+  
+  <!-- Content -->
   <div class="canvas-area">
     <canvas id="game-canvas"></canvas>
   </div>
 
-  <!-- Status Panel (Right Side) -->
-  <div class="status-panel" id="status-panel">
-    <div class="status-header">
-      <h2>SimLife</h2>
-      <span id="time-display">Day 1 — 6:00 AM</span>
+  <!-- Post-processing overlays (CSS Filters) -->
+  <div id="vignette-overlay"></div>
+  <div id="color-grading-overlay"></div>
+  <div id="tilt-shift-overlay"></div>
+
+  <!-- RPG UI: Top Ribbon -->
+  <div class="rpg-hud-top">
+    <div class="hud-left">
+      <div class="hud-box">
+        <span id="time-display">Day 1 — 6:00 AM</span>
+      </div>
+      <div class="hud-box speed-controls">
+        <button class="speed-btn" data-speed="0">⏸</button>
+        <button class="speed-btn active" data-speed="1">1×</button>
+        <button class="speed-btn" data-speed="3">3×</button>
+        <button class="speed-btn" data-speed="10">10×</button>
+      </div>
+    </div>
+    
+    <div class="hud-center">
+      <h1 class="game-title">SimLife</h1>
     </div>
 
-    <!-- Money, Mood, Activity Row -->
-    <div class="status-row">
-      <span id="money-display">$500</span>
-      <span id="mood-display">😊 Happy</span>
-      <span id="autonomy-indicator" title="Autonomy (Q to toggle)">🤖</span>
+    <div class="hud-right">
+      <div class="hud-box money">
+        <span id="money-display">$500</span>
+      </div>
+      <div class="hud-box mood">
+        <span id="mood-display">😊 Happy</span>
+      </div>
+      <div class="hud-box autonomy">
+        <span id="autonomy-indicator" title="Autonomy (Q to toggle)">🤖</span>
+      </div>
+    </div>
+  </div>
+  
+  <!-- RPG UI: Bottom Action Bar -->
+  <div class="rpg-hud-bottom" id="status-panel">
+    <div class="needs-section-rpg" id="needs-bars"></div>
+    
+    <div class="action-panel">
+      <div id="activity-display">💤 Idle</div>
+      <div id="moodlet-bar" class="moodlet-bar"></div>
+      <div id="queue-bar" class="queue-bar"></div>
     </div>
 
-    <div id="activity-display">💤 Idle</div>
-
-    <!-- Speed Controls -->
-    <div class="speed-controls">
-      <button class="speed-btn" data-speed="0">⏸</button>
-      <button class="speed-btn active" data-speed="1">1×</button>
-      <button class="speed-btn" data-speed="3">3×</button>
-      <button class="speed-btn" data-speed="10">10×</button>
-      <span id="pause-label"></span>
-    </div>
-
-    <!-- Need Bars -->
-    <div class="needs-section" id="needs-bars"></div>
-
-    <!-- Moodlet Bar (populated dynamically) -->
-    <div id="moodlet-bar" class="moodlet-bar"></div>
-
-    <!-- Action Queue Bar (populated dynamically) -->
-    <div id="queue-bar" class="queue-bar"></div>
-
-    <!-- Panel Buttons -->
-    <div class="panel-buttons">
+    <div class="menu-bar">
       <button class="panel-btn" data-panel="build">🏗️ Build</button>
       <button class="panel-btn" data-panel="activities">🎯 Do</button>
       <button class="panel-btn" data-panel="career">💼 Career</button>
@@ -75,10 +86,10 @@
       <button class="panel-btn" data-panel="skills">📚 Skills</button>
       <button class="panel-btn" data-panel="legacy">🌟 Legacy</button>
     </div>
-
-    <!-- Side Panel Content -->
-    <div id="side-panel"></div>
   </div>
+
+  <!-- Detail Dialogs (Replaces side panel) -->
+  <div id="side-panel" class="rpg-dialog hidden"></div>
 </div>
 
 <!-- Scripts in dependency order -->
