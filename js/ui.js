@@ -285,36 +285,54 @@ Game.UI = (function() {
     const panel = document.getElementById('side-panel');
     if (!panel) return;
 
-    if (panel.dataset.active === panelName) {
-      panel.style.display = 'none';
+    if (panel.dataset.active === panelName && !panel.classList.contains('hidden')) {
+      panel.classList.add('hidden');
       panel.dataset.active = '';
       return;
     }
 
     panel.dataset.active = panelName;
-    panel.style.display = 'block';
+    panel.classList.remove('hidden');
 
+    const closeHtml = `<button class="panel-close" onclick="Game.UI.togglePanel('${panelName}')">✕</button>`;
     switch (panelName) {
-      case 'build': buildBuildPanel(panel); break;
-      case 'activities': buildActivitiesPanel(panel); break;
-      case 'career': buildCareerPanel(panel); break;
-      case 'social': buildSocialPanel(panel); break;
-      case 'skills': buildSkillsPanel(panel); break;
-      case 'legacy': buildLegacyPanel(panel); break;
+      case 'build': buildBuildPanel(panel, closeHtml); break;
+      case 'activities': buildActivitiesPanel(panel, closeHtml); break;
+      case 'career': buildCareerPanel(panel, closeHtml); break;
+      case 'social': buildSocialPanel(panel, closeHtml); break;
+      case 'skills': buildSkillsPanel(panel, closeHtml); break;
+      case 'legacy': buildLegacyPanel(panel, closeHtml); break;
     }
   }
 
-  function buildBuildPanel(panel) {
-    let html = '<h3>🏗️ Build Mode</h3>';
-    html += '<h4>Rooms</h4><div class="build-grid">';
+  function buildBuildPanel(panel, closeHtml) {
+    let html = '<div class="dialog-header"><h3>🏗️ Build Mode</h3><button class="close-btn" onclick="Game.UI.togglePanel(\'build\')">&times;</button></div>';
+    html += '<div class="dialog-content">';
+    // Sell mode toggle
+    const sellActive = Game.State.get().ui.mode === 'sell';
+    html += `<button class="sell-mode-btn ${sellActive ? 'active' : ''}" onclick="Game.UI.toggleSellMode()">🗑️ ${sellActive ? 'Exit Sell Mode' : 'Sell Mode'}</button>`;
+    // Broken furniture indicator
+    const broken = (Game.State.get().house.brokenFurniture || []).length;
+    if (broken > 0) {
+      html += `<div class="broken-alert">⚠️ ${broken} broken item${broken > 1 ? 's' : ''} — click them to repair!</div>`;
+    }
+    html += '<h4 class="build-category">Rooms</h4><div class="build-grid">';
     for (const [key, room] of Object.entries(Game.Config.ROOMS)) {
-      html += `<button class="build-item" onclick="Game.UI.startBuild('room','${key}')">${room.icon} ${room.label}<br><small>$${room.baseCost}</small></button>`;
+      html += `<div class="build-item" onclick="Game.UI.startBuild('room','${key}')">
+        <div class="build-item-icon">${room.icon}</div>
+        <div class="build-item-name">${room.label}</div>
+        <div class="build-item-cost">$${room.baseCost}</div>
+      </div>`;
     }
-    html += '</div><h4>Furniture</h4><div class="build-grid">';
+    html += '</div><h4 class="build-category">Furniture</h4><div class="build-grid">';
     for (const [key, furn] of Object.entries(Game.Config.FURNITURE)) {
-      html += `<button class="build-item" onclick="Game.UI.startBuild('furniture','${key}')">${furn.icon} ${furn.label}<br><small>$${furn.cost}</small></button>`;
+      html += `<div class="build-item" onclick="Game.UI.startBuild('furniture','${key}')">
+        <div class="build-item-icon">${furn.icon}</div>
+        <div class="build-item-name">${furn.label}</div>
+        <div class="build-item-cost">$${furn.cost}</div>
+      </div>`;
     }
-    html += '</div>';
+    html += '</div></div>';
     panel.innerHTML = html;
   }
 
@@ -323,7 +341,7 @@ Game.UI = (function() {
     ui.mode = 'build';
     if (type === 'room') {
       const r = Game.Config.ROOMS[key];
-      ui.buildGhost = { type: 'room', key, x: 1, y: 1, w: r.w, h: r.h };
+      ui.buildGhost = { type: 'room', key, x: 1, y: 1, w: r.minW, h: r.minH };
     } else {
       const f = Game.Config.FURNITURE[key];
       ui.buildGhost = { type: 'furniture', key, x: 1, y: 1, w: f.w, h: f.h };
@@ -362,12 +380,24 @@ Game.UI = (function() {
     const gp = Game.Renderer.getGridPos(cx, cy);
 
     if (ghost.type === 'room') {
-      if (Game.House.buildRoom(ghost.key, gp.x, gp.y)) {
+      if (Game.House.buildRoom(ghost.key, gp.x, gp.y, ghost.w, ghost.h)) {
         showNotification(`🏠 Built ${Game.Config.ROOMS[ghost.key].label}!`);
+      } else {
+        showNotification(`❌ Can't build here!`);
+        return; // Don't cancel — let the user try another spot
       }
     } else {
-      if (Game.House.placeFurniture(ghost.key, gp.x, gp.y)) {
+      // Find which room the click is inside of
+      const room = Game.House.getRoomAt(gp.x, gp.y);
+      if (!room) {
+        showNotification(`❌ Place furniture inside a room!`);
+        return;
+      }
+      if (Game.House.placeFurniture(ghost.key, room.id, gp.x, gp.y)) {
         showNotification(`🪑 Placed ${Game.Config.FURNITURE[ghost.key].label}!`);
+      } else {
+        showNotification(`❌ Can't place here!`);
+        return;
       }
     }
 
@@ -384,9 +414,9 @@ Game.UI = (function() {
     canvas.removeEventListener('click', handleBuildClick);
   }
 
-  function buildActivitiesPanel(panel) {
+  function buildActivitiesPanel(panel, closeHtml) {
     const available = Game.Character.getAvailableActivities();
-    let html = '<h3>🎯 Activities</h3><div class="activity-list">';
+    let html = (closeHtml || '') + '<h3>🎯 Activities</h3><div class="activity-list">';
     for (const act of available) {
       html += `<button class="activity-item" onclick="Game.Character.startActivity('${act.key}')">
         ${act.icon} ${act.label}
@@ -399,9 +429,9 @@ Game.UI = (function() {
     panel.innerHTML = html;
   }
 
-  function buildCareerPanel(panel) {
+  function buildCareerPanel(panel, closeHtml) {
     const careerInfo = Game.Economy.getCareerInfo();
-    let html = '<h3>💼 Career</h3>';
+    let html = (closeHtml || '') + '<h3>💼 Career</h3>';
 
     if (careerInfo) {
       html += `<div class="career-info">
@@ -425,9 +455,9 @@ Game.UI = (function() {
     panel.innerHTML = html;
   }
 
-  function buildSocialPanel(panel) {
+  function buildSocialPanel(panel, closeHtml) {
     const rels = Game.Social.getAllRelationships();
-    let html = '<h3>👥 Social</h3><div class="social-list">';
+    let html = (closeHtml || '') + '<h3>👥 Social</h3><div class="social-list">';
 
     for (const npc of rels) {
       const interactions = Game.Social.getAvailableInteractions(npc.id);
@@ -449,9 +479,15 @@ Game.UI = (function() {
     togglePanel('social'); // refresh
   }
 
-  function buildSkillsPanel(panel) {
+  function buildSkillsPanel(panel, closeHtml) {
     const char = Game.State.get().character;
-    let html = '<h3>📚 Skills</h3><div class="skill-list">';
+    // Trait display
+    const traitCfg = Game.Config.TRAITS[char.trait];
+    let html = (closeHtml || '') + '<h3>📚 Skills</h3>';
+    if (traitCfg) {
+      html += `<div class="trait-badge">${traitCfg.icon} <strong>${traitCfg.label}</strong> — ${traitCfg.desc}</div>`;
+    }
+    html += '<div class="skill-list">';
     for (const [key, skill] of Object.entries(Game.Config.SKILLS)) {
       const level = char.skills[key] || 0;
       const xp = char.skillXp[key] || 0;
@@ -466,13 +502,13 @@ Game.UI = (function() {
     panel.innerHTML = html;
   }
 
-  function buildLegacyPanel(panel) {
+  function buildLegacyPanel(panel, closeHtml) {
     const prestige = Game.Prestige.getPrestige();
     const points = Game.Prestige.calculateLegacyPoints();
     const upgrades = Game.Prestige.getUpgradeInfo();
     const canP = Game.Prestige.canPrestige();
 
-    let html = `<h3>🌟 Legacy</h3>
+    let html = (closeHtml || '') + `<h3>🌟 Legacy</h3>
       <p>Generation: ${prestige.generation + 1}</p>
       <p>Legacy Points: ${prestige.legacyPoints} LP</p>
       <p>Points if reset now: +${points} LP</p>`;
@@ -507,5 +543,66 @@ Game.UI = (function() {
     startBuild,
     cancelBuild,
     doSocialInteraction,
+    toggleSellMode,
   };
+
+  function toggleSellMode() {
+    const ui = Game.State.get().ui;
+    if (ui.mode === 'sell') {
+      ui.mode = 'live';
+      Game.UI.showNotification('🚪 Exited sell mode');
+      // Refresh build panel
+      const panel = document.getElementById('side-panel');
+      if (panel && panel.dataset.active === 'build') {
+        buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      }
+    } else {
+      ui.mode = 'sell';
+      Game.UI.showNotification('🗑️ Sell Mode: Click furniture to sell, rooms to demolish');
+      // Set up sell click handler
+      const canvas = document.getElementById('game-canvas');
+      canvas.addEventListener('click', handleSellClick);
+      // Refresh build panel
+      const panel = document.getElementById('side-panel');
+      if (panel && panel.dataset.active === 'build') {
+        buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      }
+    }
+  }
+
+  function handleSellClick(e) {
+    const ui = Game.State.get().ui;
+    if (ui.mode !== 'sell') {
+      const canvas = document.getElementById('game-canvas');
+      canvas.removeEventListener('click', handleSellClick);
+      return;
+    }
+
+    const canvas = document.getElementById('game-canvas');
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const cx = (e.clientX - rect.left) * scaleX;
+    const cy = (e.clientY - rect.top) * scaleY;
+    const gp = Game.Renderer.getGridPos(cx, cy);
+
+    // Try to sell furniture first
+    const furn = Game.House.getFurnitureAt(gp.x, gp.y);
+    if (furn) {
+      // Clean from broken list too
+      if (Game.Character.repairFurniture) Game.Character.repairFurniture(furn.id);
+      Game.House.sellFurniture(furn.id);
+      e.stopPropagation();
+      return;
+    }
+
+    // Try to demolish room
+    const room = Game.House.getRoomAt(gp.x, gp.y);
+    if (room) {
+      Game.House.removeRoom(room.id);
+      e.stopPropagation();
+      return;
+    }
+  }
+
 })();

@@ -11,6 +11,8 @@ Game.Main = (function() {
   const IDLE_WANDER_INTERVAL = 12; // seconds
   let tutorialShown = false;
   let canvasTooltip = null;
+  let pieMenuJustOpened = false;
+  let npcSpawnTimer = 30; // First NPC after 30 seconds
 
   function init() {
     const canvas = document.getElementById('game-canvas');
@@ -77,6 +79,9 @@ Game.Main = (function() {
     } else {
       idleTimer = 0;
     }
+
+    // ---- NPC Walkers ----
+    updateNPCWalkers(delta * gameSpeed);
 
     // ---- Render ----
     Game.Renderer.render(timestamp);
@@ -159,7 +164,19 @@ Game.Main = (function() {
       if (furn) {
         const screenX = e.clientX;
         const screenY = e.clientY;
-        showPieMenu(furn, screenX, screenY, e.shiftKey);
+        // Check if broken — offer repair instead
+        if (Game.Character.isFurnitureBroken && Game.Character.isFurnitureBroken(furn.id)) {
+          showRepairPieMenu(furn, screenX, screenY);
+        } else {
+          showPieMenu(furn, screenX, screenY, e.shiftKey);
+        }
+        return;
+      }
+
+      // Check NPC walker hit
+      const npcHit = hitTestNPCWalker(gp.x, gp.y);
+      if (npcHit) {
+        showNPCPieMenu(npcHit, e.clientX, e.clientY);
         return;
       }
 
@@ -204,6 +221,10 @@ Game.Main = (function() {
 
     // Close pie menu on outside click
     document.addEventListener('click', (e) => {
+      if (pieMenuJustOpened) {
+        pieMenuJustOpened = false;
+        return;
+      }
       if (!e.target.closest('.pie-menu')) {
         closePieMenu();
       }
@@ -213,6 +234,7 @@ Game.Main = (function() {
   // ---- PIE MENU (Radial Context Menu) ----
   function showPieMenu(furn, screenX, screenY, shiftKey) {
     closePieMenu();
+    pieMenuJustOpened = true;
     const activities = getActivitiesForFurniture(furn.type);
     if (activities.length === 0) return;
 
@@ -275,6 +297,7 @@ Game.Main = (function() {
 
   function showRoomPieMenu(room, screenX, screenY, shiftKey) {
     closePieMenu();
+    pieMenuJustOpened = true;
     const activities = getActivitiesForRoom(room.type);
     if (activities.length === 0) return;
     // Reuse the same pie menu logic
@@ -347,6 +370,184 @@ Game.Main = (function() {
       .filter(([key, act]) => act.room === roomType && !act.furniture)
       .filter(([key]) => Game.Character.isAvailableActivity(key))
       .map(([key, act]) => ({ key, ...act }));
+  }
+
+  // ---- Repair Pie Menu ----
+  function showRepairPieMenu(furn, screenX, screenY) {
+    closePieMenu();
+    pieMenuJustOpened = true;
+    const menu = document.createElement('div');
+    menu.className = 'pie-menu';
+    menu.style.left = screenX + 'px';
+    menu.style.top = screenY + 'px';
+
+    const cancel = document.createElement('div');
+    cancel.className = 'pie-center';
+    cancel.innerHTML = '✕';
+    cancel.addEventListener('click', (e) => { e.stopPropagation(); closePieMenu(); });
+    menu.appendChild(cancel);
+
+    // Repair option
+    const radius = 65;
+    const rx = Math.cos(-Math.PI / 2) * radius;
+    const ry = Math.sin(-Math.PI / 2) * radius;
+    const repairItem = document.createElement('div');
+    repairItem.className = 'pie-item';
+    repairItem.style.transform = `translate(${rx}px, ${ry}px)`;
+    repairItem.innerHTML = `<span class="pie-icon">🔧</span><span class="pie-label">Repair</span>`;
+    repairItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const handiness = Game.Character.getSkillLevel('handiness');
+      const success = Math.random() < (0.4 + handiness * 0.06);
+      if (success) {
+        Game.Character.repairFurniture(furn.id);
+        Game.Character.addSkillXp('handiness', 25);
+        const fc = Game.Config.FURNITURE[furn.type];
+        Game.UI.showNotification(`✅ ${fc ? fc.label : 'Item'} repaired!`);
+        Game.Character.addMoodlet({ name: 'Handy', value: 4, duration: 120, icon: '🔧' });
+      } else {
+        Game.Character.addSkillXp('handiness', 15);
+        Game.UI.showNotification(`❌ Repair failed! Try again or level up Handiness.`);
+      }
+      closePieMenu();
+    });
+    menu.appendChild(repairItem);
+
+    // Sell broken option
+    const sellAngle = Math.PI / 6;
+    const sx = Math.cos(sellAngle) * radius;
+    const sy = Math.sin(sellAngle) * radius;
+    const sellItem = document.createElement('div');
+    sellItem.className = 'pie-item';
+    sellItem.style.transform = `translate(${sx}px, ${sy}px)`;
+    const fc = Game.Config.FURNITURE[furn.type];
+    const refund = fc ? Math.floor(fc.cost * 0.25) : 0;
+    sellItem.innerHTML = `<span class="pie-icon">🗑️</span><span class="pie-label">Sell $${refund}</span>`;
+    sellItem.addEventListener('click', (e) => {
+      e.stopPropagation();
+      Game.Character.repairFurniture(furn.id);
+      Game.House.sellFurniture(furn.id);
+      closePieMenu();
+    });
+    menu.appendChild(sellItem);
+
+    document.body.appendChild(menu);
+    requestAnimationFrame(() => menu.classList.add('visible'));
+  }
+
+  // ---- NPC Social Pie Menu ----
+  function showNPCPieMenu(npc, screenX, screenY) {
+    closePieMenu();
+    pieMenuJustOpened = true;
+    const npcCfg = Game.Config.NPCS.find(n => n.id === npc.configId);
+    if (!npcCfg) return;
+
+    const interactions = Game.Social.getAvailableInteractions(npc.configId);
+    if (interactions.length === 0) return;
+
+    const menu = document.createElement('div');
+    menu.className = 'pie-menu';
+    menu.style.left = screenX + 'px';
+    menu.style.top = screenY + 'px';
+
+    const cancel = document.createElement('div');
+    cancel.className = 'pie-center';
+    cancel.innerHTML = npcCfg.avatar;
+    cancel.title = npcCfg.name;
+    cancel.addEventListener('click', (e) => { e.stopPropagation(); closePieMenu(); });
+    menu.appendChild(cancel);
+
+    const radius = 65;
+    const angleStep = (2 * Math.PI) / Math.max(interactions.length, 1);
+    const startAngle = -Math.PI / 2;
+
+    interactions.forEach((int, i) => {
+      const angle = startAngle + i * angleStep;
+      const ix = Math.cos(angle) * radius;
+      const iy = Math.sin(angle) * radius;
+      const item = document.createElement('div');
+      item.className = 'pie-item';
+      item.style.transform = `translate(${ix}px, ${iy}px)`;
+      item.innerHTML = `<span class="pie-icon">💬</span><span class="pie-label">${int.label}</span>`;
+      item.title = int.label;
+      item.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const result = Game.Social.interact(npc.configId, int.key);
+        Game.UI.showNotification(result.msg);
+        const char = Game.State.get().character;
+        char.targetPosition = { x: npc.position.x, y: npc.position.y - 1 };
+        closePieMenu();
+      });
+      item.style.animationDelay = `${i * 0.05}s`;
+      menu.appendChild(item);
+    });
+
+    document.body.appendChild(menu);
+    requestAnimationFrame(() => menu.classList.add('visible'));
+  }
+
+  // ---- NPC Walker System ----
+  function updateNPCWalkers(delta) {
+    const state = Game.State.get();
+    if (!state.npcWalkers) state.npcWalkers = [];
+    const house = state.house;
+
+    // Spawn timer
+    npcSpawnTimer -= delta;
+    if (npcSpawnTimer <= 0) {
+      npcSpawnTimer = 40 + Math.random() * 50;
+      spawnNPCWalker();
+    }
+
+    // Update positions
+    for (const npc of state.npcWalkers) {
+      if (!npc.active) continue;
+      const speed = 1.5 * delta;
+      npc.position.x += npc.direction * speed;
+
+      if (npc.position.x < -3 || npc.position.x > house.lotWidth + 3) {
+        npc.active = false;
+      }
+
+      npc.lifeTimer -= delta;
+      if (npc.lifeTimer <= 0) npc.active = false;
+    }
+
+    state.npcWalkers = state.npcWalkers.filter(n => n.active);
+  }
+
+  function spawnNPCWalker() {
+    const state = Game.State.get();
+    const house = state.house;
+    const npcs = Game.Config.NPCS;
+    const activeIds = state.npcWalkers.map(n => n.configId);
+    const available = npcs.filter(n => !activeIds.includes(n.id));
+    if (available.length === 0) return;
+
+    const chosen = available[Math.floor(Math.random() * available.length)];
+    const fromLeft = Math.random() > 0.5;
+    const pathY = house.lotHeight + 1;
+
+    state.npcWalkers.push({
+      id: 'walker_' + Date.now(),
+      configId: chosen.id,
+      position: { x: fromLeft ? -2 : house.lotWidth + 2, y: pathY },
+      direction: fromLeft ? 1 : -1,
+      active: true,
+      phase: Math.random() * Math.PI * 2,
+      lifeTimer: 60,
+    });
+  }
+
+  function hitTestNPCWalker(gx, gy) {
+    const state = Game.State.get();
+    for (const npc of (state.npcWalkers || [])) {
+      if (!npc.active) continue;
+      if (Math.abs(gx - npc.position.x) < 1.5 && Math.abs(gy - npc.position.y) < 1.5) {
+        return npc;
+      }
+    }
+    return null;
   }
 
   // ---- Keyboard Shortcuts ----
