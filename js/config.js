@@ -18,6 +18,18 @@ Game.Config = {
   },
 
   // ----------------------------------------------------------
+  // Seasons & Weather
+  // ----------------------------------------------------------
+  SEASONS: {
+    spring: { label: 'Spring', icon: '🌸', cropGrowthMult: 1.0, weatherChance: { clear: 0.6, rain: 0.3, storm: 0.1 } },
+    summer: { label: 'Summer', icon: '☀️', cropGrowthMult: 1.3, weatherChance: { clear: 0.7, rain: 0.2, storm: 0.1 } },
+    autumn: { label: 'Autumn', icon: '🍂', cropGrowthMult: 0.8, weatherChance: { clear: 0.5, rain: 0.3, wind: 0.2 } },
+    winter: { label: 'Winter', icon: '❄️', cropGrowthMult: 0.0, weatherChance: { clear: 0.4, snow: 0.4, wind: 0.2 } },
+  },
+  SEASON_ORDER: ['spring', 'summer', 'autumn', 'winter'],
+  DAYS_PER_SEASON: 28,
+
+  // ----------------------------------------------------------
   // Need Definitions
   // ----------------------------------------------------------
   NEEDS: {
@@ -27,6 +39,7 @@ Game.Config = {
     fun:     { label: 'Fun',     icon: '😊', decayPerHour: 2.5,  color: '#A78BFA', criticalThreshold: 15 },
     social:  { label: 'Social',  icon: '💬', decayPerHour: 1.5,  color: '#F472B6', criticalThreshold: 20 },
     comfort: { label: 'Comfort', icon: '🛋️', decayPerHour: 1.0, color: '#FB923C', criticalThreshold: 25 },
+    bladder: { label: 'Bladder', icon: '🚽', decayPerHour: 4.5,  color: '#FEF08A', criticalThreshold: 20 },
   },
 
   // ----------------------------------------------------------
@@ -66,6 +79,7 @@ Game.Config = {
     logic:     { label: 'Logic',     icon: '📚', maxLevel: 10, xpPerLevel: 125 },
     gardening: { label: 'Gardening', icon: '🌿', maxLevel: 10, xpPerLevel: 90  },
     handiness: { label: 'Handiness', icon: '🔧', maxLevel: 10, xpPerLevel: 100 },
+    language:  { label: 'Chinese (HSK)', icon: '🗣️', maxLevel: 6, xpPerLevel: 250 },
   },
 
   // ----------------------------------------------------------
@@ -85,6 +99,7 @@ Game.Config = {
     library:    { label: 'Library',    icon: '🏛️', minW: 2, minH: 2, maxW: 4, maxH: 4, baseCost: 1400, floorColor: '#8D6E63', wallColor: '#5D4037' },
     patio:      { label: 'Patio',      icon: '☀️', minW: 2, minH: 2, maxW: 5, maxH: 5, baseCost: 600,  floorColor: '#B0BEC5', wallColor: '#90A4AE' },
     workshop:   { label: 'Workshop',   icon: '🛠️', minW: 2, minH: 2, maxW: 4, maxH: 4, baseCost: 1200, floorColor: '#9E9E9E', wallColor: '#616161' },
+    subway:     { label: 'Subway Station', icon: '🚇', minW: 3, minH: 3, maxW: 5, maxH: 5, baseCost: 0, floorColor: '#B0BEC5', wallColor: '#546E7A' },
   },
 
   // ----------------------------------------------------------
@@ -103,7 +118,9 @@ Game.Config = {
     // Kitchen
     basic_stove:   { label: 'Basic Stove',    icon: '🔥', room: 'kitchen', cost: 200,  quality: 1, needBonus: { hunger: 20 }, comfort: 0, w: 1, h: 1, skill: 'cooking', breakChance: 0.08 },
     good_stove:    { label: 'Gas Range',      icon: '🔥', room: 'kitchen', cost: 600,  quality: 2, needBonus: { hunger: 30 }, comfort: 0, w: 1, h: 1, skill: 'cooking', breakChance: 0.04 },
+    smart_stove:   { label: 'Smart Oven',     icon: '🔥', room: 'kitchen', cost: 1800, quality: 3, needBonus: { hunger: 40 }, comfort: 0, w: 1, h: 1, skill: 'cooking', breakChance: 0.01 },
     fridge:        { label: 'Refrigerator',   icon: '🧊', room: 'kitchen', cost: 300,  quality: 1, needBonus: { hunger: 5 },  comfort: 1, w: 1, h: 1, breakChance: 0.03 },
+    smart_fridge:  { label: 'Smart Fridge',   icon: '🧊', room: 'kitchen', cost: 1400, quality: 3, needBonus: { hunger: 15 }, comfort: 2, w: 1, h: 1, breakChance: 0.01 },
     counter:       { label: 'Counter',        icon: '🔲', room: 'kitchen', cost: 100,  quality: 1, needBonus: {},             comfort: 0, w: 1, h: 1 },
     sink_k:        { label: 'Kitchen Sink',   icon: '🚰', room: 'kitchen', cost: 120,  quality: 1, needBonus: { hygiene: 5 }, comfort: 0, w: 1, h: 1, breakChance: 0.05 },
     microwave:     { label: 'Microwave',      icon: '🍱', room: 'kitchen', cost: 150,  quality: 1, needBonus: { hunger: 15 }, comfort: 0, w: 1, h: 1, breakChance: 0.06 },
@@ -119,11 +136,14 @@ Game.Config = {
     // Living Room
     basic_sofa:    { label: 'Basic Sofa',     icon: '🛋️', room: 'living', cost: 200,  quality: 1, needBonus: { comfort: 10, fun: 5 }, comfort: 3,  w: 2, h: 1 },
     nice_sofa:     { label: 'Sectional Sofa', icon: '🛋️', room: 'living', cost: 800,  quality: 2, needBonus: { comfort: 18, fun: 8 }, comfort: 6,  w: 2, h: 1 },
+    cushion:       { label: 'Floor Cushion',  icon: '🟣', room: 'living', cost: 50,   quality: 1, needBonus: { comfort: 8, fun: 2 },  comfort: 2, w: 1, h: 1 },
     basic_tv:      { label: 'Small TV',       icon: '📺', room: 'living', cost: 250,  quality: 1, needBonus: { fun: 15 },              comfort: 0,  w: 1, h: 1 },
     big_tv:        { label: 'Flat Screen TV', icon: '📺', room: 'living', cost: 900,  quality: 2, needBonus: { fun: 25 },              comfort: 0,  w: 2, h: 1 },
     bookshelf:     { label: 'Bookshelf',      icon: '📚', room: 'living', cost: 150,  quality: 1, needBonus: { fun: 8 },               comfort: 1,  w: 1, h: 1, skill: 'logic' },
+    wide_bookcase: { label: 'Wide Bookcase',  icon: '🏛️', room: 'living', cost: 600,  quality: 2, needBonus: { fun: 15 },              comfort: 0,  w: 3, h: 1, skill: 'logic' },
     coffee_table:  { label: 'Coffee Table',   icon: '☕', room: 'living', cost: 80,   quality: 1, needBonus: {},                       comfort: 2,  w: 1, h: 1 },
     stereo:        { label: 'Stereo System',  icon: '📻', room: 'living', cost: 350,  quality: 1, needBonus: { fun: 20 },              comfort: 0,  w: 1, h: 1 },
+    decorated_table:{ label: 'Decorated Table',icon: '🕯️', room: 'living', cost: 400,  quality: 2, needBonus: { comfort: 10 },          comfort: 2,  w: 2, h: 1 },
     fireplace:     { label: 'Fireplace',      icon: '🔥', room: 'living', cost: 1200, quality: 3, needBonus: { comfort: 15 },          comfort: 5,  w: 2, h: 1 },
     recliner:      { label: 'Recliner',       icon: '💺', room: 'living', cost: 450,  quality: 2, needBonus: { comfort: 12, energy: 5},comfort: 5,  w: 1, h: 1 },
 
@@ -131,6 +151,7 @@ Game.Config = {
     basic_desk:    { label: 'Basic Desk',     icon: '🪑', room: 'study', cost: 200,  quality: 1, needBonus: {},             comfort: 1, w: 1, h: 1 },
     computer:      { label: 'Computer',       icon: '💻', room: 'study', cost: 500,  quality: 1, needBonus: { fun: 10 },    comfort: 0, w: 1, h: 1, skill: 'tech' },
     good_computer: { label: 'Gaming PC',      icon: '💻', room: 'study', cost: 1500, quality: 2, needBonus: { fun: 20 },    comfort: 0, w: 1, h: 1, skill: 'tech' },
+    candle_stand:  { label: 'Candle Stand',   icon: '🕯️', room: 'study', cost: 130,  quality: 2, needBonus: { comfort: 12 },comfort: 0, w: 1, h: 1 },
     study_shelf:   { label: 'Study Bookshelf',icon: '📚', room: 'study', cost: 180,  quality: 1, needBonus: {},             comfort: 1, w: 1, h: 1, skill: 'logic' },
     globe:         { label: 'Globe',          icon: '🌍', room: 'library', cost: 150,  quality: 2, needBonus: {},             comfort: 0, w: 1, h: 1, skill: 'logic' },
     drafting_table:{ label: 'Drafting Table', icon: '📐', room: 'library', cost: 220,  quality: 2, needBonus: { fun: 10 },    comfort: 0, w: 2, h: 1, skill: 'creativity' },
@@ -140,8 +161,9 @@ Game.Config = {
     weights:       { label: 'Weight Bench',   icon: '🏋️', room: 'gym', cost: 350,  quality: 1, needBonus: {},          comfort: 0, w: 1, h: 1, skill: 'fitness' },
     yoga_mat:      { label: 'Yoga Mat',       icon: '🧘', room: 'gym', cost: 50,   quality: 1, needBonus: { fun: 8 },  comfort: 0, w: 1, h: 1, skill: 'fitness' },
 
-    // Game Room
+    // Game Room / Hobby
     game_console:  { label: 'Game Console',   icon: '🎮', room: 'gameroom', cost: 400,  quality: 1, needBonus: { fun: 25 },            comfort: 0, w: 1, h: 1 },
+    display_case:  { label: 'Display Case',   icon: '💎', room: 'gameroom', cost: 800,  quality: 2, needBonus: { fun: 15 },            comfort: 0, w: 1, h: 2 },
     pool_table:    { label: 'Pool Table',     icon: '🎱', room: 'gameroom', cost: 700,  quality: 2, needBonus: { fun: 20, social: 10 }, comfort: 0, w: 2, h: 1 },
     dartboard:     { label: 'Dartboard',      icon: '🎯', room: 'gameroom', cost: 80,   quality: 1, needBonus: { fun: 12 },            comfort: 0, w: 1, h: 1 },
 
@@ -170,6 +192,16 @@ Game.Config = {
     aquarium:      { label: 'Aquarium',       icon: '🐠', room: '*', cost: 600, quality: 2, needBonus: { fun: 10, comfort: 5 },comfort: 0, w: 2, h: 1 },
     mirror:        { label: 'Standing Mirror',icon: '🪞', room: '*', cost: 150, quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1, skill: 'charisma' },
     indoor_tree:   { label: 'Indoor Tree',    icon: '🌲', room: '*', cost: 100, quality: 1, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2 },
+    map_portal:    { label: 'Door / Portal',  icon: '🚪', room: '*', cost: 0,   quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1 },
+
+    // City & Specialized
+    subway_gate:   { label: 'Subway Gate',    icon: '🚇', room: '*', cost: 0,   quality: 1, needBonus: {}, comfort: 0, w: 1, h: 1 },
+    language_book: { label: 'HSK Textbook',   icon: '📘', room: '*', cost: 80,  quality: 1, needBonus: { fun: -5 }, comfort: 0, w: 1, h: 1, skill: 'language' },
+    display_shelf: { label: 'Souvenir Shelf', icon: '🪆', room: '*', cost: 200, quality: 1, needBonus: { fun: 5 }, comfort: 0, w: 1, h: 1 },
+
+    // Pets & Cultivation Rewards
+    pet_bowl:      { label: 'Pet Bowl',       icon: '🥣', room: '*', cost: 40,  quality: 1, needBonus: {}, comfort: 0, w: 1, h: 1 },
+    potted_flower: { label: 'Potted Flower',  icon: '🌷', room: '*', cost: 200, quality: 3, needBonus: { comfort: 10, fun: 5 }, comfort: 5, w: 1, h: 1 },
   },
 
   // ----------------------------------------------------------
@@ -291,6 +323,23 @@ Game.Config = {
   // Events
   // ----------------------------------------------------------
   EVENTS: [
+    { 
+      id: 'study_abroad_arrival', 
+      type: 'story', 
+      title: '🛫 Arrival at Pudong Airport', 
+      visual: '🛬',
+      dialogue: [
+        "Visa Officer: Welcome to Shanghai. Purpose of your visit?",
+        "You: I'm here for my Master's Degree.",
+        "Visa Officer: Excellent. Ensure you register at the local police station within 24 hours."
+      ],
+      description: 'You stepped off the plane holding your admission letter tightly. The humid Shanghai air hits you instantly. Your multi-epoch journey as an international student in China has just begun.', 
+      choices: [
+        { label: 'Take the Maglev Train ($8)', effects: { money: -8, fun: 20, energy: -5 } },
+        { label: 'Take a Taxi ($30)', effects: { money: -30, comfort: 20, energy: -2 } },
+        { label: 'Take the Metro ($1)', effects: { money: -1, energy: -15 } },
+      ]
+    },
     { id: 'neighbor_cookies', type: 'opportunity', title: '🍪 Neighbor Visit', desc: 'Your neighbor brought homemade cookies!', choices: [
       { label: 'Accept warmly', effects: { hunger: 15, social: 10, fun: 5 } },
       { label: 'Invite them in', effects: { social: 20, fun: 10 }, relBoost: { random: 5 } },
@@ -350,7 +399,7 @@ Game.Config = {
       { label: 'Buy medicine ($50)', effects: { money: -50, energy: -10 } },
     ]},
     { id: 'alien_abduction', type: 'discovery', title: '🛸 Alien Abduction!', desc: 'You were beamed up to a saucer and probed.', choices: [
-      { label: 'Whoa...', effects: { logic: 50, energy: -40, fun: -20 } },
+      { label: 'Whoa...', effects: { energy: -40, fun: -20 }, skillGain: { logic: 50 } },
     ]},
     { id: 'secret_admirer', type: 'social', title: '💌 Secret Admirer', desc: 'You found an anonymous love letter and a gift.', choices: [
       { label: 'Read it', effects: { social: 25, fun: 15 } },
@@ -364,16 +413,22 @@ Game.Config = {
     sleep:        { label: 'Sleep',          duration: 480, needs: { energy: 80 },  room: 'bedroom',  furniture: 'bed',    icon: '💤', moodlet: { name: 'Well Rested', value: 8, duration: 240, icon: '😴' } },
     nap:          { label: 'Take a Nap',     duration: 120, needs: { energy: 30 },  room: 'bedroom',  furniture: 'bed',    icon: '😴', moodlet: { name: 'Refreshed', value: 4, duration: 120, icon: '💤' } },
     cook:         { label: 'Cook a Meal',    duration: 30,  needs: { hunger: 25 },  room: 'kitchen',  furniture: 'stove',  icon: '🍳', skill: 'cooking', xp: 15, moodlet: { name: 'Home Cooked', value: 6, duration: 180, icon: '🍳' } },
+    gourmet_feast:{ label: 'Gourmet Feast',  duration: 60,  needs: { hunger: 100, fun: 15 }, room: 'kitchen', furniture: 'smart_stove', icon: '🍲', skill: 'cooking', xp: 40, moodlet: { name: 'Culinary Masterpiece', value: 12, duration: 400, icon: '✨' }, requires: { skill: 'cooking', level: 5 } },
     eat:          { label: 'Eat',            duration: 20,  needs: { hunger: 20 },  room: 'kitchen',  furniture: null,     icon: '🍽️', moodlet: { name: 'Satisfied', value: 3, duration: 120, icon: '🍽️' } },
     shower:       { label: 'Shower',         duration: 20,  needs: { hygiene: 40 }, room: 'bathroom', furniture: 'shower', icon: '🚿', moodlet: { name: 'Squeaky Clean', value: 5, duration: 180, icon: '✨' } },
     bath:         { label: 'Take a Bath',    duration: 45,  needs: { hygiene: 50, fun: 10 }, room: 'bathroom', furniture: 'bathtub', icon: '🛁', moodlet: { name: 'Pampered', value: 8, duration: 240, icon: '🛁' } },
-    use_toilet:   { label: 'Use Bathroom',   duration: 10,  needs: { hygiene: 5 },  room: 'bathroom', furniture: 'toilet', icon: '🚽' },
+    use_toilet:   { label: 'Use Bathroom',   duration: 10,  needs: { bladder: 100, hygiene: -10 }, room: 'bathroom', furniture: 'toilet', icon: '🚽', moodlet: { name: 'Relieved', value: 2, duration: 60, icon: '🚽' } },
     watch_tv:     { label: 'Watch TV',       duration: 30,  needs: { fun: 20 },     room: 'living',   furniture: 'tv',     icon: '📺', moodlet: { name: 'Entertained', value: 4, duration: 120, icon: '📺' } },
     read:         { label: 'Read a Book',    duration: 45,  needs: { fun: 12 },     room: 'living',   furniture: 'bookshelf', icon: '📚', skill: 'logic', xp: 12, moodlet: { name: 'Inspired', value: 5, duration: 180, icon: '📖' } },
+    read_wide:    { label: 'Deep Study',     duration: 90,  needs: { fun: 20 },     room: 'living',   furniture: 'wide_bookcase', icon: '🏛️', skill: 'logic', xp: 40, moodlet: { name: 'Enlightened', value: 8, duration: 300, icon: '💡' }, requires: { skill: 'logic', level: 3 } },
     use_computer: { label: 'Use Computer',   duration: 60,  needs: { fun: 15 },     room: 'study',    furniture: 'computer', icon: '💻', skill: 'tech', xp: 15, moodlet: { name: 'Plugged In', value: 4, duration: 120, icon: '💻' } },
+    light_candle: { label: 'Meditate',       duration: 45,  needs: { comfort: 30, energy: 10 }, room: 'study', furniture: 'candle_stand', icon: '🕯️', moodlet: { name: 'Zen', value: 10, duration: 240, icon: '🧘' } },
+    admire_case:  { label: 'Admire Display', duration: 20,  needs: { fun: 15 },     room: 'gameroom', furniture: 'display_case', icon: '💎', moodlet: { name: 'Impressed', value: 5, duration: 120, icon: '🤩' } },
     exercise:     { label: 'Exercise',       duration: 60,  needs: { fun: 8 },      room: 'gym',      furniture: null,     icon: '🏋️', skill: 'fitness', xp: 18, energyCost: 15, moodlet: { name: 'Pumped Up', value: 6, duration: 180, icon: '💪' } },
     play_games:   { label: 'Play Games',     duration: 45,  needs: { fun: 25 },     room: 'gameroom', furniture: 'game_console', icon: '🎮', moodlet: { name: 'Having a Blast', value: 7, duration: 150, icon: '🎮' } },
-    garden:       { label: 'Garden',         duration: 40,  needs: { fun: 10 },     room: 'garden',   furniture: 'garden_plot', icon: '🌱', skill: 'gardening', xp: 12, moodlet: { name: 'Green Thumb', value: 5, duration: 180, icon: '🌿' } },
+    plant_seed:   { label: 'Plant Seeds',    duration: 15,  needs: { fun: 5 },      room: 'garden',   furniture: 'garden_plot', icon: '🌱', skill: 'gardening', xp: 5, energyCost: 5 },
+    water_crop:   { label: 'Water Crop',     duration: 10,  needs: { fun: 2 },      room: 'garden',   furniture: 'garden_plot', icon: '💧', skill: 'gardening', xp: 5, energyCost: 2 },
+    harvest_crop: { label: 'Harvest Crop',   duration: 20,  needs: { fun: 15 },     room: 'garden',   furniture: 'garden_plot', icon: '🌾', skill: 'gardening', xp: 20, earnings: 50, moodlet: { name: 'Bountiful Harvest', value: 5, duration: 180, icon: '🥕' } },
     paint:        { label: 'Paint',          duration: 60,  needs: { fun: 15 },     room: 'study',    furniture: null,     icon: '🎨', skill: 'creativity', xp: 15, moodlet: { name: 'Creatively Fulfilled', value: 6, duration: 180, icon: '🎨' } },
     relax_sofa:   { label: 'Relax on Sofa',  duration: 30,  needs: { comfort: 20, fun: 8 }, room: 'living', furniture: 'sofa', icon: '🛋️', moodlet: { name: 'Cozy', value: 4, duration: 120, icon: '🛋️' } },
     sit_garden:   { label: 'Enjoy Garden',   duration: 20,  needs: { fun: 12, comfort: 8 }, room: 'garden', furniture: 'garden_bench', icon: '🌸', moodlet: { name: 'At Peace', value: 5, duration: 150, icon: '🌸' } },
@@ -386,6 +441,11 @@ Game.Config = {
     practice_speech:{ label:'Practice Speech',duration: 30, needs: { fun: 5 },              room: 'bedroom', furniture: 'mirror',      icon: '🪞', skill: 'charisma', xp: 15, moodlet: { name: 'Confident', value: 5, duration: 180, icon: '😎' } },
     repair:        { label: 'Repair',         duration: 30, needs: {},                       room: null,      furniture: null,           icon: '🔧', skill: 'handiness', xp: 25, moodlet: { name: 'Handy', value: 4, duration: 120, icon: '🔧' } },
     invite_over:   { label: 'Invite Friend',  duration: 60, needs: { social: 30, fun: 15 },  room: 'living',  furniture: null,           icon: '🏠', moodlet: { name: 'Good Company', value: 7, duration: 240, icon: '👥' } },
+    travel:        { label: 'Travel',         duration: 1,  needs: {},                       room: '*',       furniture: 'map_portal',   icon: '🚶' },
+    take_subway:   { label: 'Take Subway',    duration: 15, needs: { energy: 5 },            room: '*',       furniture: 'subway_gate',  icon: '🚇', cost: 5 },
+    fill_bowl:     { label: 'Fill Pet Bowl',  duration: 10,  needs: { fun: 5 },              room: '*',       furniture: 'pet_bowl',     icon: '🐟', cost: 10, moodlet: { name: 'Caring Provider', value: 3, duration: 120, icon: '❤️' } },
+    study_language:{ label: 'Study Chinese',  duration: 45,  needs: { energy: 10, fun: -5 }, room: '*',       furniture: 'language_book',icon: '📖', skill: 'language', xp: 20, moodlet: { name: 'Mind Expanded', value: 4, duration: 120, icon: '🧠' } },
+    buy_souvenir:  { label: 'Buy Souvenir',   duration: 15,  needs: { fun: 10 },             room: '*',       furniture: 'display_shelf',icon: '🛍️', cost: 150, moodlet: { name: 'Shopper', value: 5, duration: 180, icon: '🎁' } },
   },
 
   // ----------------------------------------------------------
@@ -398,10 +458,11 @@ Game.Config = {
     { need: 'hunger',  threshold: 50, activity: 'eat',     priority: 4 },
     { need: 'hygiene', threshold: 30, activity: 'shower',  priority: 8 },
     { need: 'hygiene', threshold: 50, activity: 'bath',    priority: 3 },
+    { need: 'bladder', threshold: 40, activity: 'use_toilet', priority: 15 },
     { need: 'fun',     threshold: 35, activity: 'watch_tv',priority: 6 },
     { need: 'fun',     threshold: 50, activity: 'play_games', priority: 3 },
     { need: 'comfort', threshold: 35, activity: 'relax_sofa', priority: 4 },
-    { need: 'social',  threshold: 35, activity: null,      priority: 2 }, // social triggers NPC interaction
+    { need: 'social',  threshold: 35, activity: 'invite_over', priority: 2 },
   ],
 
   // ----------------------------------------------------------
@@ -419,11 +480,32 @@ Game.Config = {
   },
 
   // ----------------------------------------------------------
+  // Achievements
+  // ----------------------------------------------------------
+  ACHIEVEMENTS: {
+    first_friend:  { id: 'first_friend', label: 'First Friend', icon: '🤝', desc: 'Make your first friend in China.', rewardText: 'Social Confidence' },
+    hsk_master:    { id: 'hsk_master',   label: 'HSK Master',   icon: '🎓', desc: 'Reach Chinese HSK level 6.', rewardText: '+20% Social Gain' },
+    millionaire:   { id: 'millionaire',  label: 'Millionaire',  icon: '💰', desc: 'Accumulate $1,000,000.', rewardText: 'Financial Freedom' },
+    globe_trotter: { id: 'globe_trotter',label: 'Globe Trotter',icon: '🧭', desc: 'Travel to every major city location.', rewardText: 'Cultural Insight' },
+  },
+
+  // ----------------------------------------------------------
+  // Collections (Souvenirs)
+  // ----------------------------------------------------------
+  COLLECTIONS: {
+    panda_plushie:           { id: 'panda_plushie',           label: 'Panda Plushie',           icon: '🐼', rarity: 'common' },
+    terracotta_figurine:     { id: 'terracotta_figurine',     label: 'Terracotta Figurine',     icon: '🏺', rarity: 'uncommon' },
+    silk_fan:                { id: 'silk_fan',                label: 'Silk Fan',                icon: '🪭', rarity: 'common' },
+    jade_dragon:             { id: 'jade_dragon',             label: 'Jade Dragon',             icon: '🐉', rarity: 'rare' },
+    opera_mask:              { id: 'opera_mask',              label: 'Peking Opera Mask',       icon: '🎭', rarity: 'uncommon' },
+  },
+
+  // ----------------------------------------------------------
   // Starting State
   // ----------------------------------------------------------
   STARTING_STATE: {
     money: 500,
-    lotWidth: 8,
-    lotHeight: 8,
+    lotWidth: 12,
+    lotHeight: 12,
   },
 };

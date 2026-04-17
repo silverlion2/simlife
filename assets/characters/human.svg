@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-50 -100 100 120" width="100" height="120">
+    <g transform="translate(0, 0)">
+        <polygon points="0,-10 -15,-2.5 -15,-22.5 0,-30" fill="#d78b5a" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="0,-10 15,-2.5 15,-22.5 0,-30" fill="#bf7445" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="0,-30 -15,-22.5 0,-15.0 15,-22.5" fill="#e8a472" stroke="#000" stroke-width="2" stroke-linejoin="round"/> <!-- Head -->
+        <polygon points="0,15 -12,21.0 -12,-4.0 0,-10" fill="#3d8dd9" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="0,15 12,21.0 12,-4.0 0,-10" fill="#2970b3" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="0,-10 -12,-4.0 0,2.0 12,-4.0" fill="#4facfe" stroke="#000" stroke-width="2" stroke-linejoin="round"/> <!-- Body -->
+        <polygon points="-15,15 -20,17.5 -20,2.5 -15,0" fill="#d78b5a" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="-15,15 -10,17.5 -10,2.5 -15,0" fill="#bf7445" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="-15,0 -20,2.5 -15,5.0 -10,2.5" fill="#e8a472" stroke="#000" stroke-width="2" stroke-linejoin="round"/> <!-- Arm L -->
+        <polygon points="15,15 10,17.5 10,2.5 15,0" fill="#d78b5a" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="15,15 20,17.5 20,2.5 15,0" fill="#bf7445" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="15,0 10,2.5 15,5.0 20,2.5" fill="#e8a472" stroke="#000" stroke-width="2" stroke-linejoin="round"/> <!-- Arm R -->
+        <polygon points="-5,40 -11,43.0 -11,23.0 -5,20" fill="#141c24" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="-5,40 1,43.0 1,23.0 -5,20" fill="#0a0f14" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="-5,20 -11,23.0 -5,26.0 1,23.0" fill="#1c2833" stroke="#000" stroke-width="2" stroke-linejoin="round"/> <!-- Leg L -->
+        <polygon points="5,40 -1,43.0 -1,23.0 5,20" fill="#141c24" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="5,40 11,43.0 11,23.0 5,20" fill="#0a0f14" stroke="#000" stroke-width="2" stroke-linejoin="round"/>
+<polygon points="5,20 -1,23.0 5,26.0 11,23.0" fill="#1c2833" stroke="#000" stroke-width="2" stroke-linejoin="round"/> <!-- Leg R -->
+    </g>
+</svg>

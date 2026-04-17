@@ -15,13 +15,13 @@ Game.Events = (function() {
     events.cooldown -= deltaMinutes;
     if (events.cooldown <= 0) {
       triggerRandomEvent();
-      events.cooldown = 120 + Math.random() * 180; // 2-5 game hours between events
+      events.cooldown = 720 + Math.random() * 720; // 12-24 game hours between events
     }
   }
 
   function triggerRandomEvent() {
     const events = getEvents();
-    const pool = cfg.EVENTS.filter(e => !events.history.slice(-3).includes(e.id));
+    const pool = cfg.EVENTS.filter(e => !events.history.slice(-6).includes(e.id));
     if (pool.length === 0) return;
 
     const event = pool[Math.floor(Math.random() * pool.length)];
@@ -50,13 +50,20 @@ Game.Events = (function() {
       }
     }
 
-    // Skill check
+    // Skill check (support both explicit fields and legacy object-key format)
     if (choice.skillCheck) {
-      const [skill, reqLevel] = Object.entries(choice.skillCheck).find(([k]) => k !== 'failCost') || [];
+      let skill, reqLevel;
+      if (choice.skillCheck.skill && choice.skillCheck.level) {
+        skill = choice.skillCheck.skill;
+        reqLevel = choice.skillCheck.level;
+      } else {
+        // Legacy format: { cooking: 3, failCost: -100 }
+        const entry = Object.entries(choice.skillCheck).find(([k]) => k !== 'failCost');
+        if (entry) { skill = entry[0]; reqLevel = entry[1]; }
+      }
       if (skill) {
         const playerLevel = Game.Character.getSkillLevel(skill);
         if (playerLevel < reqLevel) {
-          // Failed check
           if (choice.skillCheck.failCost) {
             Game.Economy.addMoney(choice.skillCheck.failCost);
             Game.UI && Game.UI.showNotification(`❌ Skill check failed! Lost $${Math.abs(choice.skillCheck.failCost)}`);

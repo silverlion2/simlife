@@ -12,22 +12,205 @@ Game.UI = (function() {
     buildMoodletBar();
     buildQueueBar();
     setupPanelButtons();
-    setupWelcomeScreen();
   }
 
-  // ---- Welcome Screen ----
-  function setupWelcomeScreen() {
-    const welcome = document.getElementById('welcome-screen');
-    if (!welcome) return;
-    if (Game.State.get().time.day > 1) {
-      welcome.style.display = 'none';
+  // ---- Main Menu Flow (New) ----
+  function initMainMenu() {
+    const mm = document.getElementById('main-menu-screen');
+    const cc = document.getElementById('char-creation-screen');
+    const ls = document.getElementById('load-game-screen');
+    const ui = document.getElementById('ui-layer');
+
+    // Populate trait grids
+    populateTraitGrid('cc-trait-grid');
+    populateTraitGrid('ec-trait-grid');
+
+    // Make sure we are at Main Menu
+    mm.classList.remove('hidden');
+    cc.classList.add('hidden');
+    ls.classList.add('hidden');
+    if (ui) ui.style.display = 'none';
+
+    // Main Menu Buttons
+    document.getElementById('btn-mm-new').addEventListener('click', () => {
+      mm.classList.add('hidden');
+      cc.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-mm-load').addEventListener('click', () => {
+      buildSavesList();
+      mm.classList.add('hidden');
+      ls.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-mm-wipe').addEventListener('click', () => {
+      if (confirm('WARNING: This will permanently delete ALL active saves. Are you sure you want to wipe the slate clean?')) {
+        localStorage.clear();
+        alert('All saves wiped! The game will now launch fresh.');
+        window.location.reload();
+      }
+    });
+
+    // Char Creation Buttons
+    document.getElementById('btn-cc-back').addEventListener('click', () => {
+      cc.classList.add('hidden');
+      mm.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-cc-start').addEventListener('click', () => {
+      const worldName = document.getElementById('cc-world-name').value || 'My World';
+      const simName = document.getElementById('cc-sim-name').value || 'Player';
+      const color = document.getElementById('cc-sim-color').value || '#88CCFF';
+      const form = document.getElementById('cc-sim-form').value || 'human';
+      const selectedTraitCard = document.querySelector('#cc-trait-grid .trait-card.selected');
+      const traitKey = selectedTraitCard ? selectedTraitCard.dataset.key : 'neat';
+
+      Game.State.createSave(worldName, { name: simName, trait: traitKey, color: color, form: form });
+      startGameLoop(cc);
+    });
+
+    // Load Screen Buttons
+    document.getElementById('btn-ls-back').addEventListener('click', () => {
+      ls.classList.add('hidden');
+      mm.classList.remove('hidden');
+    });
+
+    // In-Game Menu Button
+    document.getElementById('btn-ingame-menu').addEventListener('click', () => {
+      Game.State.save();
+      // To prevent Phaser canvas duplication memory leaks, simple reload is safest
+      window.location.reload(); 
+    });
+
+    // Edit Character Button (In-Game Makeover)
+    const btnEcClose = document.getElementById('btn-ec-close');
+    if(btnEcClose) btnEcClose.addEventListener('click', closeEditModal);
+    
+    document.getElementById('btn-ec-save').addEventListener('click', () => {
+      const simName = document.getElementById('ec-sim-name').value;
+      const color = document.getElementById('ec-sim-color').value;
+      const form = document.getElementById('ec-sim-form').value;
+      const selectedTraitCard = document.querySelector('#ec-trait-grid .trait-card.selected');
+      
+      const char = Game.State.get().character;
+      if(simName) char.name = simName;
+      if(color) {
+        char.color = parseInt(color.replace('#', '0x'), 16);
+      }
+      if(form) char.form = form;
+      if(selectedTraitCard) {
+        char.trait = selectedTraitCard.dataset.key;
+      }
+      closeEditModal();
+      updateStatusBars();
+      
+      // Force renderer update to catch new color
+      Game.Renderer.setBgDirty(); 
+      Game.UI.showNotification('✨ Looking good!');
+    });
+  }
+
+  function startGameLoop(hideScreen) {
+    if (hideScreen) hideScreen.classList.add('hidden');
+    const ui = document.getElementById('ui-layer');
+    if (ui) ui.style.display = 'block';
+    
+    // Now trigger main loop init
+    if (Game.Main.init) Game.Main.init();
+    Game.UI.playAnnouncer('Welcome to SimLife!');
+  }
+
+  function populateTraitGrid(containerId) {
+    const grid = document.getElementById(containerId);
+    if (!grid) return;
+    grid.innerHTML = '';
+    const traits = Game.Config.TRAITS;
+    let first = true;
+    for (const [key, t] of Object.entries(traits)) {
+      const card = document.createElement('div');
+      card.className = 'trait-card' + (first ? ' selected' : '');
+      card.dataset.key = key;
+      card.innerHTML = `<div class="trait-card-title">${t.icon} ${t.label}</div><div class="trait-card-desc">${t.desc}</div>`;
+      card.addEventListener('click', () => {
+        grid.querySelectorAll('.trait-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+      });
+      grid.appendChild(card);
+      first = false;
+    }
+  }
+
+  function buildSavesList() {
+    const list = document.getElementById('load-saves-list');
+    if (!list) return;
+    list.innerHTML = '';
+    const saves = Game.State.getSaves();
+    if (saves.length === 0) {
+      list.innerHTML = '<p style="color:var(--text-dim);">No saved worlds found.</p>';
       return;
     }
-    const startBtn = document.getElementById('start-btn');
-    if (startBtn) {
-      startBtn.addEventListener('click', () => {
-        welcome.style.display = 'none';
+
+    saves.forEach(save => {
+      const d = new Date(save.lastPlayed).toLocaleString();
+      const slot = document.createElement('div');
+      slot.className = 'save-slot';
+      slot.innerHTML = `
+        <div class="save-info">
+          <h4>${save.name}</h4>
+          <p>Sim: ${save.characterName} | Day ${save.day} | 💰$${save.money}</p>
+          <p style="font-size:10px; opacity:0.6;">Last played: ${d}</p>
+        </div>
+        <div class="save-actions">
+          <button class="btn-load">Load</button>
+          <button class="btn-delete">X</button>
+        </div>
+      `;
+      
+      slot.querySelector('.btn-load').addEventListener('click', () => {
+        if(Game.State.loadSlot(save.id)) {
+          startGameLoop(document.getElementById('load-game-screen'));
+        }
       });
+      slot.querySelector('.btn-delete').addEventListener('click', () => {
+        if(confirm('Delete this world forever?')) {
+          Game.State.deleteSave(save.id);
+          buildSavesList();
+        }
+      });
+      
+      list.appendChild(slot);
+    });
+  }
+
+  function openEditModal() {
+    const modal = document.getElementById('edit-char-modal');
+    if(!modal) return;
+    const char = Game.State.get().character;
+    document.getElementById('ec-sim-name').value = char.name;
+    document.getElementById('ec-sim-form').value = char.form || 'human';
+    
+    // Hex parse
+    let hex = char.color.toString(16);
+    while(hex.length < 6) hex = '0' + hex;
+    document.getElementById('ec-sim-color').value = '#' + hex;
+    
+    const grid = document.getElementById('ec-trait-grid');
+    if (grid) {
+      grid.querySelectorAll('.trait-card').forEach(c => {
+        if (c.dataset.key === char.trait) c.classList.add('selected');
+        else c.classList.remove('selected');
+      });
+    }
+    
+    modal.classList.remove('hidden');
+    modal.style.display = 'block';
+  }
+
+  function closeEditModal() {
+    const modal = document.getElementById('edit-char-modal');
+    if(modal) {
+      modal.classList.add('hidden');
+      modal.style.display = 'none';
     }
   }
 
@@ -43,10 +226,9 @@ Game.UI = (function() {
       bar.className = 'need-bar';
       bar.innerHTML = `
         <span class="need-icon" title="${need.label}">${need.icon}</span>
-        <div class="need-track">
-          <div class="need-fill" id="need-${key}"></div>
+        <div class="need-track-rustic">
+          <div class="rustic-fill" id="need-${key}-fill"></div>
         </div>
-        <span class="need-value" id="need-val-${key}"></span>
       `;
       container.appendChild(bar);
     }
@@ -56,19 +238,17 @@ Game.UI = (function() {
     const char = Game.State.get().character;
     const time = Game.State.get().time;
 
-    // Update need bars
+    // Update need bars (Rustic smooth style)
     for (const key of Object.keys(Game.Config.NEEDS)) {
-      const val = Math.round(char.needs[key] || 0);
-      const fill = document.getElementById(`need-${key}`);
-      const valEl = document.getElementById(`need-val-${key}`);
-      if (fill) {
-        fill.style.width = val + '%';
-        fill.className = 'need-fill';
-        if (val <= 20) fill.classList.add('critical');
-        else if (val <= 40) fill.classList.add('low');
-        else if (val >= 80) fill.classList.add('high');
+      const val = Math.max(0, Math.min(100, Math.round(char.needs[key] || 0)));
+      const fillEl = document.getElementById(`need-${key}-fill`);
+      if (fillEl) {
+        fillEl.style.width = val + '%';
+        fillEl.className = 'rustic-fill';
+        if (val <= 20) fillEl.classList.add('critical');
+        else if (val <= 40) fillEl.classList.add('low');
+        else if (val >= 80) fillEl.classList.add('high');
       }
-      if (valEl) valEl.textContent = val;
     }
 
     // Money
@@ -244,10 +424,29 @@ Game.UI = (function() {
       document.body.appendChild(modal);
     }
 
+    let visualHtml = '';
+    if (event.visual) {
+      visualHtml = `<div class="event-visual">${event.visual.startsWith('http') || event.visual.startsWith('/') ? `<img src="${event.visual}" alt="Event Image">` : event.visual}</div>`;
+    }
+
+    let dialogueHtml = '';
+    if (event.dialogue) {
+      if (Array.isArray(event.dialogue)) {
+        dialogueHtml = event.dialogue.map(d => `<div class="event-dialogue">"${d}"</div>`).join('');
+      } else {
+        dialogueHtml = `<div class="event-dialogue">"${event.dialogue}"</div>`;
+      }
+    }
+
+    const descText = event.desc || event.description || '';
+    const descHtml = descText ? `<div class="event-desc">${descText}</div>` : '';
+
     modal.innerHTML = `
       <div class="event-card">
-        <h3>${event.icon || '📢'} ${event.title}</h3>
-        <p>${event.description}</p>
+        ${visualHtml}
+        <h3>${event.title}</h3>
+        ${dialogueHtml}
+        ${descHtml}
         <div class="event-choices">
           ${event.choices.map((c, i) => `
             <button class="event-choice" data-idx="${i}">
@@ -312,7 +511,8 @@ Game.UI = (function() {
     const sellActive = Game.State.get().ui.mode === 'sell';
     html += `<button class="sell-mode-btn ${sellActive ? 'active' : ''}" onclick="Game.UI.toggleSellMode()">🗑️ ${sellActive ? 'Exit Sell Mode' : 'Sell Mode'}</button>`;
     // Broken furniture indicator
-    const broken = (Game.State.get().house.brokenFurniture || []).length;
+    const activeMap = Game.State.getActiveMap();
+    const broken = activeMap && activeMap.brokenFurniture ? activeMap.brokenFurniture.length : 0;
     if (broken > 0) {
       html += `<div class="broken-alert">⚠️ ${broken} broken item${broken > 1 ? 's' : ''} — click them to repair!</div>`;
     }
@@ -344,21 +544,24 @@ Game.UI = (function() {
       ui.buildGhost = { type: 'room', key, x: 1, y: 1, w: r.minW, h: r.minH };
     } else {
       const f = Game.Config.FURNITURE[key];
+      if (!f) {
+        console.warn('Game.UI.startBuild: Invalid furniture key ->', key);
+        return;
+      }
       ui.buildGhost = { type: 'furniture', key, x: 1, y: 1, w: f.w, h: f.h };
     }
 
-    const canvas = document.getElementById('game-canvas');
-    canvas.addEventListener('mousemove', handleBuildMove);
-    canvas.addEventListener('click', handleBuildClick);
+    // Target the Phaser container, not the hidden vanilla canvas
+    const container = document.querySelector('.canvas-area');
+    container.addEventListener('mousemove', handleBuildMove);
+    container.addEventListener('click', handleBuildClick);
   }
 
   function handleBuildMove(e) {
-    const canvas = document.getElementById('game-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const cx = (e.clientX - rect.left) * scaleX;
-    const cy = (e.clientY - rect.top) * scaleY;
+    const container = document.querySelector('.canvas-area');
+    const rect = container.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
     const gp = Game.Renderer.getGridPos(cx, cy);
     const ghost = Game.State.get().ui.buildGhost;
     if (ghost) {
@@ -369,15 +572,33 @@ Game.UI = (function() {
 
   function handleBuildClick(e) {
     const ghost = Game.State.get().ui.buildGhost;
-    if (!ghost) return;
-
-    const canvas = document.getElementById('game-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const cx = (e.clientX - rect.left) * scaleX;
-    const cy = (e.clientY - rect.top) * scaleY;
+    const container = document.querySelector('.canvas-area');
+    const rect = container.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
     const gp = Game.Renderer.getGridPos(cx, cy);
+
+    if (!ghost) {
+      if (!Game.Renderer || !Game.House) return;
+      // Try to pick up existing furniture
+      const fHit = Game.Renderer.hitTestFurniture(Math.floor(gp.x), Math.floor(gp.y));
+      if (fHit) {
+        Game.House.sellFurniture(fHit.id);
+        const fc = Game.Config.FURNITURE[fHit.type];
+        if (fc) {
+          Game.State.get().ui.buildGhost = {
+            type: 'furniture',
+            key: fHit.type,
+            x: Math.floor(gp.x),
+            y: Math.floor(gp.y),
+            w: fHit.rotated ? fc.h : fc.w,
+            h: fHit.rotated ? fc.w : fc.h,
+            rotated: Boolean(fHit.rotated)
+          };
+        }
+      }
+      return;
+    }
 
     if (ghost.type === 'room') {
       if (Game.House.buildRoom(ghost.key, gp.x, gp.y, ghost.w, ghost.h)) {
@@ -393,7 +614,7 @@ Game.UI = (function() {
         showNotification(`❌ Place furniture inside a room!`);
         return;
       }
-      if (Game.House.placeFurniture(ghost.key, room.id, gp.x, gp.y)) {
+      if (Game.House.placeFurniture(ghost.key, room.id, gp.x, gp.y, ghost.rotated)) {
         showNotification(`🪑 Placed ${Game.Config.FURNITURE[ghost.key].label}!`);
       } else {
         showNotification(`❌ Can't place here!`);
@@ -409,10 +630,22 @@ Game.UI = (function() {
     const ui = Game.State.get().ui;
     ui.mode = 'live';
     ui.buildGhost = null;
-    const canvas = document.getElementById('game-canvas');
-    canvas.removeEventListener('mousemove', handleBuildMove);
-    canvas.removeEventListener('click', handleBuildClick);
+    const container = document.querySelector('.canvas-area');
+    container.removeEventListener('mousemove', handleBuildMove);
+    container.removeEventListener('click', handleBuildClick);
+    Game.UI.togglePanel('build');
   }
+
+  function toggleSellMode() {
+    const ui = Game.State.get().ui;
+    ui.mode = ui.mode === 'sell' ? 'live' : 'sell';
+    ui.buildGhost = null;
+    showNotification(ui.mode === 'sell' ? '🗑️ Sell Mode: Click furniture' : '▶️ Live Mode');
+    const panel = document.getElementById('side-panel');
+    if (panel) buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+  }
+
+  // [REMOVED] First duplicate buildSkillsPanel — canonical version is below (with trait display + customize button)
 
   function buildActivitiesPanel(panel, closeHtml) {
     const available = Game.Character.getAvailableActivities();
@@ -486,6 +719,7 @@ Game.UI = (function() {
     let html = (closeHtml || '') + '<h3>📚 Skills</h3>';
     if (traitCfg) {
       html += `<div class="trait-badge">${traitCfg.icon} <strong>${traitCfg.label}</strong> — ${traitCfg.desc}</div>`;
+      html += `<button onclick="Game.UI.openEditModal()" style="margin-top:5px; background:var(--gold-dim); border:none; border-radius:4px; padding:6px; width:100%; cursor:pointer; color:#1a1412; font-weight:bold;">✨ Customise Sim</button>`;
     }
     html += '<div class="skill-list">';
     for (const [key, skill] of Object.entries(Game.Config.SKILLS)) {
@@ -509,7 +743,7 @@ Game.UI = (function() {
     const canP = Game.Prestige.canPrestige();
 
     let html = (closeHtml || '') + `<h3>🌟 Legacy</h3>
-      <p>Generation: ${prestige.generation + 1}</p>
+      <p>Generation: ${prestige.generation}</p>
       <p>Legacy Points: ${prestige.legacyPoints} LP</p>
       <p>Points if reset now: +${points} LP</p>`;
 
@@ -528,11 +762,40 @@ Game.UI = (function() {
       </div>`;
     }
     html += '</div>';
+
+    // ---- Achievements ----
+    const char = Game.State.get().character;
+    const unlockedAchs = char.achievements || [];
+    html += '<h4>🏆 Achievements</h4><div class="upgrade-list" style="display:flex; flex-wrap:wrap; gap:5px;">';
+    for (const [key, ach] of Object.entries(Game.Config.ACHIEVEMENTS)) {
+      const isUnlocked = unlockedAchs.includes(key);
+      html += `<div style="flex: 1 1 45%; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 4px; opacity: ${isUnlocked ? 1 : 0.4};">
+        <div style="font-weight:bold; margin-bottom:4px;">${ach.icon} ${ach.label}</div>
+        <div style="font-size:10px;">${ach.desc}</div>
+      </div>`;
+    }
+    html += '</div>';
+
+    // ---- Collections ----
+    const unlockedCols = char.collection || [];
+    if (unlockedCols.length > 0) {
+      html += '<h4>🪆 Collections Showcase</h4><div style="display:flex; flex-wrap:wrap; gap:10px; padding: 10px; background: rgba(0,0,0,0.1); border-radius:4px; margin-top:10px;">';
+      for (const colId of unlockedCols) {
+        const item = Game.Config.COLLECTIONS[colId];
+        if (item) {
+          html += `<div title="${item.label}" style="font-size:24px; background:var(--bg-panel); padding:5px; border-radius:5px; border:1px solid rgba(255,255,255,0.1); cursor:help;">${item.icon}</div>`;
+        }
+      }
+      html += '</div>';
+    }
+
     panel.innerHTML = html;
   }
 
   return {
     init,
+    initMainMenu,
+    openEditModal,
     updateStatusBars,
     updateMoodletDisplay,
     updateQueueDisplay,
@@ -544,12 +807,36 @@ Game.UI = (function() {
     cancelBuild,
     doSocialInteraction,
     toggleSellMode,
+    playAnnouncer,
   };
+
+  function playAnnouncer(text) {
+    const overlay = document.getElementById('announcer-overlay');
+    const txt = document.getElementById('announcer-text');
+    if (!overlay || !txt) return;
+    
+    txt.innerText = text;
+    overlay.style.display = 'block';
+    overlay.classList.remove('hidden');
+    
+    // Force reflow to restart animation
+    txt.style.animation = 'none';
+    txt.offsetHeight; /* trigger reflow */
+    txt.style.animation = null;
+    
+    setTimeout(() => {
+        overlay.style.display = 'none';
+        overlay.classList.add('hidden');
+    }, 2500);
+  }
 
   function toggleSellMode() {
     const ui = Game.State.get().ui;
+    const container = document.querySelector('.canvas-area');
     if (ui.mode === 'sell') {
       ui.mode = 'live';
+      // Always clean up handler on exit
+      container.removeEventListener('click', handleSellClick);
       Game.UI.showNotification('🚪 Exited sell mode');
       // Refresh build panel
       const panel = document.getElementById('side-panel');
@@ -559,9 +846,8 @@ Game.UI = (function() {
     } else {
       ui.mode = 'sell';
       Game.UI.showNotification('🗑️ Sell Mode: Click furniture to sell, rooms to demolish');
-      // Set up sell click handler
-      const canvas = document.getElementById('game-canvas');
-      canvas.addEventListener('click', handleSellClick);
+      // Set up sell click handler on the Phaser container
+      container.addEventListener('click', handleSellClick);
       // Refresh build panel
       const panel = document.getElementById('side-panel');
       if (panel && panel.dataset.active === 'build') {
@@ -573,17 +859,15 @@ Game.UI = (function() {
   function handleSellClick(e) {
     const ui = Game.State.get().ui;
     if (ui.mode !== 'sell') {
-      const canvas = document.getElementById('game-canvas');
-      canvas.removeEventListener('click', handleSellClick);
+      const container = document.querySelector('.canvas-area');
+      container.removeEventListener('click', handleSellClick);
       return;
     }
 
-    const canvas = document.getElementById('game-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const cx = (e.clientX - rect.left) * scaleX;
-    const cy = (e.clientY - rect.top) * scaleY;
+    const container = document.querySelector('.canvas-area');
+    const rect = container.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
     const gp = Game.Renderer.getGridPos(cx, cy);
 
     // Try to sell furniture first

@@ -33,15 +33,24 @@ Game.Character = (function() {
     return (ups.good_genes || 0) * -0.10;
   }
 
+  // ---- Comfort Cache (invalidated by furniture changes) ----
+  let _comfortCache = null;
+  let _comfortDirty = true;
+  function invalidateComfortCache() { _comfortDirty = true; }
+
   function calculateComfortBonus() {
-    const house = Game.State.get().house;
+    if (!_comfortDirty && _comfortCache !== null) return _comfortCache;
+    const activeMap = Game.State.getActiveMap();
     let totalComfort = 0;
-    for (const furn of house.furniture) {
-      if (isFurnitureBroken(furn.id)) continue; // Broken furniture gives no comfort
+    if (!activeMap) { _comfortCache = 0; _comfortDirty = false; return 0; }
+    for (const furn of activeMap.furniture) {
+      if (isFurnitureBroken(furn.id)) continue;
       const furnCfg = cfg.FURNITURE[furn.type];
       if (furnCfg) totalComfort += furnCfg.comfort;
     }
-    return Math.min(totalComfort, 30);
+    _comfortCache = Math.min(totalComfort, 30);
+    _comfortDirty = false;
+    return _comfortCache;
   }
 
   // ---- Moodlet System ----
@@ -149,7 +158,11 @@ Game.Character = (function() {
     if (char.currentActivity) return; // Still doing something
     if (char.actionQueue.length === 0) return false;
     const next = char.actionQueue.shift();
-    return startActivity(next, true); // true = from queue
+    // Queue stores plain activity key strings, not objects
+    if (typeof next === 'string') {
+      return startActivity(next, true);
+    }
+    return startActivity(next.key, true, next.targetFurnId); // true = from queue
   }
 
   function clearQueue() {
@@ -157,20 +170,49 @@ Game.Character = (function() {
   }
 
   // ---- Activity System ----
-  function startActivity(activityKey, fromQueue) {
+  function startActivity(activityKey, fromQueue, targetFurnId = null) {
     const char = getState();
     const actCfg = cfg.ACTIVITIES[activityKey];
     if (!actCfg) return false;
+    const activeMap = Game.State.getActiveMap();
 
-    // Check if we have the room
-    if (actCfg.room) {
-      const house = Game.State.get().house;
-      const hasRoom = house.rooms.some(r => r.type === actCfg.room);
+    // Check money cost
+    if (actCfg.cost && !Game.Economy.canAfford(actCfg.cost)) {
+        if (Game.UI) Game.UI.showNotification(`Not enough money for ${actCfg.label}!`);
+        return false;
+    }
+
+    // Handle instant Travel
+    if (activityKey === 'travel' && targetFurnId) {
+      const portal = activeMap.furniture.find(f => f.id === targetFurnId);
+      if (portal && portal.config && portal.config.targetMap) {
+        char.mapId = portal.config.targetMap;
+        char.position.x = portal.config.targetX || 2;
+        char.position.y = portal.config.targetY || 2;
+        char.targetPosition = null;
+        char.currentActivity = null;
+        char.activityProgress = 0;
+        char.actionQueue = [];
+        if (Game.Renderer && Game.Renderer.transitionMap) {
+           Game.Renderer.transitionMap();
+        }
+        Game.UI && Game.UI.showNotification(`🚪 Traveled!`);
+        return true;
+      }
+      return false;
+    }
+    if (actCfg.room && actCfg.room !== '*') {
+      const hasRoom = activeMap.rooms.some(r => r.type === actCfg.room);
       if (!hasRoom) return false;
 
       // Check furniture if needed
       if (actCfg.furniture) {
-        const hasFurn = house.furniture.some(f => f.type.includes(actCfg.furniture));
+        const hasFurn = activeMap.furniture.some(f => f.type.includes(actCfg.furniture));
+        if (!hasFurn) return false;
+      }
+    } else if (actCfg.room === '*') {
+      if (actCfg.furniture) {
+        const hasFurn = activeMap.furniture.some(f => f.type.includes(actCfg.furniture));
         if (!hasFurn) return false;
       }
     }
@@ -178,8 +220,15 @@ Game.Character = (function() {
     // Check energy cost
     if (actCfg.energyCost && char.needs.energy < actCfg.energyCost) return false;
 
+    // Check money cost
+    if (actCfg.cost && !Game.Economy.canAfford(actCfg.cost)) {
+        if (Game.UI) Game.UI.showNotification(`Not enough money for ${actCfg.label}!`);
+        return false;
+    }
+
     char.currentActivity = {
       type: activityKey,
+      targetFurnId: targetFurnId,
       startTime: Game.State.get().time.totalMinutes,
       duration: actCfg.duration,
       elapsed: 0,
@@ -189,17 +238,25 @@ Game.Character = (function() {
 
     // Move to room
     if (actCfg.room) {
-      const room = Game.State.get().house.rooms.find(r => r.type === actCfg.room);
-      if (room) {
+      let room = null;
+      if (actCfg.room !== '*') room = activeMap.rooms.find(r => r.type === actCfg.room);
+      
+      if (room || actCfg.room === '*') {
         // Find the specific furniture if activity requires it
         if (actCfg.furniture) {
-          const furn = Game.State.get().house.furniture.find(f => f.type.includes(actCfg.furniture));
+          let furn = null;
+          if (targetFurnId) {
+             furn = activeMap.furniture.find(f => f.id === targetFurnId);
+          } else {
+             furn = activeMap.furniture.find(f => f.type.includes(actCfg.furniture));
+          }
           if (furn) {
             char.targetPosition = { x: furn.x + 0.5, y: furn.y + 0.5 };
-          } else {
+            char.currentActivity.targetFurnId = furn.id; // Save it if we auto-picked
+          } else if (room) {
             char.targetPosition = { x: room.x + 1, y: room.y + 1 };
           }
-        } else {
+        } else if (room) {
           char.targetPosition = { x: room.x + 1, y: room.y + 1 };
         }
       }
@@ -224,13 +281,13 @@ Game.Character = (function() {
 
     // Activity complete
     if (act.elapsed >= act.duration) {
-      completeActivity(act.type, actCfg);
+      completeActivity(act.type, actCfg, act.targetFurnId);
       char.currentActivity = null;
       char.activityProgress = 0;
     }
   }
 
-  function completeActivity(type, actCfg) {
+  function completeActivity(type, actCfg, targetFurnId) {
     const char = getState();
 
     // Apply need bonuses
@@ -246,6 +303,11 @@ Game.Character = (function() {
     if (actCfg.energyCost) {
       char.needs.energy = Math.max(0, char.needs.energy - actCfg.energyCost);
     }
+    
+    // Deduct monetary cost
+    if (actCfg.cost) {
+      Game.Economy.spend(actCfg.cost);
+    }
 
     // Apply skill XP
     if (actCfg.skill && actCfg.xp) {
@@ -255,6 +317,103 @@ Game.Character = (function() {
     // Apply moodlet
     if (actCfg.moodlet) {
       addMoodlet(actCfg.moodlet);
+      if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
+         Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y, '+ Moodlet', '#9C27B0', '🎭');
+      }
+    }
+
+    // Floating text for big Need boosts
+    if (actCfg.needs) {
+       let bestNeed = '';
+       let maxVal = 0;
+       for (const [n, v] of Object.entries(actCfg.needs)) {
+          if (v > maxVal) { maxVal = v; bestNeed = n; }
+       }
+       if (maxVal > 0 && Game.Renderer && Game.Renderer.spawnFloatingBubble) {
+          let mainColor = '#4CAF50';
+          if (bestNeed === 'fun') mainColor = '#FF9800';
+          else if (bestNeed === 'energy' || bestNeed === 'bladder') mainColor = '#FFEB3B';
+          else if (bestNeed === 'social') mainColor = '#E91E63';
+          else if (bestNeed === 'hygiene') mainColor = '#03A9F4';
+          
+          Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 0.5, `+${maxVal} ${bestNeed}`, mainColor, actCfg.icon || '✨');
+       }
+    }
+
+    // Award money (e.g. harvesting)
+    if (actCfg.earnings) {
+      const state = Game.State.get();
+      state.money = (state.money || 0) + actCfg.earnings;
+      if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
+         Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 1.0, `+$${actCfg.earnings}`, '#FFD700', '💰');
+      }
+    }
+
+    // Custom Furniture Logic (e.g. Garden Plots)
+    if (targetFurnId) {
+      const activeMap = Game.State.getActiveMap();
+      const furn = activeMap.furniture.find(f => f.id === targetFurnId);
+      if (furn) {
+        if (type === 'plant_seed') {
+          furn.cropState = 'growing';
+          furn.growth = 0;
+          furn.needsWater = true;
+        } else if (type === 'water_crop') {
+          furn.needsWater = false;
+        } else if (type === 'harvest_crop') {
+          // Grant Potted Flower Cultivation Reward!
+          if (furn.growth >= 100) {
+            activeMap.furniture.push({
+               id: 'flower_' + Date.now(),
+               type: 'potted_flower',
+               x: Math.floor(char.position.x),
+               y: Math.floor(char.position.y) + 1,
+               roomId: null,
+               rotated: false
+            });
+            if (Game.UI) Game.UI.showNotification('🌸 Harvested a beautiful Potted Flower! Enter Build Mode to decorate with it.');
+            if (Game.Renderer && Game.Renderer.requestFullSync) Game.Renderer.requestFullSync();
+          }
+
+          furn.cropState = 'empty';
+          furn.growth = 0;
+          furn.needsWater = false;
+        } else if (type === 'fill_bowl') {
+          furn.isFull = true;
+          if (Game.UI) Game.UI.showNotification('🐟 Filled the pet bowl! Let\'s wait and see who comes by.');
+          if (Game.Renderer && Game.Renderer.requestFullSync) Game.Renderer.requestFullSync();
+        } else if (type === 'take_subway') {
+           if (furn.config && furn.config.targetMap) {
+              char.mapId = furn.config.targetMap;
+              char.position.x = furn.config.targetX || 4;
+              char.position.y = furn.config.targetY || 8;
+              char.targetPosition = null;
+              char.actionQueue = [];
+              if (Game.Renderer && Game.Renderer.transitionMap) Game.Renderer.transitionMap();
+              Game.UI && Game.UI.showNotification(`🚇 Arrived at ${furn.config.targetMap}!`);
+           }
+        }
+      }
+    }
+
+    if (type === 'buy_souvenir') {
+       const collections = Object.values(Game.Config.COLLECTIONS);
+       if (collections.length > 0) {
+         const item = collections[Math.floor(Math.random() * collections.length)];
+         if (!char.collection.includes(item.id)) {
+           char.collection.push(item.id);
+           Game.UI && Game.UI.showNotification(`🎁 Got a new souvenir: ${item.icon} ${item.label}!`);
+         } else {
+           Game.UI && Game.UI.showNotification(`🎁 Got a duplicate: ${item.icon} ${item.label}.`);
+         }
+       }
+    }
+
+    if (type === 'invite_over') {
+       if (Game.Main && Game.Main.spawnNPCWalker) {
+          Game.Main.spawnNPCWalker();
+          if (Game.UI) Game.UI.showNotification('👋 A friend has arrived to visit!');
+       }
     }
 
     // Stats tracking
@@ -262,10 +421,13 @@ Game.Character = (function() {
       Game.State.get().stats.mealsCooked++;
     }
 
+    // Check Achievements periodically
+    checkAchievements();
+
     // Furniture breakage roll
     if (actCfg.furniture) {
-      const house = Game.State.get().house;
-      const usedFurn = house.furniture.find(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id));
+      const activeMap = Game.State.getActiveMap();
+      const usedFurn = activeMap.furniture.find(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id));
       if (usedFurn) {
         const fc = cfg.FURNITURE[usedFurn.type];
         if (fc && fc.breakChance) {
@@ -285,6 +447,12 @@ Game.Character = (function() {
       }
     }
 
+    // Visual feedback: only spawn explosion for physical activities
+    const physicalActivities = ['cook', 'exercise', 'repair', 'grill', 'tinker', 'harvest_crop', 'plant_seed', 'invite_over'];
+    if (physicalActivities.includes(type) && Game.Renderer && Game.Renderer.spawnExplosion) {
+      const pos = char.targetPosition || char.position;
+      Game.Renderer.spawnExplosion(pos.x + 0.5, pos.y + 0.5, 0.5);
+    }
     Game.UI && Game.UI.showNotification(`✅ ${actCfg.label} complete!`);
   }
 
@@ -297,13 +465,18 @@ Game.Character = (function() {
   function isAvailableActivity(activityKey) {
     const actCfg = cfg.ACTIVITIES[activityKey];
     if (!actCfg) return false;
-    const house = Game.State.get().house;
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return false;
 
-    if (actCfg.room) {
-      if (!house.rooms.some(r => r.type === actCfg.room)) return false;
+    if (actCfg.room && actCfg.room !== '*') {
+      if (!activeMap.rooms.some(r => r.type === actCfg.room)) return false;
       if (actCfg.furniture) {
         // Check for non-broken furniture
-        if (!house.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
+        if (!activeMap.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
+      }
+    } else if (actCfg.room === '*') {
+      if (actCfg.furniture) {
+        if (!activeMap.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
       }
     }
     if (actCfg.energyCost) {
@@ -334,45 +507,139 @@ Game.Character = (function() {
   // ---- Position ----
   function updatePosition(delta) {
     const char = getState();
-    if (!char.targetPosition) return;
 
-    const dx = char.targetPosition.x - char.position.x;
-    const dy = char.targetPosition.y - char.position.y;
-    const dist = Math.sqrt(dx * dx + dy * dy);
+    // Physics update (Gravity and Z-Axis jumping)
+    if (char.position.z !== undefined && (char.position.z > 0 || char.vz !== 0)) {
+        char.vz -= 0.15 * delta; // Adjust gravity based on game speed tick delta
+        char.position.z += char.vz * delta;
+        
+        // Floor collision
+        if (char.position.z <= 0) {
+            char.position.z = 0;
+            char.vz = 0;
+            
+            // Spawn a dust explosion on landing
+            if (Game.Renderer && Game.Renderer.spawnExplosion) {
+                Game.Renderer.spawnExplosion(char.position.x, char.position.y, 0.3);
+            }
+        }
+    }
 
-    if (dist < 0.1) {
-      char.position.x = char.targetPosition.x;
-      char.position.y = char.targetPosition.y;
-      char.targetPosition = null;
+    // Reset move status
+    if (!char.targetPosition) {
+      char.wasMoving = false;
+      char.path = null;
       return;
     }
 
-    const speed = 3 * delta;
-    char.position.x += (dx / dist) * Math.min(speed, dist);
-    char.position.y += (dy / dist) * Math.min(speed, dist);
+    // Need path calculation
+    if (!char.path && !char.isPathfinding) {
+      const rx = Math.floor(char.position.x);
+      const ry = Math.floor(char.position.y);
+      const tx = Math.floor(char.targetPosition.x);
+      const ty = Math.floor(char.targetPosition.y);
+      
+      if (Game.Renderer && Game.Renderer.findPath) {
+        char.isPathfinding = true;
+        Game.Renderer.findPath(rx, ry, tx, ty, (path) => {
+          char.isPathfinding = false;
+          char.path = path;
+          // EasyStar might return null if unreachable
+          if (!path || path.length === 0) {
+             char.targetPosition = null; 
+             char.path = null;
+             Game.UI && Game.UI.showNotification("🚫 I can't reach that!");
+          }
+        });
+      } else {
+        // Fallback if no Renderer path
+        char.path = [{x: tx, y: ty}];
+      }
+      return;
+    }
+
+    // Waiting for path callback
+    if (char.isPathfinding || !char.path) return;
+
+    // We have a path, move towards the next node
+    const nextNode = char.path[0];
+    const targetX = nextNode.x + 0.5; // Walk to center of isometric tile
+    const targetY = nextNode.y + 0.5;
+
+    const dx = targetX - char.position.x;
+    const dy = targetY - char.position.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    const speed = Math.max(3, 5) * delta; // Set robust walking speed
+    
+    if (dist < speed) {
+      // Reached this node
+      char.position.x = targetX;
+      char.position.y = targetY;
+      char.path.shift();
+      
+      if (char.path.length === 0) {
+        char.targetPosition = null;
+        char.path = null;
+        char.wasMoving = false;
+        if (Game.Renderer && Game.Renderer.spawnExplosion) {
+           Game.Renderer.spawnExplosion(char.position.x, char.position.y, 0.4);
+        }
+      }
+    } else {
+      char.wasMoving = true;
+      char.position.x += (dx / dist) * speed;
+      char.position.y += (dy / dist) * speed;
+    }
   }
 
   // ---- Furniture Breakage ----
   function isFurnitureBroken(furnId) {
-    const house = Game.State.get().house;
-    return (house.brokenFurniture || []).includes(furnId);
+    const activeMap = Game.State.getActiveMap();
+    return activeMap && (activeMap.brokenFurniture || []).includes(furnId);
   }
 
   function breakFurniture(furnId) {
-    const house = Game.State.get().house;
-    if (!house.brokenFurniture) house.brokenFurniture = [];
-    if (!house.brokenFurniture.includes(furnId)) {
-      house.brokenFurniture.push(furnId);
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return;
+    if (!activeMap.brokenFurniture) activeMap.brokenFurniture = [];
+    if (!activeMap.brokenFurniture.includes(furnId)) {
+      activeMap.brokenFurniture.push(furnId);
     }
   }
 
   function repairFurniture(furnId) {
-    const house = Game.State.get().house;
-    if (!house.brokenFurniture) return false;
-    const idx = house.brokenFurniture.indexOf(furnId);
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap || !activeMap.brokenFurniture) return false;
+    const idx = activeMap.brokenFurniture.indexOf(furnId);
     if (idx === -1) return false;
-    house.brokenFurniture.splice(idx, 1);
+    activeMap.brokenFurniture.splice(idx, 1);
     return true;
+  }
+
+  // ---- Achievements & Collections ----
+  function unlockAchievement(id) {
+    const char = getState();
+    if (!char.achievements) char.achievements = [];
+    if (!char.achievements.includes(id)) {
+      char.achievements.push(id);
+      const ach = Game.Config.ACHIEVEMENTS[id];
+      if (ach && Game.UI) {
+        Game.UI.showNotification(`🏆 Achievement Unlocked: ${ach.icon} ${ach.label}!`);
+      }
+    }
+  }
+
+  function checkAchievements() {
+    const state = Game.State.get();
+    const char = state.character;
+    
+    if (state.money >= 1000000) unlockAchievement('millionaire');
+    if (char.skills.language >= 6) unlockAchievement('hsk_master');
+    if (char.collection && char.collection.length >= Object.keys(Game.Config.COLLECTIONS).length) {
+      // you could add a collector achievement
+    }
+    // more checks can be added here
   }
 
   return {
@@ -395,6 +662,7 @@ Game.Character = (function() {
     getLifeStageLabel,
     updatePosition,
     calculateComfortBonus,
+    invalidateComfortCache,
     getState,
     isFurnitureBroken,
     breakFurniture,

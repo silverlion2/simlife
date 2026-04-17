@@ -1,0 +1,526 @@
+
+<!DOCTYPE html>
+<html lang='en'>
+
+	<head>
+	
+		<meta charset='utf-8'>
+		<meta name='viewport' content='width=device-width, initial-scale=1'>
+
+		<title>Assets &middot; Kenney</title>
+		
+		<meta name='description' content=''>
+		<meta name='keywords' content='Games, Software, Game assets, Assets, Gamedev'>
+		<meta name='author' content='Kenney'>
+		
+		<script>
+		
+			(function(){
+				
+				const savedTheme = localStorage.getItem('theme');
+				const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				
+				if(savedTheme === 'dark' || (!savedTheme && systemDark)){
+					
+					document.documentElement.classList.add('dark');
+					
+				}else{
+					
+					document.documentElement.classList.remove('dark');
+					
+				}
+				
+			})();
+		
+		</script>
+		
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/bootstrap-grid.min.css?1' />
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/fonts.css?1' />
+		
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/kenney.css?1' />
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/kenney-common.css?1' />
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/kenney-dark.css?1' />
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/kenney-forms.css?1' />
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/kenney-sidebar.css?1' />
+		
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/animate.min.css?1' />
+		<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/code-github-dark-dimmed.css' />
+		
+		<!-- OpenGraph !-->
+		
+		<meta property='og:url'	content='https://kenney.nl/assets' />
+		<meta property='og:type' content='article' />
+	
+		<meta property='og:title' content='Assets &middot; Kenney' />
+		
+		<!-- Meta !-->
+		
+		<meta name='twitter:card' content='summary_large_image'>
+		<meta property='twitter:domain' content='kenney.nl'>
+		<meta property='twitter:url' content='https://kenney.nl/assets'>
+		<meta name='twitter:title' content='Assets &middot; Kenney'>
+		
+		<meta property='og:image'	content='https://kenney.nl/data/img/kenney-promo.png' />		
+				
+			<link rel="alternate" type="application/rss+xml" title="Latest game assets" href="https://kenney.nl/feed"/>
+			<link rel="alternate" type="application/json" title="Latest game assets" href="https://kenney.nl/feed"/>
+		
+				
+	</head>
+	
+	<body class='wrapper'>
+	
+		<!-- <a href='https://kenney.nl/donate' class='warning no-select'><img src='https://kenney.nl/data/img/sparkles.svg' height='20px' style='vertical-align: bottom; margin-right:0.25em' /> Our game assets are free because of <u>donations</u> from the community, consider one if you can!</a> !-->
+		<!-- <a href='https://social.kenney.nl/bluesky' class='warning no-select'><img src='https://kenney.nl/data/img/sparkles.svg' height='20px' style='vertical-align: bottom; margin-right:0.25em' /> Follow on <u>BlueSky</u> to stay up-to-date with the latest releases!</a> !-->
+		<a target='_blank' href='https://kenney.itch.io/kenney-game-assets' class='warning no-select'><img src='https://kenney.nl/data/img/sparkles.svg' height='20px' style='vertical-align: bottom; margin-right:0.25em' /> Get Kenney Game Assets All-in-1 to download <u>everything</u> at once, plus free updates!</a>
+		
+		<!-- Notifcations !-->
+		
+		<div id='header-container'>
+			<div id='header'>
+			
+				<div class='logo-full mobile-show'>
+					<a href='https://kenney.nl'><img src="https://kenney.nl/data/img/logo.png" srcset="https://kenney.nl/data/img/logo@2.png 2x"/></a>
+					<!-- Badge !-->
+				</div>
+				
+					<div class="navigation">
+					
+						<ul>
+							<li class='icon mobile-show'><a href='#' onclick="openNavigation()"><span><img width='20' height='20' style='vertical-align: middle;' src='https://kenney.nl/data/img/icons/menu.svg'/></span></a></li>
+						
+							<li class='logo mobile-hide'>
+								<a href='https://kenney.nl'><img src="https://kenney.nl/data/img/logo.png" srcset="https://kenney.nl/data/img/logo@2.png 2x"/></a>
+								<!-- Badge !-->
+							</li>
+							
+							<div class='mobile-hide'>
+								<li class='item '><a href='https://kenney.nl/games'><span>Games</span></a></li>
+								<li class='item '><a href='https://kenney.nl/tools'><span>Tools</span></a></li>
+								<li class='item active'><a href='https://kenney.nl/assets'><span>Assets</span></a></li>
+								<li class='item '><a href='https://kenney.nl/starter-kits'><span>Starter Kits</span></a></li>
+							</div>
+						</ul>
+						
+					</div>
+					
+					<div class="navigation right">
+					
+						<ul class='mobile-hide'>
+							<li class='icon'><a class='toggle-theme' href='#'><img width='20' height='20' style='vertical-align: middle' src='https://kenney.nl/data/img/icons/icon-mode-dark.svg'/></a></li>
+							<li class='item '><a href='https://kenney.nl/donate'><span>Donate</span></a></li>
+						</ul>
+					
+					</div>
+					
+					<div id="sidebar" class='sidebar' class='no-select'>
+					
+						<a href="javascript:void(0)" class="close" onclick="closeNavigation()">&times;</a>
+						
+						<div class="sidebar-menu">
+							<a href="https://kenney.nl/games">Games</a>
+							<a href="https://kenney.nl/tools">Tools</a>
+							<a href="https://kenney.nl/assets">Assets</a>
+							<a href="https://kenney.nl/starter-kits">Starter Kits</a>
+						</div>
+						
+						<hr>
+						
+						<div class="sidebar-menu small">
+							<a href="https://kenney.nl/support">Support</a>
+							<a href="https://kenney.nl/knowledge-base">Knowledge Base</a>
+							<a href="https://kenney.nl/donate">Donate</a>
+							<a href="https://twitter.com/KenneyNL" target="_blank">Twitter</a>
+						</div>
+						
+						<hr>
+						
+						<div class="sidebar-menu small">
+							<a class='toggle-theme' href='#'><img width='20' height='20' style='vertical-align: middle; filter: brightness(0) invert(1)' src='https://kenney.nl/data/img/icons/icon-mode-dark.svg'/></a>
+						</div>
+						
+					</div>
+					
+					<div id="sidebar-notifications" class='sidebar lato no-select'>
+					
+						<a href="javascript:void(0)" class="close" onclick="closeNotifications()">&times;</a>
+						
+						<h3>News</h3>
+						
+						<!-- List !-->
+						
+					</div>
+				
+				<div style='clear:both'></div>
+				
+			</div>
+		</div>
+		
+		<!-- Tab !-->
+		
+		<div id='content'>
+
+<section class='no-padding mobile-padding'>
+
+	<div class='container large text-justify'>
+	
+		<form action='https://kenney.nl/assets/series:Isometric%20Miniature' autoComplete='none'>
+			<div class='row justify-content-center text-center'>
+			
+				<div class='col-md-4' style='position:relative'>
+					<img style='vertical-align:middle; position:absolute; left:20px; top:8px; opacity:0.5' src='https://kenney.nl/data/img/icons/search.svg'/>
+					
+					<input autocomplete='off' type='search' placeholder='Search' name='search' value='' style='text-align:center; font-family: "Noto Sans"; font-weight:800; font-size: 0.9em'/>
+					
+											<a style='vertical-align:sub; font-size: 1.5em; text-decoration:none; position:absolute; right:23px; top:5px' href='https://kenney.nl/assets'>&times;</a>
+									</div>
+			
+			</div>
+		</form>
+			
+		<div class='row justify-content-center text-center'>
+		
+			<div class='col-lg-5' style='position:relative'>
+				<p class='bold cloud no-select' style='overflow:visible'>
+					<a class='' href="https://kenney.nl/assets/category:2D">2D</a>
+					<a class='' href="https://kenney.nl/assets/category:3D">3D</a>
+					<a class='' href="https://kenney.nl/assets/tag:interface">UI</a>
+					<a class='' href="https://kenney.nl/assets/category:Audio">Audio</a>
+					<a class='' href="https://kenney.nl/assets/tag:pixel">Pixel</a>
+					<a class='mobile-hide ' href="https://kenney.nl/assets/category:Textures">Textures</a>
+				</p>
+			</div>
+		
+		</div>
+			
+		<div class='row'>
+		
+			<div class='col no-select align-self-start align-self-center'>
+				<p class='horizontal-list text-muted'>
+					<a href='https://kenney.nl/upcoming'>Upcoming</a>
+					<a href='https://kenney.nl/feed'>Feed</a>
+				</p>
+			</div>
+		
+			<div class='col text-right no-select align-self-end align-self-center'>
+				<form action='https://kenney.nl/assets/series:Isometric%20Miniature'>
+					
+					
+					<p class='horizontal-list text-muted'>
+						<span style='border-right:none; margin-right:0'>Sort by</span>
+						<span>
+							<select onchange="this.form.submit()" id="sort" name="sort" style='font-size:100% !important; width:auto; padding: 0.5em; font-size: 0.8em; border-right: 0.7em solid transparent;'>
+								
+								
+								<option value="release" >Release date</option>
+								<option value="update" selected>Latest update</option>
+								<option value="amount" >Quantity</option>
+								<option value="name" >Name</option>
+							</select>
+						</span>
+					</p>
+				</form>
+			</div>
+		
+		</div>
+	
+		<div class='row margin-top'>
+			
+					
+											
+				<div class='col-md-3'>
+					<div class='asset'>
+						<a href='https://kenney.nl/assets/isometric-miniature-bases'>
+							<div class='cover' style='background-image:url("https://kenney.nl/media/pages/assets/isometric-miniature-bases/b5cc6d2994-1686811736/preview-400x.png")'></div>
+						</a>
+						<h2><a href='https://kenney.nl/assets/isometric-miniature-bases'>Isometric Miniature Bases</a></h2>
+						<span class='bold text-muted'><span><a href='https://kenney.nl/assets/category:2D'>2D</a></span><span class='horizontal-separator'>&bull;</span><a href='https://kenney.nl/assets/series:Isometric%20Miniature'>Isometric Miniature</a></span>
+					</div>
+				</div>
+		
+											
+				<div class='col-md-3'>
+					<div class='asset'>
+						<a href='https://kenney.nl/assets/isometric-miniature-farm'>
+							<div class='cover' style='background-image:url("https://kenney.nl/media/pages/assets/isometric-miniature-farm/9e3139a2ce-1670690281/sample-400x.png")'></div>
+						</a>
+						<h2><a href='https://kenney.nl/assets/isometric-miniature-farm'>Isometric Miniature Farm</a></h2>
+						<span class='bold text-muted'><span><a href='https://kenney.nl/assets/category:2D'>2D</a></span><span class='horizontal-separator'>&bull;</span><a href='https://kenney.nl/assets/series:Isometric%20Miniature'>Isometric Miniature</a></span>
+					</div>
+				</div>
+		
+											
+				<div class='col-md-3'>
+					<div class='asset'>
+						<a href='https://kenney.nl/assets/isometric-miniature-dungeon'>
+							<div class='cover' style='background-image:url("https://kenney.nl/media/pages/assets/isometric-miniature-dungeon/32b0fa44cc-1674932240/sample-400x.png")'></div>
+						</a>
+						<h2><a href='https://kenney.nl/assets/isometric-miniature-dungeon'>Isometric Miniature Dungeon</a></h2>
+						<span class='bold text-muted'><span><a href='https://kenney.nl/assets/category:2D'>2D</a></span><span class='horizontal-separator'>&bull;</span><a href='https://kenney.nl/assets/series:Isometric%20Miniature'>Isometric Miniature</a></span>
+					</div>
+				</div>
+		
+											
+				<div class='col-md-3'>
+					<div class='asset'>
+						<a href='https://kenney.nl/assets/isometric-miniature-library'>
+							<div class='cover' style='background-image:url("https://kenney.nl/media/pages/assets/isometric-miniature-library/64cbf3ee0f-1674932044/sample-400x.png")'></div>
+						</a>
+						<h2><a href='https://kenney.nl/assets/isometric-miniature-library'>Isometric Miniature Library</a></h2>
+						<span class='bold text-muted'><span><a href='https://kenney.nl/assets/category:2D'>2D</a></span><span class='horizontal-separator'>&bull;</span><a href='https://kenney.nl/assets/series:Isometric%20Miniature'>Isometric Miniature</a></span>
+					</div>
+				</div>
+		
+											
+				<div class='col-md-3'>
+					<div class='asset'>
+						<a href='https://kenney.nl/assets/isometric-miniature-prototype'>
+							<div class='cover' style='background-image:url("https://kenney.nl/media/pages/assets/isometric-miniature-prototype/8e09ce09d3-1674932123/sample-400x.png")'></div>
+						</a>
+						<h2><a href='https://kenney.nl/assets/isometric-miniature-prototype'>Isometric Miniature Prototype</a></h2>
+						<span class='bold text-muted'><span><a href='https://kenney.nl/assets/category:2D'>2D</a></span><span class='horizontal-separator'>&bull;</span><a href='https://kenney.nl/assets/series:Isometric%20Miniature'>Isometric Miniature</a></span>
+					</div>
+				</div>
+		
+						
+		</div>
+		
+		<div class='row text-center margin-top'>
+			<div class='col'>
+				
+<style>
+
+	.pagination{
+		
+		list-style:none;
+		margin:0; padding:0;
+		
+		font-size:90%;
+		font-weight: bold;
+		
+	}
+	
+	.pagination li{ display:inline; }
+
+	.pagination li a{
+		
+		color:inherit;
+		display:inline;
+		border-radius:0.25em;
+		
+		text-decoration:none;
+		
+		padding: 0.3em 0.8em;
+		vertical-align: top;
+		
+	}
+	
+	.pagination li a:hover{
+		
+		color:#ffbd2e !important;
+		
+	}
+	
+	.pagination li a.selected{
+		
+		background-color:#ffbd2e;
+		border-radius:0.3em;
+		
+	}
+	
+	.pagination li a.selected:hover{
+		
+		color:white !important;
+		text-decoration:none !important;
+		
+	}
+
+	.pagination li a.icon{ vertical-align: sub; opacity:0.35; }
+	.pagination li a.icon:hover{ opacity:1; }
+	
+	.pagination li.space{
+		
+		margin:0em 1em;
+		
+	}
+	
+	.pagination li.seperator{
+		
+		margin-left: 0.5em;
+		margin-right: 0.5em;
+		opacity: 0.5;
+		vertical-align: text-bottom;
+		
+	}
+	
+</style>			</div>
+		</div>
+		
+	</div>
+	
+</section>
+
+	</div>
+
+<footer class='text-muted'>
+	
+	<div class='row mobile-stack'>
+	
+		<div class='col horizontal-list'>
+		
+			<span>Copyright &copy; 2010 - 2026 &middot; All rights reserved</span>
+		
+		</div>
+		
+		<div class='col text-right mobile-text-center mobile-margin-top horizontal-list'>
+		
+						
+				<a href='https://kenney.nl/feed'>Feed</a>
+			
+					
+			<a href='https://kenney.nl/support'>Support</a>
+			<a href='https://kenney.nl/knowledge-base'>Knowledge Base</a>
+			<a href='https://kenney.nl/privacy-policy'>Privacy Policy</a>
+			<a href='https://kenney.nl/terms-of-service'>Terms of Service</a>
+			
+						
+		</div>
+	
+	</div>
+	
+</footer>
+
+<link rel='stylesheet' type='text/css' href='https://kenney.nl/data/css/lity.min.css' />
+
+<script type='text/javascript' src='https://kenney.nl/data/js/mobile-menu.js'></script>
+<script type='text/javascript' src='https://kenney.nl/data/js/jquery.slim.min.js'></script>
+<script type='text/javascript' src='https://kenney.nl/data/js/lity.min.js'></script>
+<script type='text/javascript' src='https://kenney.nl/data/js/kenney.js'></script>
+<script type='text/javascript' src='https://kenney.nl/data/js/kenney-theme-switching.js'></script>
+
+<a style='display:none' rel="me" href="https://mastodon.gamedev.place/@kenney">Mastodon</a>
+
+
+</body>
+</html>
+
+<!-- Rendered at 2026-04-16 13:53:02 -->
+<style>
+
+	/* Asset */
+	
+	.asset{
+		
+		text-align: center;
+		
+		position:relative;
+		margin-bottom:3em;
+		
+		text-decoration:none !important;
+		
+	}
+	
+	.asset a{ text-decoration:none; }
+	
+	.asset .cover{
+		
+		position:relative;
+		
+		margin-bottom:1em;
+		height:120px;
+		
+		display:block;
+		
+		border-radius:0.5em;
+		
+		background-size: 130%;
+		transition: background-size 0.2s ease-out;
+		
+		background-position: center center;
+		
+		box-shadow: 0px 2px 2px #0000003b;
+		
+	}
+	
+	.asset .cover:hover{
+		
+		background-color:#262633;
+		
+		background-size: 160%;
+		transition: background-size 0.1s ease-out;
+		
+	}
+	
+	.asset .bold a{
+		
+		border:none;
+		
+	}
+	
+	.asset h2{
+		
+		text-overflow: ellipsis;
+		overflow: hidden;
+		white-space: nowrap;
+		
+		font-size:1.25em;
+		margin:0;
+		
+	}
+	
+	.asset h2:hover{
+		
+		text-decoration:underline;
+		
+	}
+	
+	.asset h2 a:hover, .bold a:hover{
+		
+		color:inherit !important;
+		border-color:inherit !important;
+		
+	}
+	
+	.asset p{
+		
+		margin:0;
+		margin-bottom:0.25em;
+		
+	}
+	
+	.asset .tag{
+		
+		font-size: 0.8em;
+		font-weight: 800;
+		
+		text-align:left;
+	
+	}
+	
+	.asset .tag a{ text-decoration:none; }
+	
+	/* Tag cloud */
+	
+	.cloud a{
+		
+		color:#262633;
+		font-size: 0.9em;
+		padding: 0.3em 0.7em;
+		background-color: white;
+		margin: 0em 0.2em;
+		border-radius: 0.3em;
+		border: none !important;
+		
+	}
+	
+	.cloud a:hover, .cloud a.selected{
+
+		color:white !important;
+		background-color:#ffbd2e;
+		border-width: 0 !important;
+		
+	}
+	
+	.cloud a.selected{ color:white; pointer-events: none; }
+
+</style>

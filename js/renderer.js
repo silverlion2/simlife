@@ -1,819 +1,1137 @@
 // ============================================================
-// SimLife — Canvas Renderer (Top-Down Orthogonal RPG Style)
+// SimLife — Phaser 3 Isometric Renderer
 // ============================================================
+// Phase 1 Migration: Basic Grid & Isometric Projections
+
 window.Game = window.Game || {};
 
 Game.Renderer = (function() {
-  let canvas, ctx;
-  let bgCanvas, bgCtx;
-  let bgDirty = true;
-  let cellSize = 64;
-  let particles = [];
-  let animFrame = 0;
-  let clouds = [];
+  let phaserGame = null;
+  let mainScene = null;
+  let easyStar = null;
   
-  // Camera Panning
-  let cameraX = 0;
-  let cameraY = 0;
+  // Grid metrics
+  const TILE_W = 64;
+  const TILE_H = 32;
 
-  // Render context toggles for offscreen cache
-  let activeCtx = null;
-  let activeToScreen = null;
+  let spriteMap = new Map();
+  let characterSprite = null;
+  let buildGhostSprite = null;
+  let npcSpriteMap = new Map();
+  let debugGraphics = null;
+  window.DEBUG_BOUNDS = false;
 
-  // Delta time tracking
-  let lastTimestamp = 0;
-
-  // Character interpolation
-  let charRenderX = 0;
-  let charRenderY = 0;
-  let isWalking = false;
-
-  // Expose marking background dirty globally 
-  function setBgDirty() { bgDirty = true; }
-
-  function toScreen(gx, gy) {
-    if (!canvas) return { x: 0, y: 0 };
-    const w = canvas.width;
-    const h = canvas.height;
-    const state = Game.State.get();
-    const houseW = state.house ? state.house.lotWidth : 10;
-    const houseH = state.house ? state.house.lotHeight : 10;
-    
-    const sx = (w / 2) + (gx - houseW/2) * cellSize + cameraX;
-    const sy = (h / 2) + (gy - houseH/2) * cellSize + cameraY;
-    return { x: sx, y: sy };
-  }
-
-  function toGrid(sx, sy) {
-    if (!canvas) return { x: 0, y: 0 };
-    const w = canvas.width;
-    const h = canvas.height;
-    const state = Game.State.get();
-    const houseW = state.house ? state.house.lotWidth : 10;
-    const houseH = state.house ? state.house.lotHeight : 10;
-    
-    const gx = (sx - (w / 2) - cameraX) / cellSize + (houseW/2);
-    const gy = (sy - (h / 2) - cameraY) / cellSize + (houseH/2);
-    return { x: gx, y: gy };
-  }
-
-  function toBgScreen(gx, gy) {
-    return {
-      x: gx * cellSize + cellSize * 2,
-      y: gy * cellSize + cellSize * 2
-    };
-  }
-
-  function init(canvasEl) {
-    canvas = canvasEl;
-    ctx = canvas.getContext('2d');
-    
-    bgCanvas = document.createElement('canvas');
-    bgCtx = bgCanvas.getContext('2d');
-    
-    activeCtx = ctx;
-    activeToScreen = toScreen;
-
-    ctx.imageSmoothingEnabled = false;
-    bgCtx.imageSmoothingEnabled = false;
-
-    resize();
-    window.addEventListener('resize', resize);
-  }
-
-  function resize() {
-    const container = canvas.parentElement;
-    const size = Math.min(container.clientWidth, container.clientHeight, 800);
-    canvas.width = size;
-    canvas.height = size;
-    const house = Game.State.get().house;
-    cellSize = Math.floor(size / Math.max(house.lotWidth || 10, house.lotHeight || 10) * 0.75);
-    ctx.imageSmoothingEnabled = false;
-    bgDirty = true;
-  }
-
-  function setCameraOffset(dx, dy) {
-    cameraX += dx;
-    cameraY += dy;
-    const maxPan = cellSize * 5;
-    cameraX = Math.max(-maxPan, Math.min(maxPan, cameraX));
-    cameraY = Math.max(-maxPan, Math.min(maxPan, cameraY));
-  }
-
-  function updateBgCache(house) {
-    const houseW = house ? house.lotWidth : 10;
-    const houseH = house ? house.lotHeight : 10;
-    const pad = cellSize * 2;
-    bgCanvas.width = houseW * cellSize + pad * 2;
-    bgCanvas.height = houseH * cellSize + pad * 2;
-    bgCtx.imageSmoothingEnabled = false;
-
-    activeCtx = bgCtx;
-    activeToScreen = toBgScreen;
-
-    // Grass Base
-    bgCtx.fillStyle = '#4CAF50';
-    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
-    bgCtx.fillStyle = '#388E3C';
-    for(let i=0; i<30; i++) {
-        const gx = Math.sin(i * 123) * bgCanvas.width;
-        const gy = Math.cos(i * 321) * bgCanvas.height;
-        bgCtx.fillRect(Math.abs(gx) % bgCanvas.width, Math.abs(gy) % bgCanvas.height, 4, 8);
+  class MainScene extends Phaser.Scene {
+    constructor() {
+      super({ key: 'MainScene' });
     }
 
-    drawRoomFloors(house);
-    drawWalls(house);
-    drawGrid(house);
+    preload() {
+      // -------------------------------------------------------------
+      // PHASE 3 INTEGRATION: Real Asset Loading (Kenney.nl)
+      // -------------------------------------------------------------
+      // We load the 256x512 Kenney Isometric Farm assets
+      this.load.image('floor', 'assets/kenney_minifarm/Isometric/dirt_E.png');
+      this.load.image('planks', 'assets/kenney_minifarm/Isometric/planks_E.png');
+      this.load.image('wall_e', 'assets/kenney_minifarm/Isometric/woodWall_E.png');
+      this.load.image('wall_n', 'assets/kenney_minifarm/Isometric/woodWall_N.png');
+      this.load.image('character', 'assets/kenney_minifarm/Isometric/corn_E.png'); // legacy fallback
+      this.load.image('new_iso_human', 'assets/characters/new_iso_human.png'); // new genuine 3D char
+      this.load.image('hay', 'assets/kenney_minifarm/Isometric/hayBales_E.png');
+      this.load.image('hayStack', 'assets/kenney_minifarm/Isometric/hayBalesStacked_E.png');
+      this.load.image('crate', 'assets/kenney_minifarm/Isometric/sacksCrate_E.png');
+      this.load.image('chimney', 'assets/kenney_minifarm/Isometric/chimneyTop_E.png');
+      this.load.image('fence', 'assets/kenney_minifarm/Isometric/fenceLow_E.png');
 
-    activeCtx = ctx;
-    activeToScreen = toScreen;
-    bgDirty = false;
-  }
+      // NEW Kenney Asset Packs
+      // Library Pack
+      this.load.image('longTable', 'assets/kenney_library/Isometric/longTable_E.png');
+      this.load.image('libraryChair', 'assets/kenney_library/Isometric/libraryChair_E.png');
+      this.load.image('bookcaseWideBooks', 'assets/kenney_library/Isometric/bookcaseWideBooks_E.png');
+      this.load.image('floorCarpet', 'assets/kenney_library/Isometric/floorCarpet_E.png');
+      this.load.image('displayCase', 'assets/kenney_library/Isometric/displayCase_E.png');
 
-  // --- Main Render Loop ---
-  function render(timestamp) {
-    if (!ctx) return;
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const deltaMs = timestamp - lastTimestamp;
-    const dt = Math.min(deltaMs / 1000, 0.1); 
-    lastTimestamp = timestamp;
+      // Dungeon Pack
+      this.load.image('chestClosed', 'assets/kenney_dungeon/Isometric/chestClosed_E.png');
+      this.load.image('tableShort', 'assets/kenney_dungeon/Isometric/tableShort_E.png');
+      this.load.image('barrel', 'assets/kenney_dungeon/Isometric/barrel_E.png');
+      // Library Specifics (displayCase already loaded above)
+      this.load.image('candleStand', 'assets/kenney_library/Isometric/candleStand_E.png');
+      this.load.image('decoratedTable', 'assets/kenney_library/Isometric/longTableDecorated_E.png');
+      this.load.image('wideBookcase', 'assets/kenney_library/Isometric/bookcaseWideBooks_E.png');
 
-    animFrame++;
-    const state = Game.State.get();
-    const house = state.house;
-    const time = state.time;
+      // Load new custom SVG forms
+      this.load.image('human_iso', 'assets/characters/human.svg');
+      this.load.image('robot_iso', 'assets/characters/robot.svg');
+      this.load.image('cat_iso', 'assets/characters/cat.svg');
+      this.load.image('banana_iso', 'assets/characters/banana.svg');
+      this.load.image('online_witch_iso', 'assets/characters/online_witch.png');
+      this.load.image('online_witch_N_iso', 'assets/characters/online_witch_N.png');
+      this.load.image('online_witch_S_iso', 'assets/characters/online_witch_S.png');
+      this.load.image('online_witch_E_iso', 'assets/characters/online_witch_E.png');
+      this.load.image('online_witch_NE_iso', 'assets/characters/online_witch_NE.png');
+      this.load.image('online_witch_SE_iso', 'assets/characters/online_witch_SE.png');
+    }
 
-    activeCtx = ctx;
-    activeToScreen = toScreen;
-
-    // Character Interpolation via delta-time
-    if (charRenderX === 0 && charRenderY === 0) {
-      charRenderX = state.character.position.x;
-      charRenderY = state.character.position.y;
-    } else {
-      const dx = state.character.position.x - charRenderX;
-      const dy = state.character.position.y - charRenderY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      isWalking = dist > 0.05;
+    create() {
+      mainScene = this;
+      this.cameras.main.setBackgroundColor('#2E7D32');
       
-      const speed = 10.0;
-      charRenderX += dx * speed * dt;
-      charRenderY += dy * speed * dt;
-    }
+      // Stop context menu from appearing on right click
+      this.input.mouse.disableContextMenu();
 
-    cameraX = Math.round(cameraX);
-    cameraY = Math.round(cameraY);
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    if (bgDirty) {
-      updateBgCache(house);
-    }
-
-    const origin = toScreen(0, 0);
-    ctx.drawImage(bgCanvas, origin.x - cellSize * 2, origin.y - cellSize * 2);
-
-    drawBuildGhost(state.ui);
-
-    // Viewport Frustum Calculation
-    const vpLeft = -cameraX - canvas.width/2 - cellSize*2;
-    const vpRight = -cameraX + canvas.width/2 + cellSize*2;
-    const vpTop = -cameraY - canvas.height/2 - cellSize*2;
-    const vpBottom = -cameraY + canvas.height/2 + cellSize*2;
-    
-    function isVisible(gx, gy, w, h) {
-       // Convert gx,gy to origin-centered offsets 
-       const houseW = state.house ? state.house.lotWidth : 10;
-       const houseH = state.house ? state.house.lotHeight : 10;
-       const px = (gx - houseW/2) * cellSize;
-       const py = (gy - houseH/2) * cellSize;
-       return px + (w*cellSize) > vpLeft && px < vpRight && 
-              py + (h*cellSize) > vpTop && py < vpBottom;
-    }
-
-    const renderQueue = [];
-    
-    for (const furn of house.furniture) {
-      const fc = Game.Config.FURNITURE[furn.type];
-      if (!fc) continue;
+      // Setup interaction camera controls
+      this.input.on('pointermove', (pointer) => {
+        if (!pointer.isDown) {
+            this.handleHover(pointer);
+            return;
+        }
+        if (pointer.button === 1 || pointer.button === 2) {
+          this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
+          this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
+        }
+      });
       
-      if (isVisible(furn.x, furn.y, fc.w, fc.h)) {
-        renderQueue.push({
-          ySort: furn.y + fc.h,
-          type: 'furn',
-          furn: furn,
-          fc: fc
+      this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY, deltaZ) => {
+        adjustZoom(deltaY > 0 ? -0.1 : 0.1);
+      });
+
+      // Native Phaser pointer interaction mapping directly to world coords
+      this.input.on('pointerdown', (pointer) => {
+        if (pointer.button !== 0) return; // Only process left clicks
+        if (Game.State.get().ui.mode === 'build') return;
+        
+        const gp = isoUnproject(pointer.worldX, pointer.worldY);
+        const gx = Math.floor(gp.x);
+        const gy = Math.floor(gp.y);
+
+        // Check furniture hit
+        const furn = hitTestFurniture(gx, gy);
+        if (furn) {
+          Game.Interaction.handleObjectClick('furniture', furn, pointer.event.clientX, pointer.event.clientY, pointer.event.shiftKey);
+          return;
+        }
+
+        // Check NPC walker hit
+        const npcHit = Game.Main.hitTestNPCWalker ? Game.Main.hitTestNPCWalker(gx, gy) : null;
+        if (npcHit) {
+          Game.Interaction.handleObjectClick('npc', npcHit, pointer.event.clientX, pointer.event.clientY, pointer.event.shiftKey);
+          return;
+        }
+
+        // Check room hit
+        const room = hitTestRoom(gx, gy);
+        if (room) {
+          Game.Interaction.handleObjectClick('room', room, pointer.event.clientX, pointer.event.clientY, pointer.event.shiftKey);
+          return;
+        }
+
+        // Click on empty space — move character
+        const char = Game.State.get().character;
+        char.targetPosition = { x: gx, y: gy };
+      });
+      
+      this.input.keyboard.on('keydown-SPACE', () => {
+          const char = Game.State.get().character;
+          if (char && char.position && (!char.position.z || char.position.z <= 0)) {
+              char.vz = 4.0; // Trigger jump velocity (units per minute)
+          }
+      });
+
+      // Global Shadow Overlay
+      this.shadowOverlay = this.add.rectangle(window.innerWidth/2, window.innerHeight/2, window.innerWidth, window.innerHeight, 0x040822);
+      this.shadowOverlay.setScrollFactor(0);
+      this.shadowOverlay.setDepth(800000);
+      this.shadowOverlay.setAlpha(0);
+
+      this.input.keyboard.on('keydown-B', () => {
+          window.DEBUG_BOUNDS = !window.DEBUG_BOUNDS;
+          document.dispatchEvent(new CustomEvent('notification', { detail: { message: window.DEBUG_BOUNDS ? '🔍 Debug Overlays: ON' : '🔍 Debug Overlays: OFF' }}));
+      });
+
+      debugGraphics = this.add.graphics();
+      debugGraphics.setDepth(999999);
+
+      // Draw static grid representing the house rooms/lot
+      this.drawHouseGrid();
+    }
+
+    drawHouseGrid() {
+      const activeMap = Game.State.getActiveMap();
+      if(!activeMap) return;
+      const w = activeMap.lotWidth || 10;
+      const h = activeMap.lotHeight || 10;
+      
+      this.frontWalls = []; // Track obscuring walls
+      
+      // Draw a grid of floor tiles
+      for(let y=0; y<h; y++){
+        for(let x=0; x<w; x++){
+          const pt = isoProject(x, y);
+          const tile = this.add.image(pt.x, pt.y, 'floor');
+          tile.setScale(0.25);
+          tile.setOrigin(0.5, 0.5); 
+          tile.depth = (x + y) * 10 - 5; // Floor is always at bottom
+
+          // Check if this tile is inside a room
+          let inRoom = false;
+          let isTopEdge = false;
+          let isLeftEdge = false;
+          let isRightEdge = false;
+          let isBottomEdge = false;
+
+          const roomsList = activeMap.rooms || [];
+          for (const r of roomsList) {
+            if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
+              inRoom = true;
+              if (y === r.y) isTopEdge = true;
+              if (x === r.x) isLeftEdge = true;
+              if (x === r.x + r.w - 1) isRightEdge = true;
+              if (y === r.y + r.h - 1) isBottomEdge = true;
+              break;
+            }
+          }
+
+          if (inRoom) {
+            tile.setTexture('planks');
+            // Remove tint entirely for interior floors to let original texture shine
+            tile.clearTint();
+            
+            // Draw isometric walls explicitly on the tile
+            if (isTopEdge) {
+               const wall = this.add.image(pt.x, pt.y, 'wall_n');
+               wall.setScale(0.25);
+               wall.setOrigin(0.5, 0.5); 
+               wall.depth = (x + y) * 10 - 1; 
+            }
+            if (isLeftEdge) {
+               const wall = this.add.image(pt.x, pt.y, 'wall_e');
+               wall.setScale(0.25);
+               wall.setOrigin(0.5, 0.5); 
+               wall.depth = (x + y) * 10 - 1; 
+            }
+            
+            // Front walls (Occluding the room)
+            if (isBottomEdge) {
+               const ptF = isoProject(x, y+1); // Push to edge
+               const wall = this.add.image(ptF.x, ptF.y, 'wall_n');
+               wall.setScale(0.25);
+               wall.setOrigin(0.5, 0.5); 
+               wall.depth = (x + y + 1) * 10 - 1; 
+               this.frontWalls.push({ sprite: wall, room: roomsList.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) });
+            }
+            if (isRightEdge) {
+               const ptF = isoProject(x+1, y); // Push to edge
+               const wall = this.add.image(ptF.x, ptF.y, 'wall_e');
+               wall.setScale(0.25);
+               wall.setOrigin(0.5, 0.5); 
+               wall.depth = (x + 1 + y) * 10 - 1; 
+               this.frontWalls.push({ sprite: wall, room: roomsList.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) });
+            }
+          } else {
+            tile.setTexture('floor');
+            tile.setTint(0x88cc88); // Green grass color for outside
+          }
+        }
+      }
+    }
+
+    handleHover(pointer) {
+      if (Game.State.get().ui.mode === 'build') {
+         this.clearHover();
+         return;
+      }
+      
+      const gp = isoUnproject(pointer.worldX, pointer.worldY);
+      const gx = Math.floor(gp.x);
+      const gy = Math.floor(gp.y);
+
+      const furn = hitTestFurniture(gx, gy);
+      const npcHit = Game.Main.hitTestNPCWalker ? Game.Main.hitTestNPCWalker(gx, gy) : null;
+      
+      if (furn) {
+        this.setHoverEffect('furniture', furn, pointer.event.clientX, pointer.event.clientY);
+      } else if (npcHit) {
+        this.setHoverEffect('npc', npcHit, pointer.event.clientX, pointer.event.clientY);
+      } else {
+        this.clearHover();
+      }
+    }
+
+    setHoverEffect(type, obj, clientX, clientY) {
+       if (this.hoveredObj === obj) {
+           if (this.hoverTooltipEl && !this.hoverTooltipEl.classList.contains('hidden')) {
+               this.hoverTooltipEl.style.left = clientX + 'px';
+               this.hoverTooltipEl.style.top = clientY + 'px';
+           }
+           return;
+       }
+       
+       this.clearHover();
+       this.hoveredObj = obj;
+       if (!this.hoverTooltipEl) this.hoverTooltipEl = document.getElementById('hover-tooltip');
+       
+       if (type === 'furniture') {
+           const sprite = spriteMap.get(obj.id);
+           if (sprite) {
+               if (!sprite.glowFx) {
+                   sprite.glowFx = sprite.preFX.addGlow(0xffffff, 2, 0, false, 0.1, 10);
+               }
+           }
+           
+           if (this.hoverTooltipEl) {
+               let text = '';
+               if (obj.type === 'garden_plot') {
+                   text = `🌱 Growth: ${Math.floor(obj.growth || 0)}%`;
+                   if (obj.needsWater) text += ` (Needs Water)`;
+               } else if (obj.type === 'pet_bowl') {
+                   text = `🥣 Food: ${Math.floor(obj.foodLevel || 0)}%`;
+               } else {
+                   const fc = Game.Config.FURNITURE[obj.type];
+                   text = fc ? fc.label : 'Object';
+               }
+               
+               this.hoverTooltipEl.textContent = text;
+               this.hoverTooltipEl.classList.remove('hidden');
+               this.hoverTooltipEl.style.left = clientX + 'px';
+               this.hoverTooltipEl.style.top = clientY + 'px';
+           }
+       } else if (type === 'npc') {
+           if (this.hoverTooltipEl) {
+               this.hoverTooltipEl.textContent = `👤 ${obj.name || 'Stranger'}`;
+               this.hoverTooltipEl.classList.remove('hidden');
+               this.hoverTooltipEl.style.left = clientX + 'px';
+               this.hoverTooltipEl.style.top = clientY + 'px';
+           }
+       }
+    }
+
+    clearHover() {
+       if (this.hoveredObj) {
+           const sprite = spriteMap.get(this.hoveredObj.id);
+           if (sprite) {
+               if (sprite.glowFx) {
+                   sprite.preFX.remove(sprite.glowFx);
+                   sprite.glowFx = null;
+               }
+           }
+           this.hoveredObj = null;
+       }
+       if (!this.hoverTooltipEl) this.hoverTooltipEl = document.getElementById('hover-tooltip');
+       if (this.hoverTooltipEl) this.hoverTooltipEl.classList.add('hidden');
+    }
+
+    update(time, delta) {
+      if (Game.Main.tick) {
+         Game.Main.tick(time, delta);
+      }
+
+      // Sync State to Phaser Sprites
+      const state = Game.State.get();
+      if(!state) return;
+
+      this.syncCharacter(state.character);
+      this.syncFurniture(Game.State.getActiveMap());
+      this.syncBuildGhost(state.ui.buildGhost);
+      this.syncPets(state.pets);
+      this.updateCutawayWalls(state.character);
+      if (this.syncNPCs) this.syncNPCs(state.npcWalkers);
+      
+      // Only re-sort depth when positions have changed (dirty flag set by movement/sync)
+      if (this._depthDirty) {
+        this.updateDepthSorting();
+        this._depthDirty = false;
+      }
+      
+      // Time of day shadow map (use actual time state, not raw gameTime)
+      const hour = state.time.hour || 0;
+      let darkness = 0;
+      if (hour < 6 || hour > 19) darkness = 0.55;
+      else if (hour >= 6 && hour < 8) darkness = 0.55 - ((hour - 6)/2)*0.55;
+      else if (hour >= 17 && hour <= 19) darkness = ((hour - 17)/2)*0.55;
+      if (this.shadowOverlay) this.shadowOverlay.setAlpha(darkness);
+
+      if (easyStar) easyStar.calculate();
+
+      this.syncDebugBounds(state);
+    }
+    
+    syncDebugBounds(state) {
+        if (!debugGraphics) return;
+        debugGraphics.clear();
+        if (!window.DEBUG_BOUNDS) return;
+
+        // Draw isometric polygon helper
+        const drawIsoRect = (gx, gy, w, h, color) => {
+            const p1 = isoProject(gx, gy);
+            const p2 = isoProject(gx + w, gy);
+            const p3 = isoProject(gx + w, gy + h);
+            const p4 = isoProject(gx, gy + h);
+
+            debugGraphics.lineStyle(2, color, 1.0);
+            debugGraphics.beginPath();
+            debugGraphics.moveTo(p1.x, p1.y);
+            debugGraphics.lineTo(p2.x, p2.y);
+            debugGraphics.lineTo(p3.x, p3.y);
+            debugGraphics.lineTo(p4.x, p4.y);
+            debugGraphics.closePath();
+            debugGraphics.strokePath();
+            
+            // Faint fill
+            debugGraphics.fillStyle(color, 0.2);
+            debugGraphics.fillPath();
+        };
+
+        const activeMap = Game.State.getActiveMap();
+
+        // Draw active room bounds
+        if (activeMap && activeMap.rooms) {
+            activeMap.rooms.forEach(r => {
+                drawIsoRect(r.x, r.y, r.w, r.h, 0x666666);
+            });
+        }
+
+        // Draw furniture bounds
+        if (activeMap && activeMap.furniture) {
+            activeMap.furniture.forEach(f => {
+                const fc = Game.Config.FURNITURE[f.type];
+                if (fc) {
+                    drawIsoRect(f.x, f.y, fc.w, fc.h, 0xFF0000);
+                }
+            });
+        }
+
+        // Draw character bounds (1x1 box exactly centered on their map location)
+        if (state.character && state.character.position) {
+            drawIsoRect(state.character.position.x - 0.5, state.character.position.y - 0.5, 1, 1, 0x00FF00);
+        }
+    }
+    
+    updateCutawayWalls(character) {
+        if (!this.frontWalls || !character || !character.position) return;
+        
+        const cx = Math.floor(character.position.x);
+        const cy = Math.floor(character.position.y);
+        
+        for (const wallObj of this.frontWalls) {
+            const r = wallObj.room;
+            const inRoom = (cx >= r.x && cx < r.x + r.w && cy >= r.y && cy < r.y + r.h);
+            
+            // If character is inside the room corresponding to this wall, fade it
+            if (inRoom) {
+               wallObj.sprite.setAlpha(0.25);
+            } else {
+               wallObj.sprite.setAlpha(1.0);
+            }
+        }
+    }
+    
+    updateDepthSorting() {
+        const renderables = [];
+        
+        // Character
+        const charObj = Game.State.get().character;
+        if (characterSprite) {
+           renderables.push({
+              sprite: characterSprite,
+              rx: charObj.position.x, ry: charObj.position.y,
+              rw: 1, rh: 1, type: 'char',
+              z: charObj.position.z || 0
+           });
+        }
+        
+        // Pets
+        const pets = Game.State.get().pets || [];
+        for (const p of pets) {
+            const sprite = this.petSpriteMap ? this.petSpriteMap.get(p.id) : null;
+            if (sprite) {
+               renderables.push({
+                  sprite: sprite, rx: p.position.x, ry: p.position.y, rw: 1, rh: 1, type: 'pet', z: p.position.z || 0
+               });
+            }
+        }
+        
+        // NPCs
+        const activeWalkers = Game.State.get().npcWalkers || [];
+        for (const n of activeWalkers) {
+             const spriteGroup = npcSpriteMap ? npcSpriteMap.get(n.id) : null;
+             if (spriteGroup && n.active) {
+                 renderables.push({
+                    sprite: spriteGroup, rx: n.position.x, ry: n.position.y, rw: 1, rh: 1, type: 'npc', z: 0
+                 });
+             }
+        }
+        
+        // Furniture
+        const activeMap = Game.State.getActiveMap();
+        if (activeMap && activeMap.furniture) {
+           const charPos = Game.State.get().character ? Game.State.get().character.position : {x:0, y:0};
+
+           for (const furn of activeMap.furniture) {
+              
+              // Data-level Culling: Skip processing if extraordinarily far from active bounds (>30 tiles)
+              if (Math.abs(furn.x - charPos.x) > 30 || Math.abs(furn.y - charPos.y) > 30) {
+                  continue; // Do not instantiate or sync off-world chunks
+              }
+
+              let sprite = spriteMap.get(furn.id);
+               if (!sprite) continue;
+               const def = Game.Config.FURNITURE[furn.type];
+               renderables.push({
+                   sprite: sprite,
+                   rx: furn.x, ry: furn.y,
+                   rw: def ? def.w : 1, rh: def ? def.h : 1, type: 'furn', z: 0
+               });
+           }
+        }
+        
+        // True Spatial Bounds Sorting
+        // For each item, we define its world bounds [xmin, xmax, ymin, ymax]
+        for (const r of renderables) {
+            // For character/pets, rx/ry are center points, but for this bounding box we consider their actual logical physical occupancy footprint.
+            // If it's a character, we'll treat their bounded footprint as essentially a 0.5x0.5 box at their feet.
+            if (r.type === 'char' || r.type === 'pet') {
+                r.xmin = r.rx - 0.25;
+                r.xmax = r.rx + 0.25;
+                r.ymin = r.ry - 0.25;
+                r.ymax = r.ry + 0.25;
+            } else {
+                r.xmin = r.rx;
+                r.xmax = r.rx + r.rw;
+                r.ymin = r.ry;
+                r.ymax = r.ry + r.rh;
+            }
+        }
+        
+        renderables.sort((a, b) => {
+           // Does A definitively occlude B? (A is BEHIND B)
+           const aBehindB = (a.xmax <= b.xmin) || (a.ymax <= b.ymin);
+           const bBehindA = (b.xmax <= a.xmin) || (b.ymax <= a.ymin);
+           
+           if (aBehindB && !bBehindA) return -1; // a comes first
+           if (bBehindA && !aBehindB) return 1;  // b comes first
+           
+           // If they intersect logically (e.g. character standing next to or slightly over a furniture tile), fallback to strict center of mass mapping
+           const aCx = (a.xmin + a.xmax) / 2;
+           const aCy = (a.ymin + a.ymax) / 2;
+           const bCx = (b.xmin + b.xmax) / 2;
+           const bCy = (b.ymin + b.ymax) / 2;
+           
+           // Calculate the center-of-mass projected Z index 
+           const aZ = aCx + aCy;
+           const bZ = bCx + bCy;
+           
+           if (Math.abs(aZ - bZ) > 0.01) return aZ - bZ;
+           
+           // Tie breaker for perfectly overlapping centers (e.g. character perfectly inside)
+           return (a.z !== b.z) ? a.z - b.z : 0;
+        });
+        
+        // Reapply unified depths safely
+        for(let i=0; i<renderables.length; i++) {
+            const r = renderables[i];
+            
+            // Wait, simply assigning 1000 + i entirely disconnects them from the walls!
+            // We MUST anchor them in the wall's mathematical grid space to correctly occlude behind front walls and in front of back walls.
+            // To do this, we compute the object's anchor Depth using its maximum grid reach, and then add a tiny fractional offset via `i` to guarantee the array's topological order is perfectly respected!
+            
+            // The object's baseline wall depth slot depends on its maximum projected grid edge.
+            // For a 2x2 object at (1,1), its front edge is (3,3), so it must be allowed to draw in front of walls up to (3,3).
+            const maxBoundInt = Math.floor(r.xmax - 0.01) + Math.floor(r.ymax - 0.01); 
+            
+            r.sprite.depth = (maxBoundInt * 10) + (i / renderables.length) * 8 + 1;
+            
+            if (r.type === 'char') {
+               if (this.charLabel) this.charLabel.depth = r.sprite.depth + 0.1;
+            }
+        }
+    }
+    
+    // ---- WebGL Pie Menu ----
+    showPieMenu(x, y, centerTitle, items) {
+       this.closePieMenu();
+       if (!this.uiContainer) {
+          this.uiContainer = this.add.container(0, 0);
+          this.uiContainer.setScrollFactor(0);
+          this.uiContainer.setDepth(900000); // Sit above shadow map
+       }
+       
+       this.pieMenu = this.add.container(x, y);
+       this.uiContainer.add(this.pieMenu);
+       
+       const blocker = this.add.rectangle(0, 0, 8000, 8000, 0x000000, 0).setInteractive();
+       blocker.on('pointerdown', () => this.closePieMenu());
+       
+       const bg = this.add.circle(0, 0, 20, 0x000000, 0.7).setInteractive();
+       const cancel = this.add.text(0, 0, '✕', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
+       this.pieMenu.add([blocker, bg, cancel]);
+       
+       bg.on('pointerdown', () => this.closePieMenu());
+       
+       const radius = 65;
+       const angleStep = (2 * Math.PI) / Math.max(items.length, 1);
+       const startAngle = -Math.PI / 2;
+       
+       items.forEach((item, i) => {
+          const angle = startAngle + i * angleStep;
+          const ix = Math.cos(angle) * radius;
+          const iy = Math.sin(angle) * radius;
+          
+          const btnBg = this.add.circle(ix, iy, 25, item.locked ? 0x888888 : 0x222222, 0.9).setInteractive();
+          const btnIcon = this.add.text(ix, iy - 6, item.locked ? '🔒' : item.icon, { fontSize: '18px' }).setOrigin(0.5);
+          const btnText = this.add.text(ix, iy + 10, item.label, { fontSize: '10px', color: '#ffffff', backgroundColor: '#00000088', padding: {x:2, y:1} }).setOrigin(0.5);
+          
+          btnBg.on('pointerdown', (p) => {
+             if (item.locked) {
+                Game.UI.showNotification(`❌ ${item.lockReason}`);
+             } else {
+                item.callback(p.event);
+             }
+             this.closePieMenu(); // Auto close on interact
+          });
+          
+          this.pieMenu.add([btnBg, btnIcon, btnText]);
+          
+          btnBg.setScale(0); btnIcon.setScale(0); btnText.setScale(0);
+          this.tweens.add({ targets: [btnBg, btnIcon, btnText], scale: 1, duration: 250, delay: i * 40, ease: 'Back.easeOut' });
+       });
+    }
+
+    closePieMenu() {
+       if (this.pieMenu) {
+          this.pieMenu.destroy();
+          this.pieMenu = null;
+       }
+    }
+
+    syncBuildGhost(ghost) {
+      if (!ghost) {
+        if (buildGhostSprite) buildGhostSprite.setVisible(false);
+        return;
+      }
+      
+      if (!buildGhostSprite) {
+        buildGhostSprite = this.add.image(0, 0, 'crate');
+        buildGhostSprite.setScale(0.25);
+        buildGhostSprite.setOrigin(0.5, 0.5);
+      }
+      
+      buildGhostSprite.setVisible(true);
+
+      if (ghost.type === 'furniture') {
+         buildGhostSprite.setTexture(this.getTextureForFurn(ghost.key));
+      } else {
+         buildGhostSprite.setTexture('planks'); // Minimal indicator for rooms
+      }
+      
+      const pt = isoProject(ghost.x + (ghost.w > 1 ? ghost.w/2 - 0.5 : 0), ghost.y + (ghost.h > 1 ? ghost.h/2 - 0.5 : 0));
+      buildGhostSprite.setPosition(pt.x, pt.y);
+      buildGhostSprite.depth = 90000; // Float high
+      
+      // Validity check
+      let isValid = true;
+      if (ghost.type === 'room') {
+         isValid = Game.House.isAreaFree(ghost.x, ghost.y, ghost.w, ghost.h);
+      } else {
+         const room = Game.House.getRoomAt(ghost.x, ghost.y);
+         if (!room) {
+            isValid = false;
+         } else {
+            const furnCfg = Game.Config.FURNITURE[ghost.key];
+            if (furnCfg.room !== '*' && furnCfg.room !== room.type) isValid = false;
+            
+            if (ghost.x < room.x || ghost.y < room.y || ghost.x + furnCfg.w > room.x + room.w || ghost.y + furnCfg.h > room.y + room.h) {
+                isValid = false;
+            } else {
+                const activeMap = Game.State.getActiveMap();
+                for (const furn of activeMap.furniture) {
+                    if (furn.roomId !== room.id) continue;
+                    const fc = Game.Config.FURNITURE[furn.type];
+                    if (!fc) continue;
+                    if (ghost.x < furn.x + fc.w && ghost.x + furnCfg.w > furn.x && ghost.y < furn.y + fc.h && ghost.y + furnCfg.h > furn.y) {
+                         isValid = false; break;
+                    }
+                }
+            }
+         }
+      }
+      
+      buildGhostSprite.setAlpha(0.6);
+      buildGhostSprite.setTint(isValid ? 0x88FF88 : 0xFF4444);
+      buildGhostSprite.setFlipX(!!ghost.rotated);
+    }
+
+    syncCharacter(charObj) {
+      if(!charObj || !charObj.position) return;
+      
+      // Mark depth dirty whenever character truly moves
+      if (!this._lastCharPos || this._lastCharPos.x !== charObj.position.x || this._lastCharPos.y !== charObj.position.y || this._lastCharPos.z !== charObj.position.z) {
+          this._depthDirty = true;
+          this._lastCharPos = { ...charObj.position };
+      }
+      
+      let formKey = (charObj.form || 'online_witch') + '_iso';
+      if (formKey === 'human_iso' || formKey === 'nano_hero_iso') formKey = 'online_witch_iso'; // Map legacy forms to the Witch
+      
+      if(!characterSprite) {
+        // Draw a bright circle as the character base marker
+        this.charMarker = this.add.circle(0, 0, 12, 0x4488FF, 0.8);
+        this.charMarker.setStrokeStyle(2, 0xFFFFFF, 1);
+        
+        characterSprite = this.add.image(0, 0, formKey);
+        characterSprite.setScale(1.0); // SVG is perfectly sized
+        characterSprite.setOrigin(0.5, 0.9); // Anchor feet to grid position
+        characterSprite.clearTint();
+        
+        // Name tag
+        this.charLabel = this.add.text(0, 0, charObj.name || '🧑 You', {
+          fontSize: '12px',
+          fontFamily: 'Nunito, sans-serif',
+          color: '#ffffff',
+          stroke: '#000000',
+          strokeThickness: 3,
+          align: 'center'
+        }).setOrigin(0.5, 1);
+        
+        // Elastic cinematic camera tracking
+        this.cameras.main.startFollow(characterSprite, true, 0.05, 0.05);
+        
+        // Breathing animation tween
+        this.tweens.add({
+           targets: characterSprite,
+           scaleY: '+=0.03',
+           yoyo: true,
+           repeat: -1,
+           duration: 1200,
+           ease: 'Sine.easeInOut'
         });
       }
-    }
-
-    renderQueue.push({
-      ySort: charRenderY + 0.8, 
-      type: 'char',
-      char: state.character,
-      timestamp: timestamp
-    });
-
-    renderQueue.sort((a,b) => a.ySort - b.ySort);
-
-    for (const item of renderQueue) {
-      if (item.type === 'furn') {
-        drawFurniture(item.furn, item.fc);
-      } else if (item.type === 'char') {
-        drawCharacter(item.char, timestamp);
-      }
-    }
-
-    drawLightingPass(house, state.character, timestamp, time);
-    drawParticles();
-    drawPieMenu(state.ui.pieOpen, timestamp);
-  }
-
-  // ---- Environments ----
-  function drawRoomFloors(house) {
-    if (!house) return;
-    for (const r of house.rooms) {
-      if (!r) continue;
-      const tl = activeToScreen(r.x, r.y);
-      const w = r.w * cellSize;
-      const h = r.h * cellSize;
-
-      activeCtx.save();
-      activeCtx.beginPath();
-      activeCtx.rect(tl.x, tl.y, w, h);
-      activeCtx.clip(); 
-
-      activeCtx.fillStyle = '#D6A66C';
-      activeCtx.fillRect(tl.x, tl.y, w, h);
-
-      activeCtx.fillStyle = '#C29156';
-      for (let ix = 0; ix < r.w * 3; ix++) {
-         const px = tl.x + (ix/3)*cellSize;
-         activeCtx.fillRect(px, tl.y, 2, h);
-      }
-      activeCtx.fillStyle = '#E8B67B';
-      for (let ix = 0; ix < r.w * 3; ix++) {
-         const px = tl.x + (ix/3)*cellSize + 2;
-         activeCtx.fillRect(px, tl.y, 1, h);
+      if (!this.charShadow) {
+           this.charShadow = this.add.ellipse(0, 0, 24, 12, 0x000000, 0.4);
       }
       
-      activeCtx.fillStyle = '#A87A4D';
-      for (let i = 0; i < (r.w * r.h * 2); i++) {
-         const rx = tl.x + (Math.sin(i*999) + 1)/2 * w;
-         const ry = tl.y + (Math.cos(i*777) + 1)/2 * h;
-         activeCtx.fillRect(rx, ry, Math.max(1, cellSize/3), 2);
-      }
-      activeCtx.restore();
-    }
-  }
+      const ptGround = isoProject(charObj.position.x, charObj.position.y, 0);
+      const ptActual = isoProject(charObj.position.x, charObj.position.y, charObj.position.z || 0);
+      const pt = ptActual; // Legacy support bridging
 
-  function drawGrid(house) {
-    if (!house) return;
-    activeCtx.strokeStyle = 'rgba(255,255,255,0.08)';
-    activeCtx.lineWidth = 1;
-    for (const r of house.rooms) {
-      if (!r) continue;
-      const tl = activeToScreen(r.x, r.y);
-      for (let ix = 0; ix <= r.w; ix++) {
-        activeCtx.beginPath();
-        activeCtx.moveTo(tl.x + ix*cellSize, tl.y);
-        activeCtx.lineTo(tl.x + ix*cellSize, tl.y + r.h*cellSize);
-        activeCtx.stroke();
-      }
-      for (let iy = 0; iy <= r.h; iy++) {
-        activeCtx.beginPath();
-        activeCtx.moveTo(tl.x, tl.y + iy*cellSize);
-        activeCtx.lineTo(tl.x + r.w*cellSize, tl.y + iy*cellSize);
-        activeCtx.stroke();
-      }
-    }
-  }
+      this.charShadow.setPosition(ptGround.x, ptGround.y);
+      this.charShadow.depth = ((charObj.position.x + charObj.position.y) * 10) - 1;
 
-  function drawWalls(house) {
-    if (!house) return;
-    const wallHeight = cellSize * 1.5;
+      // When the character jumps, shrink the shadow slightly
+      const shadowScale = Math.max(0.2, 1 - (charObj.position.z || 0) * 0.15);
+      this.charShadow.setScale(shadowScale);
 
-    for (const r of house.rooms) {
-      if (!r) continue;
-      const tc = activeToScreen(r.x, r.y);
-      const w = r.w * cellSize;
-      const h = r.h * cellSize;
-
-      activeCtx.fillStyle = '#EDE0D4'; 
-      activeCtx.fillRect(tc.x, tc.y - wallHeight, w, wallHeight);
+      characterSprite.setPosition(ptActual.x, ptActual.y);
+      characterSprite.setTexture(formKey);
       
-      activeCtx.fillStyle = '#5D4037';
-      activeCtx.fillRect(tc.x, tc.y - Math.max(8, cellSize*0.1), w, Math.max(8, cellSize*0.1));
-      
-      activeCtx.fillStyle = '#4E342E';
-      activeCtx.fillRect(tc.x, tc.y - wallHeight, w, Math.max(12, cellSize*0.15));
-
-      activeCtx.fillStyle = '#3E2723';
-      activeCtx.fillRect(tc.x - 8, tc.y - wallHeight, 8, wallHeight + h); 
-      activeCtx.fillRect(tc.x + w, tc.y - wallHeight, 8, wallHeight + h); 
-
-      const grad = activeCtx.createLinearGradient(0, tc.y, 0, tc.y + cellSize*1.2);
-      grad.addColorStop(0, 'rgba(0,0,0,0.4)');
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-      activeCtx.fillStyle = grad;
-      activeCtx.fillRect(tc.x, tc.y, w, cellSize*1.2);
-    }
-  }
-
-  function drawBuildGhost(ui) {
-    if (ui.mode !== 'build' || !ui.buildGhost.active) return;
-    const ghost = ui.buildGhost;
-    const canPlace = Game.House.isAreaFree(ghost.x, ghost.y, ghost.w, ghost.h);
-    const tc = toScreen(ghost.x, ghost.y);
-    const w = ghost.w * cellSize;
-    const h = ghost.h * cellSize;
-    
-    ctx.fillStyle = canPlace ? 'rgba(76, 175, 80, 0.4)' : 'rgba(244, 67, 54, 0.4)';
-    ctx.strokeStyle = canPlace ? '#4CAF50' : '#F44336';
-    ctx.lineWidth = 3;
-    ctx.fillRect(tc.x, tc.y, w, h);
-    ctx.strokeRect(tc.x, tc.y, w, h);
-  }
-
-  // ---- Furniture Flat Pixel HD-2D ----
-  function drawOrthoCube(x, y, w, d, h, z, cTop, cFront) {
-     const drawY = y - z;
-     if (h > 0) {
-       activeCtx.fillStyle = cFront;
-       activeCtx.fillRect(x, Math.floor(drawY - h + d), w, h);
-     }
-     activeCtx.fillStyle = cTop;
-     activeCtx.fillRect(x, Math.floor(drawY - h), w, d);
-  }
-
-  function drawFurniture(furn, fc) {
-    const tc = activeToScreen(furn.x, furn.y);
-    const w = fc.w * cellSize;
-    const d = fc.h * cellSize; 
-    const pad = Math.floor(cellSize * 0.05);
-
-    const x = tc.x + pad;
-    const y = tc.y + pad;
-    const fw = w - pad*2;
-    const fd = d - pad*2; 
-
-    // Determine scale threshold for drawing detailed sub-cubes
-    // Fast path: if off screen during panning or very small, skip inner details
-    
-    activeCtx.fillStyle = 'rgba(0,0,0,0.3)';
-    activeCtx.fillRect(x + 4, y + 6, fw, fd);
-
-    if (furn.type.includes('bed')) {
-      drawOrthoCube(x, y, fw, fd, 16, 0, '#5D4037', '#4E342E'); // Frame
-      drawOrthoCube(x, y, fw, Math.max(8, fd*0.15), 32, 0, '#4E342E', '#3E2723'); // Headboard
-      drawOrthoCube(x+6, y+8, fw-12, fd-16, 8, 16, '#F5F5F5', '#E0E0E0'); // Mattress
-      drawOrthoCube(x+4, y + fd*0.4, fw-8, fd*0.6 - 6, 9, 16, '#7986CB', '#5C6BC0'); // Blanket
-      drawOrthoCube(x + fw*0.15, y + fd*0.2, fw*0.7, fd*0.2, 4, 24, '#FFFFFF', '#EEEEEE'); // Pillow
-
-    } else if (furn.type.includes('fridge')) {
-      const h = cellSize * 2.2;
-      drawOrthoCube(x, y, fw, fd, h, 0, '#CFD8DC', '#B0BEC5'); // Main Body
-      drawOrthoCube(x+4, y+4, fw-8, fd-4, h-8, 0, '#ECEFF1', '#CFD8DC'); // Doors
-      
-      // Handles
-      ctx.fillStyle = '#90A4AE';
-      ctx.fillRect(x + fw*0.8, y + fd - 4 - h + h*0.2, 4, h*0.2); // fridge
-      ctx.fillRect(x + fw*0.8, y + fd - 4 - h + h*0.5, 4, h*0.15); // freezer
-
-    } else if (furn.type.includes('sofa') || furn.type.includes('recliner')) {
-      drawOrthoCube(x, y, fw, fd, 12, 0, '#283593', '#1A237E'); // Base
-      drawOrthoCube(x, y, fw, fd*0.3, 36, 12, '#3F51B5', '#303F9F'); // Backrest
-      drawOrthoCube(x + fw*0.1, y + fd*0.25, fw*0.8, fd*0.75, 8, 12, '#5C6BC0', '#3949AB'); // Seat cushion
-      drawOrthoCube(x, y + fd*0.15, fw*0.15, fd*0.85, 20, 12, '#3949AB', '#283593'); // L arm
-      drawOrthoCube(x + fw*0.85, y + fd*0.15, fw*0.15, fd*0.85, 20, 12, '#3949AB', '#283593'); // R arm
-
-    } else if (furn.type.includes('desk') || furn.type.includes('table') || furn.type.includes('workbench')) {
-      const h = cellSize * 0.8;
-      // Legs (top faces hidden)
-      ctx.fillStyle = '#4E342E';
-      ctx.fillRect(x+6, y - h + fd - 4, 4, h); // front left
-      ctx.fillRect(x + fw - 10, y - h + fd - 4, 4, h); // front right
-      ctx.fillRect(x+6, y - h + 8, 4, h); // back left
-      ctx.fillRect(x + fw - 10, y - h + 8, 4, h); // back right
-      
-      // Tabletop
-      drawOrthoCube(x, y, fw, fd, 8, h, '#8D6E63', '#6D4C41');
-      
-      if (furn.type.includes('desk')) {
-         drawOrthoCube(x + fw*0.3, y + fd*0.3, fw*0.4, fd*0.4, 2, h+8, '#ECEFF1', '#CFD8DC'); // Laptop Base
-         drawOrthoCube(x + fw*0.3, y + fd*0.3, fw*0.4, 4, 16, h+10, '#CFD8DC', '#111'); // Screen
-      }
-
-    } else if (furn.type.includes('tv') || furn.type.includes('stereo') || furn.type.includes('printer')) {
-      const h = furn.type.includes('tv') ? cellSize * 1.5 : cellSize * 0.8;
-      drawOrthoCube(x, y, fw, fd, h * 0.4, 0, '#424242', '#212121'); // Stand
-      drawOrthoCube(x+4, y+4, fw-8, fd-8, h * 0.6, h * 0.4, '#616161', '#424242'); // Device
-      
-      if (furn.type.includes('tv')) {
-        const screenColor = (animFrame % 60 < 50) ? '#64B5F6' : '#111';
-        ctx.fillStyle = screenColor;
-        ctx.fillRect(x+8, y + fd - 4 - h + 8, fw-16, h * 0.6 - 16); // TV Screen pixels directly injected to front face
-      }
-
-    } else if (furn.type.includes('stove') || furn.type.includes('microwave') || furn.type.includes('bookshelf')) {
-      const h = cellSize * 2.0;
-      const topColor = furn.type.includes('bookshelf') ? '#5D4037' : '#90A4AE';
-      const frontColor = furn.type.includes('bookshelf') ? '#4E342E' : '#78909C';
-      drawOrthoCube(x, y, fw, fd, h, 0, topColor, frontColor);
-      
-      if (furn.type.includes('stove')) {
-        ctx.fillStyle = '#212121';
-        ctx.fillRect(x+2, y - h + 2, fw-4, fd-4); // Stove top
-        ctx.fillStyle = '#FF5252';
-        ctx.fillRect(x + fw*0.2, y - h + fd*0.2, 8, 8); // Burner
-        ctx.fillRect(x + fw*0.6, y - h + fd*0.6, 8, 8); // Burner
-        
-        ctx.fillStyle = '#212121'; // Oven Window
-        ctx.fillRect(x + fw*0.1, y + fd - h + h*0.3, fw*0.8, h*0.4);
-      } else if (furn.type.includes('bookshelf')) {
-        ctx.fillStyle = '#3E2723';
-        ctx.fillRect(x+4, y + fd - h + 4, fw-8, h-8); // Dark interior
-        const sH = (h-8)/4;
-        for(let i=1; i<4; i++) {
-           ctx.fillStyle = '#5D4037';
-           ctx.fillRect(x+4, y + fd - h + 4 + i*sH, fw-8, 4); // Shelf line
-           ctx.fillStyle = '#EF5350';
-           ctx.fillRect(x+8, y + fd - h + 4 + i*sH - 12, 6, 12); // Book
-        }
-      }
-
-    } else if (furn.type.includes('shower') || furn.type.includes('tub')) {
-      const h = cellSize * 2.2;
-      if (furn.type.includes('shower')) {
-        drawOrthoCube(x, y, fw, fd, 12, 0, '#E3F2FD', '#BBDEFB'); // Base
-        
-        ctx.fillStyle = 'rgba(255,255,255,0.4)'; // Glass
-        ctx.fillRect(x, y - h, fw, fd); // Top lip
-        ctx.fillRect(x, y - h + fd, 4, h-12); // Front left frame
-        ctx.fillRect(x+fw-4, y - h + fd, 4, h-12); // Front right frame
-        ctx.fillRect(x, y - h, fw, h-12+fd); // Back glass enclosing
-        
-        ctx.fillStyle = '#90A4AE';
-        ctx.fillRect(x + fw*0.4, y + fd*0.2 - h + 12, 8, 12); // Showerhead
+      // Handle scaling adjustments if they switched between SVGs and old assets.
+      if (formKey === 'online_witch_iso' || formKey.startsWith('online_witch_')) {
+        characterSprite.setScale(1.0); // online pixel art sprite needs to be slightly larger
+        characterSprite.setOrigin(0.5, 0.85); // Adjust origin to sit nicely on the tile center
+      } else if (formKey === 'character') {
+        characterSprite.setScale(0.25); // match world scale
+      } else if (formKey === 'new_iso_human') {
+        characterSprite.setScale(0.55); // The AI image was cropped tightly, need slightly larger scale
+        characterSprite.setOrigin(0.5, 0.7); // Adjust origin to sit nicely on the tile center
       } else {
-        drawOrthoCube(x, y, fw, fd, cellSize*0.6, 0, '#FAFAFA', '#EEEEEE');
-        drawOrthoCube(x+6, y+6, fw-12, fd-12, cellSize*0.4, cellSize*0.2, '#E1F5FE', '#B3E5FC'); // Inner pool
+        characterSprite.setScale(1.0, 0.85); // SVG squash
+      }
+      
+      // Face movement direction
+      if (charObj.targetPosition) {
+         if (formKey === 'online_witch_iso' || formKey.startsWith('online_witch_')) {
+             const dx = charObj.targetPosition.x - charObj.position.x;
+             const dy = charObj.targetPosition.y - charObj.position.y;
+             
+             let newDir = 'S';
+             let flip = false;
+             
+             if (dx > 0.1 && Math.abs(dy) < 0.1) { newDir = 'SE'; }
+             else if (dx < -0.1 && Math.abs(dy) < 0.1) { newDir = 'NE'; flip = true; } // NW
+             else if (Math.abs(dx) < 0.1 && dy > 0.1) { newDir = 'SE'; flip = true; } // SW
+             else if (Math.abs(dx) < 0.1 && dy < -0.1) { newDir = 'NE'; }
+             else if (dx > 0.1 && dy > 0.1) { newDir = 'S'; }
+             else if (dx < -0.1 && dy < -0.1) { newDir = 'N'; }
+             else if (dx > 0.1 && dy < -0.1) { newDir = 'E'; }
+             else if (dx < -0.1 && dy > 0.1) { newDir = 'E'; flip = true; } // W
+             
+             characterSprite.setFlipX(flip);
+             formKey = `online_witch_${newDir}_iso`;
+             characterSprite.setTexture(formKey);
+         } else {
+             const ptTarg = isoProject(charObj.targetPosition.x, charObj.targetPosition.y);
+             if (Math.abs(ptTarg.x - pt.x) > 0.5) {
+                characterSprite.setFlipX(ptTarg.x < pt.x);
+             }
+         }
+      }
+      
+      // Optional: don't tint the SVG entirely unless wanted, or maybe just tint
+      // But Since SVGs are colored we might want to just set a light tint or no tint at all.
+      // Let's remove the global tint for the new SVG characters so they retain their colors!
+      characterSprite.clearTint();
+      
+      const depth = (charObj.position.x + charObj.position.y) * 10 + 5;
+      characterSprite.depth = depth;
+      
+      if (this.charMarker) {
+        this.charMarker.setPosition(pt.x, pt.y + 4);
+        this.charMarker.depth = depth - 1;
+      }
+      if (this.charLabel) {
+        this.charLabel.setText(charObj.name || '🧑 You');
+        this.charLabel.setPosition(pt.x, pt.y - 45); // Move name up slightly to make room
+        this.charLabel.depth = depth + 1;
       }
 
-    } else if (furn.type.includes('plant') || furn.type.includes('tree')) {
-      drawOrthoCube(x + fw*0.2, y + fd*0.2, fw*0.6, fd*0.6, cellSize*0.4, 0, '#795548', '#5D4037'); // Pot
-      
-      const pY = y + fd/2 - cellSize*0.4; // Plant Z offset
-      ctx.fillStyle = '#2E7D32';
-      ctx.beginPath(); ctx.arc(x + fw/2, pY - cellSize*0.2, fw*0.6, 0, Math.PI*2); ctx.fill();
-      ctx.fillStyle = '#4CAF50';
-      ctx.beginPath(); ctx.arc(x + fw/2, pY - cellSize*0.5, fw*0.4, 0, Math.PI*2); ctx.fill();
-    } else {
-      drawOrthoCube(x, y, fw, fd, cellSize*0.8, 0, '#9E9E9E', '#757575'); // Generic bounding box
-    }
-
-    // Emoji label
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    const lSize = Math.max(14, cellSize * 0.3);
-    const lx = x + fw - lSize - 2;
-    const ly = y + fd - lSize - 2;
-    ctx.fillRect(lx, ly, lSize, lSize);
-    ctx.fillStyle = '#FFF';
-    ctx.font = `bold ${Math.round(lSize*0.7)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(fc.icon, lx + lSize/2, ly + lSize/2);
-  }
-
-  // ---- Character Redesign (Orthogonal Front/Side) ----
-  function drawCharacter(char, timestamp) {
-    const base = toScreen(charRenderX + 0.5, charRenderY + 0.5);
-    const s = Math.floor(cellSize * 0.45); // Scale
-    const bounce = isWalking ? Math.abs(Math.sin(timestamp * 0.012) * s * 0.2) : 0;
-    
-    // Position (base.x is center, base.y is bottom footprint)
-    const x = base.x;
-    const y = base.y; 
-
-    // Size configs
-    const w = s * 0.8;
-    const d = s * 0.5; // block depth
-    const legH = s * 0.5;
-    const torsoH = s * 0.8;
-    const headH = s * 0.7;
-
-    // Cast round ambient shadow right beneath feet
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(x, y, s*0.8, s*0.3, 0, 0, Math.PI*2);
-    ctx.fill();
-
-    const lz = bounce; // vertical pop from walking
-    
-    // Legs (drawOrthoCube uses top-left footprint)
-    const leftFootX = x - w*0.8;
-    const rightFootX = x + w*0.2;
-    const footY = y - d/2;
-    
-    drawOrthoCube(leftFootX, footY, w*0.6, d, legH, lz, '#1A237E', '#0D47A1');
-    drawOrthoCube(rightFootX, footY, w*0.6, d, legH, isWalking ? lz*0.5 : 0, '#1A237E', '#0D47A1');
-
-    // Torso
-    const shirtColor = char.name.includes('Morgan') ? '#546E7A' : (char.name.includes('Taylor') ? '#FF5722' : '#F44336');
-    const shirtTop = char.name.includes('Morgan') ? '#78909C' : (char.name.includes('Taylor') ? '#FF8A65' : '#EF5350');
-    drawOrthoCube(x - w, footY - d*0.1, w*2, d*1.2, torsoH, legH + lz, shirtTop, shirtColor);
-
-    // Head
-    const skinColor = char.name.includes('Sam') ? '#CF946A' : '#FFE0B2';
-    const skinTop = char.name.includes('Sam') ? '#BCAAA4' : '#FFCC80';
-    drawOrthoCube(x - w*0.8, footY - d*0.2, w*1.6, d*1.4, headH, legH + torsoH + lz, skinTop, skinColor);
-    
-    // Hair
-    const hairColor = char.name.includes('Morgan') ? '#757575' : (char.name.includes('Riley') ? '#7E57C2' : '#3E2723');
-    drawOrthoCube(x - w*0.9, footY - d*0.3, w*1.8, d*1.6, s*0.2, legH + torsoH + headH + lz, hairColor, hairColor);
-
-    // Eyes on Front Face
-    const faceZ = legH + torsoH + lz;
-    const faceFrontY = footY - d*0.2 + (d*1.4) - faceZ - headH;
-    ctx.fillStyle = '#111';
-    ctx.fillRect(x - w*0.4, Math.floor(faceFrontY + headH*0.3), w*0.25, w*0.3);
-    ctx.fillRect(x + w*0.15, Math.floor(faceFrontY + headH*0.3), w*0.25, w*0.3);
-
-    // Plumbob
-    const totalH = legH + torsoH + headH + s*0.2;
-    drawPlumbob(x, y - totalH - s*0.5 - lz, Game.Character.getMoodInfo().value, timestamp, s/35);
-
-    // Labels and Thoughts
-    ctx.fillStyle = 'rgba(0,0,0,0.6)';
-    ctx.fillRect(x - w, y + 8, w*2, 16);
-    ctx.fillStyle = '#FFF';
-    ctx.font = `bold ${Math.floor(s*0.3)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
-    ctx.fillText(char.name, x, y + 9);
-
-    // Thoughts / Activities
-    const bubbleY = y - totalH - s*0.3 - lz;
-    if (char.currentActivity) {
-      const actCfg = Game.Config.ACTIVITIES[char.currentActivity.type];
-      if (actCfg) {
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        const bx = x + w*0.8;
-        
-        ctx.fillRect(bx, bubbleY, 32, 28);
-        ctx.fillRect(bx - 4, bubbleY + 18, 4, 4); 
-        ctx.fillRect(bx - 8, bubbleY + 22, 4, 4);
-        
-        ctx.fillStyle = '#333';
-        ctx.font = 'bold 16px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(actCfg.icon, bx + 16, bubbleY + 12);
-
-        // Progress line
-        ctx.fillStyle = '#1B5E20';
-        ctx.fillRect(bx + 2, bubbleY + 22, 28, 4);
-        ctx.fillStyle = '#4CAF50';
-        ctx.fillRect(bx + 2, bubbleY + 22, 28 * char.activityProgress, 4);
+      // Thought Bubble Integration
+      if (!this.thoughtBubbleContainer) {
+         this.thoughtLabel = this.add.text(0, 0, '', {
+            fontSize: '18px',
+            backgroundColor: '#ffffffdd',
+            padding: { x: 6, y: 4 },
+            color: '#000000',
+            stroke: '#dddddd',
+            strokeThickness: 2
+         }).setOrigin(0.5, 1);
+         this.thoughtBubbleContainer = this.add.container(0, 0, [this.thoughtLabel]);
+         
+         this.tweens.add({
+           targets: this.thoughtLabel, // Tween the child offset!
+           y: -8,
+           duration: 1200,
+           yoyo: true,
+           repeat: -1,
+           ease: 'Sine.easeInOut'
+         });
       }
-    } else if (Game.Autonomy && Game.Autonomy.getThought()) {
-      const thought = Game.Autonomy.getThought();
-      const pulse = 0.85 + Math.sin(timestamp * 0.004) * 0.15;
-      ctx.globalAlpha = pulse;
-      ctx.fillStyle = 'rgba(255,255,240,0.95)';
-      const bx = x + w*0.8;
-      const by = bubbleY - s * 0.4;
-      
-      ctx.fillRect(bx, by, 44, 26);
-      ctx.fillRect(bx - 4, by + 16, 4, 4);
-      ctx.fillRect(bx - 8, by + 20, 4, 4);
-      
-      ctx.fillStyle = '#333';
-      ctx.font = 'bold 14px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(thought.needIcon + '→' + thought.activityIcon, bx + 22, by + 12);
-      ctx.globalAlpha = 1;
-    }
-  }
 
-  function drawPlumbob(x, y, moodValue, timestamp, scale) {
-    const size = 16 * scale;
-    const rotation = timestamp * 0.002;
-    const hover = Math.sin(timestamp * 0.004) * (4 * scale);
-    const py = y + hover;
+      // Check for urgent needs
+      let urgentNeed = null;
+      let urgentIcon = '';
+      if (charObj.needs) {
+          if (charObj.needs.hunger < 20) { urgentNeed = 'hunger'; urgentIcon = '💢 🍔'; }
+          else if (charObj.needs.energy < 20) { urgentNeed = 'energy'; urgentIcon = '💢 💤'; }
+          else if (charObj.needs.bladder < 20) { urgentNeed = 'bladder'; urgentIcon = '💢 🚽'; }
+          else if (charObj.needs.hygiene < 20) { urgentNeed = 'hygiene'; urgentIcon = '💢 🚿'; }
+      }
 
-    let color;
-    if (moodValue >= 70) color = '#4CAF50'; 
-    else if (moodValue >= 50) color = lerpColor('#FFEB3B', '#4CAF50', (moodValue - 50) / 20);
-    else if (moodValue >= 30) color = lerpColor('#FF9800', '#FFEB3B', (moodValue - 30) / 20);
-    else color = lerpColor('#F44336', '#FF9800', moodValue / 30);
-
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 15;
-    
-    // Draw 2D Plumbob (Diamond)
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.moveTo(x, py - size);
-    ctx.lineTo(x + size*0.5, py);
-    ctx.lineTo(x, py + size);
-    ctx.lineTo(x - size*0.5, py);
-    ctx.fill();
-
-    // Highlight edge
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.beginPath();
-    ctx.moveTo(x, py - size);
-    ctx.lineTo(x + size*0.5, py);
-    ctx.lineTo(x, py);
-    ctx.fill();
-
-    ctx.shadowBlur = 0;
-  }
-
-  // --- Dynamic Lighting / Post Processing ---
-  function drawLightingPass(house, character, timestamp, time) {
-    // Determine exact darkness based on time (12am = 0, noon = 1200, 11:59p = 2359)
-    // Darkest at 0-400, brightens 400-800, day at 800-1800, darkens 1800-2200.
-    const h24 = Math.floor(time / 100);
-    let alpha = 0; // 0 = transparent, logic maps to darkness level
-
-    if (h24 < 5 || h24 >= 20) {
-       alpha = 0.55; // Night dark blue layer
-    } else if (h24 >= 5 && h24 < 7) {
-       alpha = 0.35; // Dawn
-    } else if (h24 >= 18 && h24 < 20) {
-       alpha = 0.35; // Dusk
-    }
-
-    if (alpha === 0) return; // full day, no lights needed
-
-    ctx.save();
-    // Dark ambient layer
-    ctx.fillStyle = `rgba(12, 12, 28, ${alpha})`;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.globalCompositeOperation = 'lighter'; // Lights mix to brighten
-
-    // Draw Character carrying a small warm aura
-    const cp = toScreen(charRenderX + 0.5, charRenderY + 0.5);
-    drawRadialLight(cp.x, cp.y - 24, cellSize * 2, 'rgba(255, 200, 150, 0.4)');
-
-    // Furniture Lights
-    for (const furn of house.furniture) {
-      const fc = Game.Config.FURNITURE[furn.type];
-      if (!fc) continue;
-      const tc = toScreen(furn.x + fc.w/2, furn.y + fc.h/2);
-
-      if (furn.type.includes('tv') ) {
-        if (animFrame % 60 < 50) {
-          drawRadialLight(tc.x, tc.y - cellSize*0.5, cellSize * 2.5, 'rgba(64, 196, 255, 0.5)'); // cool TV glare
-        }
-      } else if (furn.type.includes('stereo')) {
-        drawRadialLight(tc.x, tc.y - cellSize*0.3, cellSize * 1.5, 'rgba(156, 39, 176, 0.4)'); // funky stereo glow
-      } else if (furn.type.includes('fridge')) {
-        // Minor cold reflection
-        drawRadialLight(tc.x, tc.y - cellSize*0.5, cellSize * 1.5, 'rgba(200, 230, 255, 0.1)');
-      } else if (furn.type.includes('bookshelf')) {
-         // Maybe a little study lamp on a desk? Right now bookshelf is next to a desk usually.
+      if (urgentNeed) {
+         this.thoughtLabel.setText(urgentIcon);
+         this.thoughtLabel.setColor('#ff0000');
+         this.thoughtLabel.setStroke('#ffffff', 3);
+         this.thoughtLabel.setFontSize('26px');
+         
+         this.thoughtBubbleContainer.setPosition(pt.x, pt.y - 80);
+         this.thoughtBubbleContainer.depth = depth + 10;
+         this.thoughtBubbleContainer.setVisible(true);
+      } else {
+         // Reset styling
+         this.thoughtLabel.setColor('#333333');
+         this.thoughtLabel.setStroke('#ffffff', 4);
+         this.thoughtLabel.setFontSize('20px');
+         
+         const thought = Game.Autonomy && Game.Autonomy.getThought();
+         if (thought && !charObj.currentActivity) {
+            this.thoughtLabel.setText(`💭 ${thought.activityIcon}`);
+            this.thoughtBubbleContainer.setPosition(pt.x, pt.y - 80);
+            this.thoughtBubbleContainer.depth = depth + 10;
+            this.thoughtBubbleContainer.setVisible(true);
+         } else {
+            this.thoughtBubbleContainer.setVisible(false);
+         }
       }
     }
 
-    ctx.restore();
-  }
+    getTextureForFurn(type, furnState) {
+      if(type === 'display_case') return 'displayCase';
+      if(type === 'candle_stand') return 'candleStand';
+      if(type === 'decorated_table') return 'decoratedTable';
+      if(type === 'wide_bookcase') return 'wideBookcase';
+      if(type === 'cushion') return 'floorCarpet';
 
-  function drawRadialLight(x, y, radius, colorInner) {
-    const grad = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    grad.addColorStop(0, colorInner);
-    grad.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = grad;
-    ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-  }
+      if(type === 'pet_bowl') return furnState && furnState.isFull ? 'chestClosed' : 'crate';
+      if(type === 'potted_flower') return 'hayStack'; 
+      if(type === 'garden_plot') {
+          if (furnState && furnState.cropState === 'ready') return 'hayStack';
+          if (furnState && furnState.cropState === 'growing') return 'hay';
+          return 'crate';
+      }
 
-  // --- UI Elements ---
-  function drawPieMenu(pieState, timestamp) {
-    if (!pieState || !pieState.active) return;
-    const pt = toScreen(pieState.targetX + 0.5, pieState.targetY + 0.5);
-    
-    // Dim background slightly when pie is open
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if(type.includes('bed')) return 'hayStack';
+      if(type.includes('dresser') || type.includes('wardrobe') || type.includes('fridge')) return 'chestClosed';
+      if(type.includes('coffee_table')) return 'tableShort';
+      if(type.includes('table') || type.includes('desk') || type.includes('bench') || type.includes('counter')) return 'longTable';
+      if(type.includes('sofa') || type.includes('chair') || type.includes('recliner') || type.includes('toilet') || type.includes('vanity')) return 'libraryChair';
+      if(type.includes('tv') || type.includes('computer') || type.includes('console') || type.includes('aquarium') || type.includes('mirror')) return 'displayCase';
+      if(type.includes('stove') || type.includes('sink') || type.includes('tub') || type.includes('microwave') || type.includes('espresso') || type.includes('dishwasher') || type.includes('fire') || type.includes('bbq')) return 'barrel';
+      if(type.includes('shelf') || type.includes('bookcase')) return 'bookcaseWideBooks';
+      if(type.includes('rug') || type.includes('mat')) return 'floorCarpet';
+      if(type.includes('plant') || type.includes('tree') || type.includes('plot')) return 'hay';
+      return 'crate'; // Generic fallback
+    }
 
-    const radius = 80;
-    const pieces = pieState.options.length;
-    const angleStep = (Math.PI * 2) / pieces;
+    syncFurniture(houseObj) {
+      if(!houseObj || !houseObj.furniture) return;
+      const charPos = Game.State.get().character && Game.State.get().character.position ? Game.State.get().character.position : {x: 0, y: 0};
+      
+      houseObj.furniture.forEach(furn => {
+        // Data-Level Culling: Off-world chunks (>40 tiles away from active bounds) are entirely skipped
+        if (Math.abs(furn.x - charPos.x) > 40 || Math.abs(furn.y - charPos.y) > 40) return;
 
-    ctx.save();
-    ctx.translate(pt.x, pt.y);
-
-    for (let i = 0; i < pieces; i++) {
-        const startAngle = i * angleStep - Math.PI / 2;
-        const endAngle = (i + 1) * angleStep - Math.PI / 2;
-        const isHover = (i === pieState.hoverIndex);
-        const opt = pieState.options[i];
+        let sprite = spriteMap.get(furn.id);
+        const fc = Game.Config.FURNITURE[furn.type];
+        const textureKey = this.getTextureForFurn(furn.type, furn);
         
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.arc(0, 0, isHover ? radius * 1.05 : radius, startAngle, endAngle);
-        ctx.closePath();
-        
-        ctx.fillStyle = isHover ? 'rgba(33, 150, 243, 0.95)' : 'rgba(30, 30, 30, 0.9)';
-        ctx.fill();
-        ctx.strokeStyle = '#FAFAFA';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        const midAngle = (startAngle + endAngle) / 2;
-        const textX = Math.cos(midAngle) * radius * 0.6;
-        const textY = Math.sin(midAngle) * radius * 0.6;
-
-        ctx.fillStyle = '#FFF';
-        ctx.font = 'bold 13px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        const lines = opt.label.split(' / ');
-        if(lines.length > 1) {
-            ctx.fillText(lines[0], textX, textY - 8);
-            ctx.fillText(lines[1], textX, textY + 8);
+        if(!sprite) {
+           sprite = this.add.image(0, 0, textureKey);
+           sprite.setScale(0.25);
+           sprite.setOrigin(0.5, 0.5); 
+           spriteMap.set(furn.id, sprite);
         } else {
-            ctx.fillText(opt.label, textX, textY);
+           if (sprite.texture.key !== textureKey) {
+               sprite.setTexture(textureKey);
+           }
         }
-    }
-    ctx.restore();
-  }
+        
+        const w = fc ? fc.w : 1;
+        const h = fc ? fc.h : 1;
+        const curW = furn.rotated ? h : w;
+        const curH = furn.rotated ? w : h;
 
-  function spawnParticles(gx, gy, count, color) {
-    const pt = toScreen(gx, gy);
-    for (let i = 0; i < count; i++) {
-      particles.push({
-        x: pt.x,
-        y: pt.y,
-        vx: (Math.random() - 0.5) * 5,
-        vy: (Math.random() - 0.5) * 5 - 2,
-        life: 1.0,
-        color: color
+        const pt = isoProject(furn.x + curW/2 - 0.5, furn.y + curH/2 - 0.5); // Center of the tile accounting for dimensions
+        sprite.setPosition(pt.x, pt.y);
+        sprite.depth = (furn.x + curW - 1 + furn.y + curH - 1) * 10;
+        sprite.setFlipX(!!furn.rotated);
+        
+        // Occlusion Fading (X-Ray Vision) if it blocks the character
+        const char = Game.State.get().character;
+        if (char && char.position) {
+           const cx = char.position.x;
+           const cy = char.position.y;
+           // If furniture depth > character depth, it's drawn IN FRONT of character
+           if (sprite.depth > (cx + cy) * 10) {
+               // Approximate distance check 
+               const dist = Math.sqrt(Math.pow(furn.x + curW/2 - 0.5 - cx, 2) + Math.pow(furn.y + curH/2 - 0.5 - cy, 2));
+               if (dist < Math.max(curW, curH) + 0.5 && (cx <= furn.x + curW && cy <= furn.y + curH)) {
+                  sprite.setAlpha(0.4);
+               } else {
+                  sprite.setAlpha(1.0);
+               }
+           } else {
+               sprite.setAlpha(1.0);
+           }
+        } else {
+           sprite.setAlpha(1.0);
+        }
+      });
+    }
+
+    syncPets(pets) {
+      if (!pets) return;
+      if (!this.petSpriteMap) this.petSpriteMap = new Map();
+      pets.forEach(pet => {
+         let sprite = this.petSpriteMap.get(pet.id);
+         if (!sprite) {
+             sprite = this.add.text(0, 0, '🐈', { fontSize: '24px' }).setOrigin(0.5, 0.5);
+             this.petSpriteMap.set(pet.id, sprite);
+         }
+         
+         const ptGround = isoProject(pet.position.x, pet.position.y, 0);
+         const ptActual = isoProject(pet.position.x, pet.position.y, pet.position.z || 0);
+         
+         if (!sprite.shadow) {
+            sprite.shadow = this.add.ellipse(0, 0, 16, 8, 0x000000, 0.4);
+         }
+         
+         sprite.shadow.setPosition(ptGround.x, ptGround.y);
+         sprite.shadow.depth = ((pet.position.x + pet.position.y) * 10) - 1;
+         
+         const shadowScale = Math.max(0.2, 1 - (pet.position.z || 0) * 0.15);
+         sprite.shadow.setScale(shadowScale);
+
+         if (sprite.x !== ptActual.x || sprite.y !== ptActual.y) {
+             this._depthDirty = true;
+             sprite.setPosition(ptActual.x, ptActual.y);
+             sprite.depth = (pet.position.x + pet.position.y) * 10;
+         }
+         
+         // Flip horizontally based on movement direction
+         if (pet.targetPosition) {
+             sprite.setFlipX(pet.targetPosition.x < pet.position.x);
+         }
+         
+         // Breathing tween
+         if (!sprite.isBreathing) {
+            sprite.isBreathing = true;
+            this.tweens.add({
+               targets: sprite,
+               scaleY: '+=0.05',
+               yoyo: true,
+               repeat: -1,
+               duration: 800,
+               ease: 'Sine.easeInOut'
+            });
+         }
+      });
+    }
+
+    syncNPCs(npcs) {
+      const currentIds = new Set((npcs || []).filter(n => n.active).map(n => n.id));
+      
+      // Cleanup
+      for (const [id, spriteGroup] of npcSpriteMap.entries()) {
+          if (!currentIds.has(id)) {
+              spriteGroup.destroy();
+              npcSpriteMap.delete(id);
+              this._depthDirty = true;
+          }
+      }
+      
+      if (!npcs) return;
+      
+      npcs.forEach(npc => {
+         if(!npc.active) return;
+         let spriteGroup = npcSpriteMap.get(npc.id);
+         const npcCfg = Game.Config.NPCS.find(n => n.id === npc.configId);
+         if (!npcCfg) return;
+         
+         const ptActual = isoProject(npc.position.x, npc.position.y, 0);
+
+         if (!spriteGroup) {
+             const marker = this.add.circle(0, 0, 10, Number(npcCfg.color.replace('#', '0x')) || 0xFFFFFF, 0.8);
+             const img = this.add.image(0, -10, 'new_iso_human');
+             img.setScale(0.5);
+             img.setOrigin(0.5, 0.8);
+             img.setTint(Number(npcCfg.color.replace('#', '0x')) || 0xFFFFFF);
+             const tag = this.add.text(0, -50, npcCfg.avatar + ' ' + npcCfg.name.split(' ')[0], { fontSize: '10px', fontFamily: 'Nunito, sans-serif', color: '#FFF' });
+             tag.setOrigin(0.5, 0.5);
+             
+             spriteGroup = this.add.container(ptActual.x, ptActual.y, [marker, img, tag]);
+             npcSpriteMap.set(npc.id, spriteGroup);
+             this._depthDirty = true;
+         } else {
+             if (spriteGroup.x !== ptActual.x || spriteGroup.y !== ptActual.y) {
+                 this._depthDirty = true;
+                 spriteGroup.setPosition(ptActual.x, ptActual.y);
+                 
+                 const img = spriteGroup.list[1];
+                 if (npc.direction !== undefined) {
+                     img.setFlipX(npc.direction < 0);
+                 }
+             }
+         }
       });
     }
   }
 
-  function drawParticles() {
-    for (let i = particles.length - 1; i >= 0; i--) {
-      const p = particles[i];
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.2; // gravity 
-      p.life -= 0.03;
+  // Cached isometric projection offsets (recalculated on resize)
+  let _isoOffsetX = window.innerWidth / 2;
+  const _isoOffsetY = 200;
+  window.addEventListener('resize', () => { _isoOffsetX = window.innerWidth / 2; });
 
-      if (p.life <= 0) {
-        particles.splice(i, 1);
-        continue;
-      }
-
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.life;
-      ctx.fillRect(p.x, p.y, Math.max(2, cellSize * 0.05), Math.max(2, cellSize * 0.05));
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  function getPixelSize() {
-      return cellSize;
+  // Pure Isometric Math: Cartesian (gridX, gridY, gridZ) to Screen (scX, scY)
+  function isoProject(gx, gy, gz = 0) {
+    return {
+      x: _isoOffsetX + (gx - gy) * (TILE_W / 2),
+      y: _isoOffsetY + (gx + gy) * (TILE_H / 2) - (gz * TILE_H)
+    };
   }
   
-  function lerpColor(c1, c2, t) {
-      if(t<0) t=0; if(t>1) t=1;
-      const parse = (c) => {
-          if(c.startsWith('#')) {
-              let hex = c.substring(1);
-              if(hex.length===3) hex = hex.split('').map(x=>x+x).join('');
-              return [parseInt(hex.substring(0,2),16), parseInt(hex.substring(2,4),16), parseInt(hex.substring(4,6),16)];
-          }
-          return [0,0,0];
-      }
-      const p1 = parse(c1), p2 = parse(c2);
-      const r = Math.round(p1[0] + (p2[0]-p1[0])*t);
-      const g = Math.round(p1[1] + (p2[1]-p1[1])*t);
-      const b = Math.round(p1[2] + (p2[2]-p1[2])*t);
-      return `rgb(${r},${g},${b})`;
-  }
-
-  // ---- Hit Tests ----
-  function getGridPos(canvasX, canvasY) {
-    const gp = toGrid(canvasX, canvasY);
+  // Inverse: Screen (scX, scY) to Cartesian (gridX, gridY)
+  function isoUnproject(sx, sy, gz = 0) {
+    const dx = sx - _isoOffsetX;
+    const dy = sy - _isoOffsetY + (gz * TILE_H);
     return {
-      x: Math.floor(gp.x),
-      y: Math.floor(gp.y),
+      x: (dy / (TILE_H / 2) + dx / (TILE_W / 2)) / 2,
+      y: (dy / (TILE_H / 2) - dx / (TILE_W / 2)) / 2
     };
   }
 
+  function init(canvasEl) {
+    canvasEl = canvasEl || document.getElementById('game-canvas');
+    if (typeof EasyStar !== 'undefined') {
+      easyStar = new EasyStar.js();
+      updatePathGrid();
+    }
+
+    // Hide the old vanilla canvas, because Phaser will create its own inside the container.
+    if (canvasEl) canvasEl.style.display = 'none';
+
+    // Initialize Phaser
+    const config = {
+      type: Phaser.WEBGL,
+      width: window.innerWidth,
+      height: window.innerHeight,
+      parent: canvasEl.parentElement, // .canvas-area
+      scene: MainScene,
+      transparent: true,
+      antialias: false,
+      pixelArt: true,
+      scale: {
+        mode: Phaser.Scale.RESIZE,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+      }
+    };
+    phaserGame = new Phaser.Game(config);
+  }
+
+  // render() removed — Phaser handles rendering automatically
+
+  // --- Adapters to keep main.js happy for now ---
+  function toScreen(gx, gy) { 
+    if (!mainScene) return isoProject(gx, gy);
+    const pt = isoProject(gx, gy);
+    return {
+      x: pt.x - mainScene.cameras.main.scrollX,
+      y: pt.y - mainScene.cameras.main.scrollY
+    };
+  }
+  
+  function toGrid(sx, sy) { 
+    if (!mainScene) return isoUnproject(sx, sy);
+    const cam = mainScene.cameras.main;
+    // Convert screen coords to world coords (accounting for zoom + scroll)
+    const worldX = sx / cam.zoom + cam.scrollX;
+    const worldY = sy / cam.zoom + cam.scrollY;
+    return isoUnproject(worldX, worldY);
+  }
+
+  function getGridPos(sx, sy) { 
+    const pt = toGrid(sx, sy);
+    return { x: Math.floor(pt.x), y: Math.floor(pt.y) }; 
+  }
+  
+  function setCameraOffset(dx, dy) {
+    if(mainScene) {
+      // Manual programmatic camera offset (e.g. from keyboard)
+      mainScene.cameras.main.scrollX += dx;
+      mainScene.cameras.main.scrollY += dy;
+    }
+  }
+  
+  function adjustZoom(step) {
+    if(mainScene) {
+      mainScene.cameras.main.zoom = Math.max(0.25, Math.min(4, mainScene.cameras.main.zoom + step));
+    }
+  }
+  
+  function showPieMenu(x, y, title, items) {
+    if (mainScene) mainScene.showPieMenu(x, y, title, items);
+  }
+  function closePieMenu() {
+    if (mainScene) mainScene.closePieMenu();
+  }
+
   function hitTestFurniture(gx, gy) {
-    const house = Game.State.get().house;
-    for (const furn of house.furniture) {
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return null;
+    for (const furn of activeMap.furniture) {
       const fc = Game.Config.FURNITURE[furn.type];
       if (!fc) continue;
-      if (gx >= furn.x && gx < furn.x + fc.w && gy >= furn.y && gy < furn.y + fc.h) {
+      const w = furn.rotated ? fc.h : fc.w;
+      const h = furn.rotated ? fc.w : fc.h;
+      if (gx >= furn.x && gx < furn.x + w && gy >= furn.y && gy < furn.y + h) {
         return { ...furn, config: fc };
       }
     }
@@ -821,8 +1139,9 @@ Game.Renderer = (function() {
   }
 
   function hitTestRoom(gx, gy) {
-    const house = Game.State.get().house;
-    for (const room of house.rooms) {
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return null;
+    for (const room of activeMap.rooms) {
       if (gx >= room.x && gx < room.x + room.w && gy >= room.y && gy < room.y + room.h) {
         return room;
       }
@@ -831,26 +1150,152 @@ Game.Renderer = (function() {
   }
 
   function getRandomRoomPosition() {
-    const house = Game.State.get().house;
-    if (!house || house.rooms.length === 0) return null;
-    const room = house.rooms[Math.floor(Math.random() * house.rooms.length)];
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap || activeMap.rooms.length === 0) return null;
+    const room = activeMap.rooms[Math.floor(Math.random() * activeMap.rooms.length)];
     return {
       x: room.x + Math.floor(Math.random() * room.w),
       y: room.y + Math.floor(Math.random() * room.h)
     };
   }
 
+  function setBgDirty() {
+    // Redraw room grid when rooms change
+    if (mainScene && mainScene.drawHouseGrid) {
+      // Clear old grid graphics and redraw
+      mainScene.children.list
+        .filter(c => c.texture && (c.texture.key === 'floor' || c.texture.key === 'planks' || c.texture.key === 'wall' || c.texture.key === 'fence'))
+        .forEach(g => g.destroy());
+      mainScene.drawHouseGrid();
+    }
+    updatePathGrid();
+  }
+
+  function updatePathGrid() {
+    if (!easyStar) return;
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return;
+    
+    const w = activeMap.lotWidth || 10;
+    const h = activeMap.lotHeight || 10;
+    const grid = [];
+    
+    for (let y = 0; y < h; y++) {
+      grid[y] = [];
+      for (let x = 0; x < w; x++) grid[y][x] = 0;
+    }
+    
+    if (activeMap.furniture) {
+      for (const furn of activeMap.furniture) {
+         const fc = Game.Config.FURNITURE[furn.type];
+         if (!fc) continue;
+         for (let fy = 0; fy < fc.h; fy++) {
+           for (let fx = 0; fx < fc.w; fx++) {
+             const px = Math.floor(furn.x) + fx;
+             const py = Math.floor(furn.y) + fy;
+             if (px >= 0 && py >= 0 && px < w && py < h) {
+               if (!furn.type.includes('rug') && !furn.type.includes('portal') && !furn.type.includes('door') && !furn.type.includes('mat')) {
+                 grid[py][px] = 1;
+               }
+             }
+           }
+         }
+      }
+    }
+    easyStar.setGrid(grid);
+    easyStar.setAcceptableTiles([0]);
+    easyStar.enableDiagonals();
+    easyStar.disableCornerCutting();
+  }
+
+  function findPath(sx, sy, ex, ey, callback) {
+    if (!easyStar) {
+       callback([{x: ex, y: ey}]); // Fallback
+       return;
+    }
+    easyStar.findPath(sx, sy, ex, ey, callback);
+  }
+
+  function transitionMap() {
+
+    spriteMap.forEach(sprite => sprite.destroy());
+    spriteMap.clear();
+    setBgDirty();
+  }
+
+  function spawnParticles(x, y, count = 20, color = '#FFFF00') {
+    if (!mainScene) return;
+    const pt = isoProject(x, y);
+    const emitter = mainScene.add.particles(pt.x, pt.y, 'hay', {
+      speed: 100,
+      scale: { start: 0.1, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 1000,
+      duration: 100,
+      maxParticles: count,
+      tint: parseInt(color.replace('#', '0x'))
+    });
+    emitter.depth = 99999;
+  }
+
+  function spawnExplosion(x, y, scale = 1) {
+    if (!mainScene) return;
+    const pt = isoProject(x, y);
+    const emitter = mainScene.add.particles(pt.x, pt.y, 'crate', {
+      speed: { min: 100, max: 200 },
+      scale: { start: 0.05 * scale, end: 0 },
+      alpha: { start: 1, end: 0 },
+      lifespan: 800,
+      quantity: 10,
+      blendMode: 'ADD'
+    });
+    // In Phaser 3.60, particles configuration explodes immediately if duration is omitted and quantity is passed.
+    // Ensure we trigger it:
+    emitter.explode(10);
+    emitter.depth = 99999;
+  }
+
+  function spawnFloatingBubble(x, y, text, color = '#FFFFFF', icon = '') {
+    if (!mainScene) return;
+    const pt = isoProject(x, y);
+    const txtEl = mainScene.add.text(pt.x, pt.y - 20, `${icon} ${text}`, {
+        fontFamily: 'Nunito, sans-serif',
+        fontSize: '18px',
+        color: color,
+        stroke: '#000000',
+        strokeThickness: 3,
+        shadow: { offsetX: 1, offsetY: 1, color: '#000', blur: 2, fill: true }
+    }).setOrigin(0.5, 0.5);
+    
+    txtEl.depth = 100000;
+    
+    mainScene.tweens.add({
+        targets: txtEl,
+        y: pt.y - 80,
+        alpha: 0,
+        duration: 2000,
+        ease: 'Power2',
+        onComplete: () => txtEl.destroy()
+    });
+  }
+
   return {
     init,
-    render,
     toScreen,
     toGrid,
     setCameraOffset,
     spawnParticles,
+    spawnExplosion,
     getGridPos,
     hitTestFurniture,
     hitTestRoom,
     getRandomRoomPosition,
-    setBgDirty
+    setBgDirty,
+    transitionMap,
+    adjustZoom,
+    showPieMenu,
+    closePieMenu,
+    spawnFloatingBubble,
+    findPath
   };
 })();

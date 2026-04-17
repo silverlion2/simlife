@@ -91,7 +91,16 @@ Game.Economy = (function() {
     const skillLevel = Game.Character.getSkillLevel(careerCfg.keySkill);
     career.performance += moodInfo.workBonus * (1 + skillLevel * 0.1);
 
-    Game.UI && Game.UI.showNotification(`💰 Earned $${salary} from work today`);
+    // Show salary with mood multiplier feedback
+    const moodPct = Math.round(moodInfo.workBonus * 100);
+    const moodTag = moodPct >= 100 ? `😄 ${moodPct}%` : `😞 ${moodPct}%`;
+    Game.UI && Game.UI.showNotification(`💰 Earned $${salary} from work today (mood: ${moodTag})`);
+
+    // Floating bubble if renderer available
+    if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
+      const char = getChar();
+      Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 0.5, `+$${salary}`, '#FFD700', '💼');
+    }
 
     // Check promotion
     checkPromotion();
@@ -117,7 +126,7 @@ Game.Economy = (function() {
 
   // Bills (weekly)
   function calculateBills() {
-    const house = Game.State.get().house;
+    const house = Game.State.getActiveMap();
     let baseBill = 20;
     baseBill += house.rooms.length * 15;
     baseBill += house.furniture.length * 3;
@@ -140,7 +149,7 @@ Game.Economy = (function() {
 
   // House value (for prestige)
   function calculateHouseValue() {
-    const house = Game.State.get().house;
+    const house = Game.State.getActiveMap();
     let value = 0;
     for (const room of house.rooms) {
       const roomCfg = cfg.ROOMS[room.type];

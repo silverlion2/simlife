@@ -13,11 +13,16 @@ Game.Main = (function() {
   let canvasTooltip = null;
   let pieMenuJustOpened = false;
   let npcSpawnTimer = 30; // First NPC after 30 seconds
+  let uiThrottleAccum = 0; // Throttle DOM updates
+  let autoSaveAccum = 0;  // Auto-save counter
 
   function init() {
     const canvas = document.getElementById('game-canvas');
     Game.Renderer.init(canvas);
     Game.UI.init();
+
+    // Announcer overlay starts hidden via HTML class + CSS;
+    // playAnnouncer() in ui.js handles showing/hiding it properly.
 
     // Time fix: ensure minute is exactly 0 at start
     const time = Game.State.get().time;
@@ -34,14 +39,11 @@ Game.Main = (function() {
     setupKeyboardShortcuts();
     setupSpeedControls();
 
-    requestAnimationFrame(gameLoop);
     showTutorial();
   }
 
-  function gameLoop(timestamp) {
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const rawDelta = (timestamp - lastTimestamp) / 1000;
-    lastTimestamp = timestamp;
+  function tick(time, deltaMs) {
+    const rawDelta = deltaMs / 1000;
     const delta = Math.min(rawDelta, 0.1);
     const state = Game.State.get();
 
@@ -57,6 +59,8 @@ Game.Main = (function() {
       Game.Character.updateNeeds(wholeMins);
       Game.Character.updateActivity(wholeMins);
       Game.Events.update(wholeMins);
+      updateGarden(wholeMins);
+      updatePets(wholeMins);
     }
 
     // ---- Character Movement ----
@@ -83,19 +87,20 @@ Game.Main = (function() {
     // ---- NPC Walkers ----
     updateNPCWalkers(delta * gameSpeed);
 
-    // ---- Render ----
-    Game.Renderer.render(timestamp);
-
-    // ---- UI Updates ----
-    Game.UI.updateStatusBars();
-    Game.UI.updateMoodletDisplay();
-
-    // ---- Auto-save ----
-    if (Math.floor(timestamp / 30000) !== Math.floor((timestamp - rawDelta * 1000) / 30000)) {
-      Game.State.save();
+    // ---- UI Updates (throttled to ~4fps for DOM performance) ----
+    uiThrottleAccum += delta;
+    if (uiThrottleAccum >= 0.25) {
+      uiThrottleAccum = 0;
+      Game.UI.updateStatusBars();
+      Game.UI.updateMoodletDisplay();
     }
 
-    requestAnimationFrame(gameLoop);
+    // ---- Auto-save (every 30 seconds of wall time) ----
+    autoSaveAccum += delta;
+    if (autoSaveAccum >= 30) {
+      autoSaveAccum = 0;
+      Game.State.save();
+    }
   }
 
   function updateTime(minutes) {
@@ -122,12 +127,25 @@ Game.Main = (function() {
       Game.UI.showNotification(`🎂 ${char.name} is now a ${Game.Character.getLifeStageLabel(newStage)}!`);
     }
 
-    // Update time display
+    // Season tracking
+    if (!time.season) time.season = 'spring';
+    const seasonIdx = Math.floor(((time.day - 1) % (Game.Config.DAYS_PER_SEASON * 4)) / Game.Config.DAYS_PER_SEASON);
+    const newSeason = Game.Config.SEASON_ORDER[seasonIdx];
+    if (newSeason !== time.season) {
+      time.season = newSeason;
+      const sc = Game.Config.SEASONS[newSeason];
+      Game.UI.playAnnouncer && Game.UI.playAnnouncer(`${sc.icon} ${sc.label} Has Arrived!`);
+      if (Game.Renderer) Game.Renderer.setBgDirty();
+    }
+
+    // Update time display with season
     const displayHour = time.hour % 12 || 12;
     const ampm = time.hour >= 12 ? 'PM' : 'AM';
     const displayMin = String(Math.max(0, Math.floor(time.minute))).padStart(2, '0');
+    const sc = Game.Config.SEASONS[time.season] || { icon: '🌸', label: 'Spring' };
+    const dayInSeason = ((time.day - 1) % Game.Config.DAYS_PER_SEASON) + 1;
     const timeEl = document.getElementById('time-display');
-    if (timeEl) timeEl.textContent = `Day ${time.day} — ${displayHour}:${displayMin} ${ampm}`;
+    if (timeEl) timeEl.textContent = `${sc.icon} ${sc.label} ${dayInSeason} — ${displayHour}:${displayMin} ${ampm}`;
   }
 
   function onNewDay() {
@@ -139,359 +157,132 @@ Game.Main = (function() {
     if (time.day % 7 === 0) {
       Game.Economy.processBills();
     }
-  }
-
-  // ---- Canvas Events (Pie Menu + Interaction) ----
-  function setupCanvasEvents(canvas) {
-    // Create tooltip element
-    canvasTooltip = document.createElement('div');
-    canvasTooltip.className = 'canvas-tooltip';
-    document.body.appendChild(canvasTooltip);
-
-    canvas.addEventListener('click', (e) => {
-      const state = Game.State.get();
-      if (state.ui.mode === 'build') return;
-
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const cx = (e.clientX - rect.left) * scaleX;
-      const cy = (e.clientY - rect.top) * scaleY;
-      const gp = Game.Renderer.getGridPos(cx, cy);
-
-      // Check furniture hit
-      const furn = Game.Renderer.hitTestFurniture(gp.x, gp.y);
-      if (furn) {
-        const screenX = e.clientX;
-        const screenY = e.clientY;
-        // Check if broken — offer repair instead
-        if (Game.Character.isFurnitureBroken && Game.Character.isFurnitureBroken(furn.id)) {
-          showRepairPieMenu(furn, screenX, screenY);
-        } else {
-          showPieMenu(furn, screenX, screenY, e.shiftKey);
-        }
-        return;
+    // Roll weather for the new day
+    const season = time.season || 'spring';
+    const sc = Game.Config.SEASONS[season];
+    if (sc) {
+      const roll = Math.random();
+      let cumul = 0;
+      time.weather = 'clear';
+      for (const [w, chance] of Object.entries(sc.weatherChance)) {
+        cumul += chance;
+        if (roll < cumul) { time.weather = w; break; }
       }
-
-      // Check NPC walker hit
-      const npcHit = hitTestNPCWalker(gp.x, gp.y);
-      if (npcHit) {
-        showNPCPieMenu(npcHit, e.clientX, e.clientY);
-        return;
-      }
-
-      // Check room hit (for room-level activities)
-      const room = Game.Renderer.hitTestRoom(gp.x, gp.y);
-      if (room) {
-        const screenX = e.clientX;
-        const screenY = e.clientY;
-        showRoomPieMenu(room, screenX, screenY, e.shiftKey);
-        return;
-      }
-
-      // Click on empty space — move character
-      const char = state.character;
-      char.targetPosition = { x: gp.x + 0.5, y: gp.y + 0.5 };
-    });
-
-    canvas.addEventListener('mousemove', (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const cx = (e.clientX - rect.left) * scaleX;
-      const cy = (e.clientY - rect.top) * scaleY;
-      const gp = Game.Renderer.getGridPos(cx, cy);
-
-      const furn = Game.Renderer.hitTestFurniture(gp.x, gp.y);
-      if (furn) {
-        canvas.style.cursor = 'pointer';
-        canvasTooltip.textContent = `${furn.config.icon} ${furn.config.label}`;
-        canvasTooltip.style.display = 'block';
-        canvasTooltip.style.left = (e.clientX + 12) + 'px';
-        canvasTooltip.style.top = (e.clientY - 8) + 'px';
-      } else {
-        canvas.style.cursor = 'default';
-        canvasTooltip.style.display = 'none';
-      }
-    });
-
-    canvas.addEventListener('mouseleave', () => {
-      canvasTooltip.style.display = 'none';
-    });
-
-    // Close pie menu on outside click
-    document.addEventListener('click', (e) => {
-      if (pieMenuJustOpened) {
-        pieMenuJustOpened = false;
-        return;
-      }
-      if (!e.target.closest('.pie-menu')) {
-        closePieMenu();
-      }
-    });
-  }
-
-  // ---- PIE MENU (Radial Context Menu) ----
-  function showPieMenu(furn, screenX, screenY, shiftKey) {
-    closePieMenu();
-    pieMenuJustOpened = true;
-    const activities = getActivitiesForFurniture(furn.type);
-    if (activities.length === 0) return;
-
-    const menu = document.createElement('div');
-    menu.className = 'pie-menu';
-    menu.style.left = screenX + 'px';
-    menu.style.top = screenY + 'px';
-
-    // Center cancel button
-    const cancel = document.createElement('div');
-    cancel.className = 'pie-center';
-    cancel.innerHTML = '✕';
-    cancel.title = 'Cancel';
-    cancel.addEventListener('click', (e) => {
-      e.stopPropagation();
-      closePieMenu();
-    });
-    menu.appendChild(cancel);
-
-    // Arrange items in a circle
-    const radius = 65;
-    const angleStep = (2 * Math.PI) / Math.max(activities.length, 1);
-    const startAngle = -Math.PI / 2; // start at top
-
-    activities.forEach((act, i) => {
-      const angle = startAngle + i * angleStep;
-      const ix = Math.cos(angle) * radius;
-      const iy = Math.sin(angle) * radius;
-
-      const item = document.createElement('div');
-      item.className = 'pie-item';
-      item.style.transform = `translate(${ix}px, ${iy}px)`;
-      item.innerHTML = `<span class="pie-icon">${act.icon}</span><span class="pie-label">${act.label}</span>`;
-      item.title = act.label;
-
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (shiftKey || e.shiftKey) {
-          // Queue the action
-          if (Game.Character.queueActivity(act.key)) {
-            Game.UI.showNotification(`📋 Queued: ${act.label}`);
-            Game.UI.updateQueueDisplay();
-          }
-        } else {
-          Game.Character.startActivity(act.key);
-        }
-        closePieMenu();
-      });
-
-      // Animate entry with staggered delay
-      item.style.animationDelay = `${i * 0.05}s`;
-
-      menu.appendChild(item);
-    });
-
-    document.body.appendChild(menu);
-    // Trigger animation
-    requestAnimationFrame(() => menu.classList.add('visible'));
-  }
-
-  function showRoomPieMenu(room, screenX, screenY, shiftKey) {
-    closePieMenu();
-    pieMenuJustOpened = true;
-    const activities = getActivitiesForRoom(room.type);
-    if (activities.length === 0) return;
-    // Reuse the same pie menu logic
-    const menu = document.createElement('div');
-    menu.className = 'pie-menu';
-    menu.style.left = screenX + 'px';
-    menu.style.top = screenY + 'px';
-
-    const cancel = document.createElement('div');
-    cancel.className = 'pie-center';
-    cancel.innerHTML = '✕';
-    cancel.addEventListener('click', (e) => { e.stopPropagation(); closePieMenu(); });
-    menu.appendChild(cancel);
-
-    const radius = 65;
-    const angleStep = (2 * Math.PI) / Math.max(activities.length, 1);
-    const startAngle = -Math.PI / 2;
-
-    activities.forEach((act, i) => {
-      const angle = startAngle + i * angleStep;
-      const ix = Math.cos(angle) * radius;
-      const iy = Math.sin(angle) * radius;
-      const item = document.createElement('div');
-      item.className = 'pie-item';
-      item.style.transform = `translate(${ix}px, ${iy}px)`;
-      item.innerHTML = `<span class="pie-icon">${act.icon}</span><span class="pie-label">${act.label}</span>`;
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (shiftKey || e.shiftKey) {
-          if (Game.Character.queueActivity(act.key)) {
-            Game.UI.showNotification(`📋 Queued: ${act.label}`);
-            Game.UI.updateQueueDisplay();
-          }
-        } else {
-          Game.Character.startActivity(act.key);
-        }
-        closePieMenu();
-      });
-      item.style.animationDelay = `${i * 0.05}s`;
-      menu.appendChild(item);
-    });
-
-    document.body.appendChild(menu);
-    requestAnimationFrame(() => menu.classList.add('visible'));
-  }
-
-  function closePieMenu() {
-    const existing = document.querySelector('.pie-menu');
-    if (existing) {
-      existing.classList.add('closing');
-      setTimeout(() => existing.remove(), 200);
     }
   }
 
-  function getActivitiesForFurniture(furnType) {
-    const activities = Game.Config.ACTIVITIES;
-    return Object.entries(activities)
-      .filter(([key, act]) => {
-        if (!act.furniture) return false;
-        // Match: furniture field is a substring of the furniture type OR exact match
-        return furnType.includes(act.furniture) || act.furniture === furnType;
-      })
-      .filter(([key]) => Game.Character.isAvailableActivity(key))
-      .map(([key, act]) => ({ key, ...act }));
-  }
-
-  function getActivitiesForRoom(roomType) {
-    const activities = Game.Config.ACTIVITIES;
-    return Object.entries(activities)
-      .filter(([key, act]) => act.room === roomType && !act.furniture)
-      .filter(([key]) => Game.Character.isAvailableActivity(key))
-      .map(([key, act]) => ({ key, ...act }));
-  }
-
-  // ---- Repair Pie Menu ----
-  function showRepairPieMenu(furn, screenX, screenY) {
-    closePieMenu();
-    pieMenuJustOpened = true;
-    const menu = document.createElement('div');
-    menu.className = 'pie-menu';
-    menu.style.left = screenX + 'px';
-    menu.style.top = screenY + 'px';
-
-    const cancel = document.createElement('div');
-    cancel.className = 'pie-center';
-    cancel.innerHTML = '✕';
-    cancel.addEventListener('click', (e) => { e.stopPropagation(); closePieMenu(); });
-    menu.appendChild(cancel);
-
-    // Repair option
-    const radius = 65;
-    const rx = Math.cos(-Math.PI / 2) * radius;
-    const ry = Math.sin(-Math.PI / 2) * radius;
-    const repairItem = document.createElement('div');
-    repairItem.className = 'pie-item';
-    repairItem.style.transform = `translate(${rx}px, ${ry}px)`;
-    repairItem.innerHTML = `<span class="pie-icon">🔧</span><span class="pie-label">Repair</span>`;
-    repairItem.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const handiness = Game.Character.getSkillLevel('handiness');
-      const success = Math.random() < (0.4 + handiness * 0.06);
-      if (success) {
-        Game.Character.repairFurniture(furn.id);
-        Game.Character.addSkillXp('handiness', 25);
-        if (Game.Renderer.spawnParticles) Game.Renderer.spawnParticles(furn.x, furn.y, '#4CAF50', 15);
-        const fc = Game.Config.FURNITURE[furn.type];
-        Game.UI.showNotification(`✅ ${fc ? fc.label : 'Item'} repaired!`);
-        Game.Character.addMoodlet({ name: 'Handy', value: 4, duration: 120, icon: '🔧' });
-      } else {
-        Game.Character.addSkillXp('handiness', 15);
-        Game.UI.showNotification(`❌ Repair failed! Try again or level up Handiness.`);
+  // ---- Gardening Loop ----
+  function updateGarden(minutes) {
+    const state = Game.State.get();
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap || !activeMap.furniture) return;
+    
+    activeMap.furniture.forEach(furn => {
+      if (furn.type === 'garden_plot' && furn.cropState === 'growing') {
+        // Grow slowly if thirsty, faster if watered
+        const growthRate = furn.needsWater ? 0.2 : 1.0; 
+        // 100 minutes to grow if fully watered (about 1.5 in-game hours)
+        furn.growth = (furn.growth || 0) + (minutes * growthRate);
+        if (furn.growth >= 100) {
+           furn.cropState = 'ready';
+           furn.growth = 100;
+           Game.UI.showNotification(`🌾 A crop is ready to harvest!`);
+        }
       }
-      closePieMenu();
     });
-    menu.appendChild(repairItem);
-
-    // Sell broken option
-    const sellAngle = Math.PI / 6;
-    const sx = Math.cos(sellAngle) * radius;
-    const sy = Math.sin(sellAngle) * radius;
-    const sellItem = document.createElement('div');
-    sellItem.className = 'pie-item';
-    sellItem.style.transform = `translate(${sx}px, ${sy}px)`;
-    const fc = Game.Config.FURNITURE[furn.type];
-    const refund = fc ? Math.floor(fc.cost * 0.25) : 0;
-    sellItem.innerHTML = `<span class="pie-icon">🗑️</span><span class="pie-label">Sell $${refund}</span>`;
-    sellItem.addEventListener('click', (e) => {
-      e.stopPropagation();
-      Game.Character.repairFurniture(furn.id);
-      Game.House.sellFurniture(furn.id);
-      closePieMenu();
-    });
-    menu.appendChild(sellItem);
-
-    document.body.appendChild(menu);
-    requestAnimationFrame(() => menu.classList.add('visible'));
   }
 
-  // ---- NPC Social Pie Menu ----
-  function showNPCPieMenu(npc, screenX, screenY) {
-    closePieMenu();
-    pieMenuJustOpened = true;
-    const npcCfg = Game.Config.NPCS.find(n => n.id === npc.configId);
-    if (!npcCfg) return;
-
-    const interactions = Game.Social.getAvailableInteractions(npc.configId);
-    if (interactions.length === 0) return;
-
-    const menu = document.createElement('div');
-    menu.className = 'pie-menu';
-    menu.style.left = screenX + 'px';
-    menu.style.top = screenY + 'px';
-
-    const cancel = document.createElement('div');
-    cancel.className = 'pie-center';
-    cancel.innerHTML = npcCfg.avatar;
-    cancel.title = npcCfg.name;
-    cancel.addEventListener('click', (e) => { e.stopPropagation(); closePieMenu(); });
-    menu.appendChild(cancel);
-
-    const radius = 65;
-    const angleStep = (2 * Math.PI) / Math.max(interactions.length, 1);
-    const startAngle = -Math.PI / 2;
-
-    interactions.forEach((int, i) => {
-      const angle = startAngle + i * angleStep;
-      const ix = Math.cos(angle) * radius;
-      const iy = Math.sin(angle) * radius;
-      const item = document.createElement('div');
-      item.className = 'pie-item';
-      item.style.transform = `translate(${ix}px, ${iy}px)`;
-      item.innerHTML = `<span class="pie-icon">💬</span><span class="pie-label">${int.label}</span>`;
-      item.title = int.label;
-      item.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const result = Game.Social.interact(npc.configId, int.key);
-        Game.UI.showNotification(result.msg);
-        const char = Game.State.get().character;
-        char.targetPosition = { x: npc.position.x, y: npc.position.y - 1 };
-        closePieMenu();
-      });
-      item.style.animationDelay = `${i * 0.05}s`;
-      menu.appendChild(item);
+  // ---- Pet Ecosystem ----
+  function updatePets(minutes) {
+    const state = Game.State.get();
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap || !activeMap.furniture) return;
+    
+    // Check pet bowls
+    let bowlFull = false;
+    activeMap.furniture.forEach(furn => {
+      if (furn.type === 'pet_bowl' && furn.isFull) {
+         furn.foodLevel = (furn.foodLevel || 100) - (minutes * 0.5); // Depletes over ~200 minutes (few game hours)
+         if (furn.foodLevel <= 0) {
+            furn.isFull = false;
+            furn.foodLevel = 0;
+            if (Game.UI) Game.UI.showNotification(`🥣 A pet bowl is empty.`);
+         } else {
+            bowlFull = true;
+         }
+      }
     });
 
-    document.body.appendChild(menu);
-    requestAnimationFrame(() => menu.classList.add('visible'));
+    if (bowlFull) {
+       // Chance to increase trust over time
+       state.catTrust = (state.catTrust || 0) + (minutes * 0.1); 
+       // Once reaching 100 (which takes about 16 in-game hours of full bowls), the cat moves in!
+       if (state.catTrust >= 100 && !state.hasStrayCat) {
+          state.hasStrayCat = true;
+          if (Game.UI) {
+             Game.UI.showNotification(`🐈 A stray cat has learned to trust you and permanently moved in!`);
+             Game.UI.playAnnouncer && Game.UI.playAnnouncer('🐈 New Pet!');
+          }
+          
+          if (!state.pets) state.pets = [];
+          state.pets.push({ id: 'cat_' + Date.now(), type: 'cat', active: true });
+       }
+    }
+
+    // Process Pet Wandering
+    if (state.pets) {
+        state.pets.forEach(pet => {
+            if (!pet.position) {
+                pet.position = { x: activeMap.lotWidth / 2, y: activeMap.lotHeight / 2 };
+                pet.targetPosition = null;
+                pet.timer = 0;
+            }
+
+            if (pet.targetPosition) {
+                const dx = pet.targetPosition.x - pet.position.x;
+                const dy = pet.targetPosition.y - pet.position.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                if (dist < 0.2) {
+                    pet.targetPosition = null;
+                    pet.timer = Math.random() * 10 + 5; // Idle for 5-15 in-game minutes
+                } else {
+                    const speed = 0.05 * minutes; // Very slow wandering
+                    pet.position.x += (dx/dist) * speed;
+                    pet.position.y += (dy/dist) * speed;
+                }
+            } else {
+                pet.timer -= minutes;
+                if (pet.timer <= 0) {
+                    // Pick a new random spot in the lot bounds
+                    pet.targetPosition = {
+                        x: 1 + Math.random() * (activeMap.lotWidth - 2),
+                        y: 1 + Math.random() * (activeMap.lotHeight - 2)
+                    };
+                }
+            }
+        });
+    }
+  }
+
+  // ---- Interaction Initialization ----
+  function setupCanvasEvents(canvas) {
+    if (Game.Interaction && Game.Interaction.init) {
+      Game.Interaction.init();
+    }
+    
+    // Zoom buttons
+    const btnZoomOut = document.getElementById('btn-zoom-out');
+    const btnZoomIn = document.getElementById('btn-zoom-in');
+    if (btnZoomOut && Game.Renderer.adjustZoom) btnZoomOut.addEventListener('click', () => Game.Renderer.adjustZoom(-0.25));
+    if (btnZoomIn && Game.Renderer.adjustZoom) btnZoomIn.addEventListener('click', () => Game.Renderer.adjustZoom(0.25));
   }
 
   // ---- NPC Walker System ----
   function updateNPCWalkers(delta) {
     const state = Game.State.get();
     if (!state.npcWalkers) state.npcWalkers = [];
-    const house = state.house;
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return;
 
     // Spawn timer
     npcSpawnTimer -= delta;
@@ -506,7 +297,7 @@ Game.Main = (function() {
       const speed = 1.5 * delta;
       npc.position.x += npc.direction * speed;
 
-      if (npc.position.x < -3 || npc.position.x > house.lotWidth + 3) {
+      if (npc.position.x < -3 || npc.position.x > activeMap.lotWidth + 3) {
         npc.active = false;
       }
 
@@ -514,25 +305,28 @@ Game.Main = (function() {
       if (npc.lifeTimer <= 0) npc.active = false;
     }
 
-    state.npcWalkers = state.npcWalkers.filter(n => n.active);
+    // In-place cleanup: reverse-iterate to avoid array copy from filter()
+    for (let i = state.npcWalkers.length - 1; i >= 0; i--) {
+      if (!state.npcWalkers[i].active) state.npcWalkers.splice(i, 1);
+    }
   }
 
   function spawnNPCWalker() {
     const state = Game.State.get();
-    const house = state.house;
-    const npcs = Game.Config.NPCS;
+    const activeMap = Game.State.getActiveMap();
+    const npcs = Game.Config.NPCS || [];
     const activeIds = state.npcWalkers.map(n => n.configId);
     const available = npcs.filter(n => !activeIds.includes(n.id));
-    if (available.length === 0) return;
+    if (available.length === 0 || state.npcWalkers.length >= 3) return;
 
     const chosen = available[Math.floor(Math.random() * available.length)];
     const fromLeft = Math.random() > 0.5;
-    const pathY = house.lotHeight + 1;
+    const pathY = activeMap.lotHeight + 0.5;
 
     state.npcWalkers.push({
       id: 'walker_' + Date.now(),
       configId: chosen.id,
-      position: { x: fromLeft ? -2 : house.lotWidth + 2, y: pathY },
+      position: { x: fromLeft ? -2 : activeMap.lotWidth + 2, y: pathY },
       direction: fromLeft ? 1 : -1,
       active: true,
       phase: Math.random() * Math.PI * 2,
@@ -566,10 +360,28 @@ Game.Main = (function() {
         case '2': gameSpeed = 3; updateSpeedDisplay(); break;
         case '3': gameSpeed = 10; updateSpeedDisplay(); break;
         case 'Escape':
-          closePieMenu();
+          if (Game.State.get().ui.mode === 'build') {
+            if (Game.State.get().ui.buildGhost) {
+              Game.State.get().ui.buildGhost = null; // Drop item
+            } else {
+              Game.State.get().ui.mode = 'live'; // Exit build mode
+            }
+            break;
+          }
+          if (Game.Interaction) Game.Interaction.closePieMenu();
           Game.Character.cancelActivity();
           Game.Character.clearQueue();
           Game.UI.updateQueueDisplay();
+          break;
+        case 'r':
+        case 'R':
+          if (Game.State.get().ui.mode === 'build' && Game.State.get().ui.buildGhost && Game.State.get().ui.buildGhost.type === 'furniture') {
+            const ghost = Game.State.get().ui.buildGhost;
+            ghost.rotated = !ghost.rotated;
+            const temp = ghost.w;
+            ghost.w = ghost.h;
+            ghost.h = temp;
+          }
           break;
         case 'q':
           // Toggle autonomy
@@ -598,7 +410,7 @@ Game.Main = (function() {
   }
 
   function setupSpeedControls() {
-    document.querySelectorAll('.speed-btn').forEach(btn => {
+    document.querySelectorAll('.speed-btn[data-speed]').forEach(btn => {
       btn.addEventListener('click', () => {
         const speed = parseInt(btn.dataset.speed);
         if (!isNaN(speed)) {
@@ -607,6 +419,8 @@ Game.Main = (function() {
         }
       });
     });
+
+    // Zoom buttons already registered in setupCanvasEvents() — don't duplicate
   }
 
   function updateSpeedDisplay() {
@@ -634,11 +448,10 @@ Game.Main = (function() {
     }, 5000);
   }
 
-  return { init, getSpeed: () => gameSpeed };
+  return { init, getSpeed: () => gameSpeed, hitTestNPCWalker, spawnNPCWalker, tick };
 })();
 
 // Boot
 window.addEventListener('DOMContentLoaded', () => {
-  Game.State.load();
-  Game.Main.init();
+  Game.UI.initMainMenu();
 });

@@ -36,8 +36,8 @@ Game.Prestige = (function() {
     else if (state.economy.money >= 5000) points += 3;
 
     // Rooms built
-    if (state.house.rooms.length >= 6) points += 12;
-    else if (state.house.rooms.length >= 3) points += 5;
+    if (state.maps.house.rooms.length >= 6) points += 12;
+    else if (state.maps.house.rooms.length >= 3) points += 5;
 
     // Stats bonuses
     points += Math.floor(state.stats.eventsHandled * 0.5);
@@ -87,8 +87,8 @@ Game.Prestige = (function() {
       state.economy.money += Math.floor(prevMoney * 0.3 * ups.inheritance);
     }
     if (ups.bigger_lot) {
-      state.house.lotWidth += 2 * ups.bigger_lot;
-      state.house.lotHeight += 2 * ups.bigger_lot;
+      state.maps.house.lotWidth += 2 * ups.bigger_lot;
+      state.maps.house.lotHeight += 2 * ups.bigger_lot;
     }
     if (ups.prodigy && topSkill) {
       state.character.skills[topSkill.key] = Math.min(3, ups.prodigy);

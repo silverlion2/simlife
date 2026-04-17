@@ -1,28 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+    <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SimLife — Build Your Dream Life</title>
   <meta name="description" content="A deep life simulation game. Build your home, grow your career, make friends, and leave a legacy. Featuring autonomous AI, moodlets, and radial pie menus.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>">
-  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/main.css?v=2">
+  
+  <!-- Phaser 3 Core Engine -->
+  <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
+  <!-- EasyStar.js for A* Pathfinding -->
+  <script src="https://cdn.jsdelivr.net/npm/easystarjs@0.4.4/build/easystar-0.4.4.min.js"></script>
 </head>
 <body>
 
-<!-- Welcome Screen -->
-<div id="welcome-screen">
-  <div class="welcome-content">
-    <h1>🏡 SimLife</h1>
-    <p>Build your dream home, grow your career, make friends, and leave a lasting legacy.</p>
-    <p style="font-size:12px;color:var(--text-dim);">
-      🤖 Your Sim now thinks autonomously!<br>
-      🎯 Click furniture for pie menus<br>
-      ⇧ Shift+Click to queue actions<br>
-      Q to toggle autonomy
-    </p>
-    <button id="start-btn">▶ Start Your Life</button>
+<!-- Main Menu Screen (Starts visible) -->
+<div id="main-menu-screen" class="fs-screen">
+  <div class="menu-content">
+    <h1 class="bounce-title">🏡 SimLife</h1>
+    <p class="subtitle">Build your dream home, grow your career, make friends.</p>
+    
+    <div class="menu-btn-group">
+      <button id="btn-mm-new">✨ New Game</button>
+      <button id="btn-mm-load">📂 Load Game</button>
+      <button id="btn-mm-wipe" style="background:#cc3333; color:white; border-color:#990000; margin-top: 15px;">🗑️ Wipe All Data</button>
+    </div>
   </div>
+</div>
+
+<!-- Character Creation Screen -->
+<div id="char-creation-screen" class="fs-screen hidden">
+  <div class="menu-content wide">
+    <button class="back-btn" id="btn-cc-back">← Back</button>
+    <h2>Create Your Sim</h2>
+    
+    <div class="cc-form">
+      <div class="cc-field">
+        <label>World Name:</label>
+        <input type="text" id="cc-world-name" value="My New Life" maxlength="20">
+      </div>
+      
+      <div class="cc-field">
+        <label>Sim Name:</label>
+        <input type="text" id="cc-sim-name" value="Alex" maxlength="15">
+      </div>
+      
+      <div class="cc-field">
+        <label>Skin / Shirt Color:</label>
+        <input type="color" id="cc-sim-color" value="#88CCFF">
+      </div>
+
+      <div class="cc-field">
+        <label>Avatar Form:</label>
+        <select id="cc-sim-form">
+          <option value="human">Person</option>
+          <option value="robot">Robot</option>
+          <option value="cat">Pet Cat</option>
+          <option value="banana">Banana</option>
+          <option value="online_witch" selected>Witch (Online Asset)</option>
+        </select>
+      </div>
+
+      <div class="cc-field">
+        <label>Primary Trait:</label>
+        <div id="cc-trait-grid" class="trait-grid"></div>
+      </div>
+      
+      <button id="btn-cc-start" class="primary-btn">▶ Start Your Life</button>
+    </div>
+  </div>
+</div>
+
+<!-- Load Game Screen -->
+<div id="load-game-screen" class="fs-screen hidden">
+  <div class="menu-content wide">
+    <button class="back-btn" id="btn-ls-back">← Back</button>
+    <h2>Load World</h2>
+    <div id="load-saves-list" class="saves-list"></div>
+  </div>
+</div>
+
+<!-- Edit Character Modal (In-game) -->
+<div id="edit-char-modal" class="rpg-dialog hidden" style="z-index: 151;">
+  <div class="dialog-header">
+    <h3>Sim Makeover</h3>
+    <button class="close-btn" id="btn-ec-close">×</button>
+  </div>
+  <div class="dialog-content">
+    <div class="cc-field">
+      <label>Sim Name:</label>
+      <input type="text" id="ec-sim-name" maxlength="15">
+    </div>
+    <div class="cc-field">
+      <label>Color Tint:</label>
+      <input type="color" id="ec-sim-color">
+    </div>
+    <div class="cc-field">
+      <label>Avatar Form:</label>
+      <select id="ec-sim-form">
+        <option value="human">Person</option>
+        <option value="robot">Robot</option>
+        <option value="cat">Pet Cat</option>
+        <option value="banana">Banana</option>
+        <option value="online_witch" selected>Witch (Online Asset)</option>
+      </select>
+    </div>
+    <div class="cc-field">
+      <label>Change Trait (Free!):</label>
+      <div id="ec-trait-grid" class="trait-grid"></div>
+    </div>
+    <button id="btn-ec-save" class="primary-btn" style="margin-top:15px; width:100%;">💾 Apply Changes</button>
+  </div>
+</div>
+
+<!-- Season Announcer Overlay -->
+<div id="announcer-overlay" class="hidden">
+  <h1 id="announcer-text">🌸 A New Day Begins!</h1>
 </div>
 
 <div class="game-container">
@@ -48,6 +142,10 @@
         <button class="speed-btn active" data-speed="1">1×</button>
         <button class="speed-btn" data-speed="3">3×</button>
         <button class="speed-btn" data-speed="10">10×</button>
+      </div>
+      <div class="hud-box zoom-controls" style="margin-top: 10px;">
+        <button id="btn-zoom-out" class="speed-btn" title="Zoom Out (Mouse Wheel Down)">➖</button>
+        <button id="btn-zoom-in" class="speed-btn" title="Zoom In (Mouse Wheel Up)">➕</button>
       </div>
     </div>
     
@@ -85,26 +183,32 @@
       <button class="panel-btn" data-panel="social">💬 Social</button>
       <button class="panel-btn" data-panel="skills">📚 Skills</button>
       <button class="panel-btn" data-panel="legacy">🌟 Legacy</button>
+      <button id="btn-ingame-menu" class="panel-btn" style="border-color: #EF5350; color: #EF5350;">⚙️ Menu</button>
     </div>
   </div>
 
   <!-- Detail Dialogs (Replaces side panel) -->
   <div id="side-panel" class="rpg-dialog hidden"></div>
+  
+  <!-- Hover Tooltip -->
+  <div id="hover-tooltip" class="hidden" style="position: absolute; pointer-events: none; z-index: 9999; background: rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; border-radius: 6px; font-family: 'Nunito', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transform: translate(-50%, -120%); white-space: nowrap;"></div>
 </div>
 
 <!-- Scripts in dependency order -->
-<script src="js/config.js"></script>
-<script src="js/state.js"></script>
-<script src="js/character.js"></script>
-<script src="js/economy.js"></script>
-<script src="js/house.js"></script>
-<script src="js/social.js"></script>
-<script src="js/events.js"></script>
-<script src="js/prestige.js"></script>
-<script src="js/renderer.js"></script>
-<script src="js/autonomy.js"></script>
-<script src="js/ui.js"></script>
-<script src="js/main.js"></script>
+<script src="js/config.js?v=2"></script>
+<script src="js/state.js?v=2"></script>
+<script src="js/character.js?v=2"></script>
+<script src="js/economy.js?v=2"></script>
+<script src="js/house.js?v=2"></script>
+<script src="js/social.js?v=2"></script>
+<script src="js/events.js?v=2"></script>
+<script src="js/prestige.js?v=2"></script>
+<script src="js/audio.js?v=2"></script>
+<script src="js/renderer.js?v=2"></script>
+<script src="js/autonomy.js?v=2"></script>
+<script src="js/interaction.js?v=2"></script>
+<script src="js/ui.js?v=2"></script>
+<script src="js/main.js?v=2"></script>
 
 </body>
 </html>

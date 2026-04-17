@@ -41,7 +41,7 @@ Game.Social = (function() {
       return { success: false, msg: `Need $${intCfg.cost}` };
     }
     if (intCfg.needRoom) {
-      const house = Game.State.get().house;
+      const house = Game.State.getActiveMap();
       if (!house.rooms.some(r => r.type === intCfg.needRoom)) {
         return { success: false, msg: `Need a ${cfg.ROOMS[intCfg.needRoom]?.label || intCfg.needRoom}` };
       }
