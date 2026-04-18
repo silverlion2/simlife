@@ -76,10 +76,32 @@ Game.State = (function() {
             { id: 'furn_18', type: 'garden_plot', roomId: null, x: 4, y: 10 },
             
             { id: 'furn_19', type: 'map_portal', roomId: null, x: 4, y: 9, config: { targetMap: 'mail_room', targetX: 2, targetY: 2 } },
-            { id: 'furn_20', type: 'subway_gate', roomId: null, x: 5, y: 9, config: { isHub: true } }
+            { id: 'furn_20', type: 'subway_gate', roomId: null, x: 5, y: 9, config: { isHub: true } },
+
+            // Expanded Yard Decor
+            { id: 'furn_21', type: 'fountain', roomId: null, x: 16, y: 16 },
+            { id: 'furn_22', type: 'garden_bench', roomId: null, x: 14, y: 16 },
+            { id: 'furn_23', type: 'garden_bench', roomId: null, x: 18, y: 16 },
+            
+            // Trees around the borders
+            { id: 'furn_24', type: 'indoor_tree', roomId: null, x: 1, y: 20 },
+            { id: 'furn_25', type: 'indoor_tree', roomId: null, x: 5, y: 20 },
+            { id: 'furn_26', type: 'indoor_tree', roomId: null, x: 9, y: 20 },
+            { id: 'furn_27', type: 'indoor_tree', roomId: null, x: 13, y: 20 },
+            { id: 'furn_28', type: 'indoor_tree', roomId: null, x: 17, y: 20 },
+            { id: 'furn_29', type: 'indoor_tree', roomId: null, x: 21, y: 20 },
+
+            { id: 'furn_30', type: 'indoor_tree', roomId: null, x: 20, y: 2 },
+            { id: 'furn_31', type: 'indoor_tree', roomId: null, x: 20, y: 6 },
+            { id: 'furn_32', type: 'indoor_tree', roomId: null, x: 20, y: 10 },
+            { id: 'furn_33', type: 'indoor_tree', roomId: null, x: 20, y: 14 },
+
+            // Extra flair
+            { id: 'furn_34', type: 'bbq_grill', roomId: null, x: 16, y: 13 },
+            { id: 'furn_35', type: 'telescope', roomId: null, x: 18, y: 13 }
           ],
           nextRoomId: 3,
-          nextFurnId: 21,
+          nextFurnId: 36,
           brokenFurniture: [],
         },
         mail_room: {
@@ -97,20 +119,20 @@ Game.State = (function() {
           brokenFurniture: [],
         },
         downtown: {
-          lotWidth: 10, lotHeight: 10,
-          rooms: [ { id: 'room_0', type: 'subway', x: 0, y: 0, w: 10, h: 10 } ],
+          lotWidth: 40, lotHeight: 40,
+          rooms: [ { id: 'room_0', type: 'subway', x: 0, y: 0, w: 40, h: 40 } ],
           furniture: [
-            { id: 'furn_0', type: 'subway_gate', roomId: 'room_0', x: 4, y: 8, config: { isHub: true } },
-            { id: 'furn_1', type: 'display_shelf', roomId: 'room_0', x: 4, y: 2 }
+            { id: 'furn_0', type: 'subway_gate', roomId: 'room_0', x: 19, y: 38, config: { isHub: true } },
+            { id: 'furn_1', type: 'display_shelf', roomId: 'room_0', x: 19, y: 2 }
           ],
           nextRoomId: 1, nextFurnId: 2, brokenFurniture: []
         },
         university: {
-          lotWidth: 10, lotHeight: 10,
-          rooms: [ { id: 'room_0', type: 'subway', x: 0, y: 0, w: 10, h: 10 } ],
+          lotWidth: 40, lotHeight: 40,
+          rooms: [ { id: 'room_0', type: 'subway', x: 0, y: 0, w: 40, h: 40 } ],
           furniture: [
-            { id: 'furn_0', type: 'subway_gate', roomId: 'room_0', x: 4, y: 8, config: { isHub: true } },
-            { id: 'furn_1', type: 'language_book', roomId: 'room_0', x: 4, y: 2 }
+            { id: 'furn_0', type: 'subway_gate', roomId: 'room_0', x: 19, y: 38, config: { isHub: true } },
+            { id: 'furn_1', type: 'language_book', roomId: 'room_0', x: 19, y: 2 }
           ],
           nextRoomId: 1, nextFurnId: 2, brokenFurniture: []
         }

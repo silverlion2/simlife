@@ -505,7 +505,7 @@ Game.Config = {
   // ----------------------------------------------------------
   STARTING_STATE: {
     money: 500,
-    lotWidth: 12,
-    lotHeight: 12,
+    lotWidth: 64,
+    lotHeight: 64,
   },
 };
