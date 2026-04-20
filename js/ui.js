@@ -12,6 +12,38 @@ Game.UI = (function() {
     buildMoodletBar();
     buildQueueBar();
     setupPanelButtons();
+    setupGraphicsToggle();
+  }
+
+  function setupGraphicsToggle() {
+    window.GRAPHICS_QUALITY = localStorage.getItem('graphicsQuality') || 'high';
+    
+    const btn = document.getElementById('btn-toggle-graphics');
+    const updateBtn = () => {
+       if (btn) {
+           btn.textContent = window.GRAPHICS_QUALITY === 'high' ? '🔆' : '🌑';
+           btn.title = window.GRAPHICS_QUALITY === 'high' ? 'Graphics: High (Press L to lower)' : 'Graphics: Low (Press L to raise)';
+       }
+    };
+    updateBtn();
+
+    const toggle = () => {
+      window.GRAPHICS_QUALITY = window.GRAPHICS_QUALITY === 'high' ? 'low' : 'high';
+      localStorage.setItem('graphicsQuality', window.GRAPHICS_QUALITY);
+      updateBtn();
+      if (Game.Renderer && Game.Renderer.setBgDirty) {
+        Game.Renderer.setBgDirty(); // Force redshift to apply pipelines
+      }
+      showNotification(`Graphics set to ${window.GRAPHICS_QUALITY === 'high' ? 'High (Dynamic Lights)' : 'Low (Performance)'}`);
+    };
+
+    if (btn) btn.addEventListener('click', toggle);
+
+    document.addEventListener('keydown', (e) => {
+       if (e.key.toLowerCase() === 'l' && document.activeElement.tagName !== 'INPUT') {
+          toggle();
+       }
+    });
   }
 
   // ---- Main Menu Flow (New) ----
@@ -41,6 +73,35 @@ Game.UI = (function() {
       buildSavesList();
       mm.classList.add('hidden');
       ls.classList.remove('hidden');
+    });
+
+    document.getElementById('btn-mm-export').addEventListener('click', () => {
+      const saves = Game.State.getSaves();
+      if (saves.length === 0) {
+         alert('No local worlds found to export.');
+         return;
+      }
+      Game.State.exportToFile(saves[0].id); // export the most recent
+    });
+
+    document.getElementById('btn-mm-import').addEventListener('click', () => {
+      document.getElementById('file-import').click();
+    });
+
+    document.getElementById('file-import').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+         const success = Game.State.importFromFile(ev.target.result);
+         if (success) {
+            alert('Save imported successfully! You can now load it from the Load Game menu.');
+            e.target.value = ''; // reset so we can import same file again if needed
+         } else {
+            alert('Failed to import save. The file may be corrupted.');
+         }
+      };
+      reader.readAsText(file);
     });
 
     document.getElementById('btn-mm-wipe').addEventListener('click', () => {
@@ -162,6 +223,7 @@ Game.UI = (function() {
         </div>
         <div class="save-actions">
           <button class="btn-load">Load</button>
+          <button class="btn-export">Export</button>
           <button class="btn-delete">X</button>
         </div>
       `;
@@ -170,6 +232,9 @@ Game.UI = (function() {
         if(Game.State.loadSlot(save.id)) {
           startGameLoop(document.getElementById('load-game-screen'));
         }
+      });
+      slot.querySelector('.btn-export').addEventListener('click', () => {
+        Game.State.exportToFile(save.id);
       });
       slot.querySelector('.btn-delete').addEventListener('click', () => {
         if(confirm('Delete this world forever?')) {
@@ -265,8 +330,11 @@ Game.UI = (function() {
     if (actEl) {
       if (char.currentActivity) {
         const actCfg = Game.Config.ACTIVITIES[char.currentActivity.type];
-        const pct = Math.round(char.activityProgress * 100);
-        actEl.textContent = actCfg ? `${actCfg.icon} ${actCfg.label} (${pct}%)` : '...';
+        let prefix = '';
+        if (char.targetPosition || char.path || char.isPathfinding) {
+           prefix = '🚶 Walking to ';
+        }
+        actEl.textContent = actCfg ? `${prefix}${actCfg.icon} ${actCfg.label} (${pct}%)` : '...';
       } else if (char.autonomy && char.autonomy.thought) {
         const actCfg = Game.Config.ACTIVITIES[char.autonomy.thought];
         actEl.textContent = actCfg ? `💭 Thinking about ${actCfg.label.toLowerCase()}...` : '💤 Idle';
@@ -510,6 +578,9 @@ Game.UI = (function() {
     // Sell mode toggle
     const sellActive = Game.State.get().ui.mode === 'sell';
     html += `<button class="sell-mode-btn ${sellActive ? 'active' : ''}" onclick="Game.UI.toggleSellMode()">🗑️ ${sellActive ? 'Exit Sell Mode' : 'Sell Mode'}</button>`;
+    // Sandbox mode toggle
+    const sandboxActive = Game.State.get().ui.sandboxMode;
+    html += `<button class="sandbox-mode-btn ${sandboxActive ? 'active' : ''}" onclick="Game.UI.toggleSandboxMode()" style="margin-left:5px; padding:6px 12px; background: ${sandboxActive ? '#FFCC00' : 'rgba(255,255,255,0.1)'}; color: ${sandboxActive ? '#000' : '#FFF'}; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🏖️ ${sandboxActive ? 'Sandbox ON' : 'Sandbox OFF'}</button>`;
     // Broken furniture indicator
     const activeMap = Game.State.getActiveMap();
     const broken = activeMap && activeMap.brokenFurniture ? activeMap.brokenFurniture.length : 0;
@@ -521,7 +592,7 @@ Game.UI = (function() {
       html += `<div class="build-item" onclick="Game.UI.startBuild('room','${key}')">
         <div class="build-item-icon">${room.icon}</div>
         <div class="build-item-name">${room.label}</div>
-        <div class="build-item-cost">$${room.baseCost}</div>
+        <div class="build-item-cost">${sandboxActive ? 'Free' : '$' + room.baseCost}</div>
       </div>`;
     }
     html += '</div><h4 class="build-category">Furniture</h4><div class="build-grid">';
@@ -529,7 +600,7 @@ Game.UI = (function() {
       html += `<div class="build-item" onclick="Game.UI.startBuild('furniture','${key}')">
         <div class="build-item-icon">${furn.icon}</div>
         <div class="build-item-name">${furn.label}</div>
-        <div class="build-item-cost">$${furn.cost}</div>
+        <div class="build-item-cost">${sandboxActive ? 'Free' : '$' + furn.cost}</div>
       </div>`;
     }
     html += '</div></div>';
@@ -807,6 +878,7 @@ Game.UI = (function() {
     cancelBuild,
     doSocialInteraction,
     toggleSellMode,
+    toggleSandboxMode,
     playAnnouncer,
   };
 
@@ -838,21 +910,26 @@ Game.UI = (function() {
       // Always clean up handler on exit
       container.removeEventListener('click', handleSellClick);
       Game.UI.showNotification('🚪 Exited sell mode');
-      // Refresh build panel
-      const panel = document.getElementById('side-panel');
-      if (panel && panel.dataset.active === 'build') {
-        buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
-      }
     } else {
       ui.mode = 'sell';
       Game.UI.showNotification('🗑️ Sell Mode: Click furniture to sell, rooms to demolish');
       // Set up sell click handler on the Phaser container
       container.addEventListener('click', handleSellClick);
-      // Refresh build panel
-      const panel = document.getElementById('side-panel');
-      if (panel && panel.dataset.active === 'build') {
-        buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
-      }
+    }
+    // Refresh build panel
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+    }
+  }
+
+  function toggleSandboxMode() {
+    const ui = Game.State.get().ui;
+    ui.sandboxMode = !ui.sandboxMode;
+    Game.UI.showNotification(ui.sandboxMode ? '🏖️ Sandbox Mode: Free Building Enabled!' : '🏖️ Sandbox Mode Disabled');
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
     }
   }
 

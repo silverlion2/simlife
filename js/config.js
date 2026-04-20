@@ -144,6 +144,7 @@ Game.Config = {
     coffee_table:  { label: 'Coffee Table',   icon: '☕', room: 'living', cost: 80,   quality: 1, needBonus: {},                       comfort: 2,  w: 1, h: 1 },
     stereo:        { label: 'Stereo System',  icon: '📻', room: 'living', cost: 350,  quality: 1, needBonus: { fun: 20 },              comfort: 0,  w: 1, h: 1 },
     decorated_table:{ label: 'Decorated Table',icon: '🕯️', room: 'living', cost: 400,  quality: 2, needBonus: { comfort: 10 },          comfort: 2,  w: 2, h: 1 },
+    grand_piano:   { label: 'Grand Piano',    icon: '🎹', room: 'living', cost: 2500, quality: 3, needBonus: { fun: 45, social: 10 },  comfort: 0,  w: 2, h: 2, texture: 'grandPiano_se' },
     fireplace:     { label: 'Fireplace',      icon: '🔥', room: 'living', cost: 1200, quality: 3, needBonus: { comfort: 15 },          comfort: 5,  w: 2, h: 1 },
     recliner:      { label: 'Recliner',       icon: '💺', room: 'living', cost: 450,  quality: 2, needBonus: { comfort: 12, energy: 5},comfort: 5,  w: 1, h: 1 },
 
@@ -163,12 +164,14 @@ Game.Config = {
 
     // Game Room / Hobby
     game_console:  { label: 'Game Console',   icon: '🎮', room: 'gameroom', cost: 400,  quality: 1, needBonus: { fun: 25 },            comfort: 0, w: 1, h: 1 },
+    arcade_machine: { label: 'Arcade Machine', icon: '🕹️', room: 'gameroom', cost: 1200, quality: 3, needBonus: { fun: 35 }, comfort: 0, w: 1, h: 2, texture: 'arcadeMachine_se' },
     display_case:  { label: 'Display Case',   icon: '💎', room: 'gameroom', cost: 800,  quality: 2, needBonus: { fun: 15 },            comfort: 0, w: 1, h: 2 },
     pool_table:    { label: 'Pool Table',     icon: '🎱', room: 'gameroom', cost: 700,  quality: 2, needBonus: { fun: 20, social: 10 }, comfort: 0, w: 2, h: 1 },
     dartboard:     { label: 'Dartboard',      icon: '🎯', room: 'gameroom', cost: 80,   quality: 1, needBonus: { fun: 12 },            comfort: 0, w: 1, h: 1 },
 
     // Garden
     garden_plot:   { label: 'Garden Plot',    icon: '🌱', room: 'garden', cost: 50,  quality: 1, needBonus: {},          comfort: 0, w: 1, h: 1, skill: 'gardening' },
+    bonsai_shrine: { label: 'Bonsai Shrine',  icon: '⛩️', room: 'garden', cost: 800, quality: 3, needBonus: { comfort: 15, fun: 10 }, comfort: 0, w: 1, h: 1, texture: 'bonsaiShrine_se' },
     garden_bench:  { label: 'Garden Bench',   icon: '🪑', room: 'garden', cost: 100, quality: 1, needBonus: { comfort: 8, fun: 5 }, comfort: 3, w: 2, h: 1 },
     fountain:      { label: 'Fountain',       icon: '⛲', room: 'garden', cost: 500, quality: 2, needBonus: { comfort: 15 },       comfort: 5, w: 1, h: 1 },
     bbq_grill:     { label: 'BBQ Grill',      icon: '🥓', room: 'patio',  cost: 400, quality: 2, needBonus: { hunger: 25, fun: 5}, comfort: 0, w: 1, h: 1, skill: 'cooking' },
@@ -407,6 +410,15 @@ Game.Config = {
   ],
 
   // ----------------------------------------------------------
+  // Crop Market
+  // ----------------------------------------------------------
+  CROPS: {
+    tomato: { label: 'Tomato', cost: 5, sellPrice: 24, growthTime: 360, icon: '🍅' }, // ~6 hours
+    corn: { label: 'Corn', cost: 15, sellPrice: 70, growthTime: 720, icon: '🌽' },     // ~12 hours
+    pumpkin: { label: 'Pumpkin', cost: 50, sellPrice: 260, growthTime: 1440, icon: '🎃' }, // ~24 hours
+  },
+
+  // ----------------------------------------------------------
   // Activities (things you can do with furniture/rooms)
   // ----------------------------------------------------------
   ACTIVITIES: {
@@ -426,9 +438,11 @@ Game.Config = {
     admire_case:  { label: 'Admire Display', duration: 20,  needs: { fun: 15 },     room: 'gameroom', furniture: 'display_case', icon: '💎', moodlet: { name: 'Impressed', value: 5, duration: 120, icon: '🤩' } },
     exercise:     { label: 'Exercise',       duration: 60,  needs: { fun: 8 },      room: 'gym',      furniture: null,     icon: '🏋️', skill: 'fitness', xp: 18, energyCost: 15, moodlet: { name: 'Pumped Up', value: 6, duration: 180, icon: '💪' } },
     play_games:   { label: 'Play Games',     duration: 45,  needs: { fun: 25 },     room: 'gameroom', furniture: 'game_console', icon: '🎮', moodlet: { name: 'Having a Blast', value: 7, duration: 150, icon: '🎮' } },
-    plant_seed:   { label: 'Plant Seeds',    duration: 15,  needs: { fun: 5 },      room: 'garden',   furniture: 'garden_plot', icon: '🌱', skill: 'gardening', xp: 5, energyCost: 5 },
-    water_crop:   { label: 'Water Crop',     duration: 10,  needs: { fun: 2 },      room: 'garden',   furniture: 'garden_plot', icon: '💧', skill: 'gardening', xp: 5, energyCost: 2 },
-    harvest_crop: { label: 'Harvest Crop',   duration: 20,  needs: { fun: 15 },     room: 'garden',   furniture: 'garden_plot', icon: '🌾', skill: 'gardening', xp: 20, earnings: 50, moodlet: { name: 'Bountiful Harvest', value: 5, duration: 180, icon: '🥕' } },
+    plant_tomato: { label: 'Plant Tomato ($5)',  duration: 15,  needs: { fun: 5 },      room: 'garden',   furniture: 'garden_plot', icon: '🍅', skill: 'gardening', xp: 5, energyCost: 5, cost: 5 },
+    plant_corn:   { label: 'Plant Corn ($15)',   duration: 15,  needs: { fun: 5 },      room: 'garden',   furniture: 'garden_plot', icon: '🌽', skill: 'gardening', xp: 8, energyCost: 8, cost: 15 },
+    plant_pumpkin:{ label: 'Plant Pumpkin ($50)',duration: 15,  needs: { fun: 5 },      room: 'garden',   furniture: 'garden_plot', icon: '🎃', skill: 'gardening', xp: 15, energyCost: 15, cost: 50 },
+    water_crop:   { label: 'Water Crop',         duration: 10,  needs: { fun: 2 },      room: 'garden',   furniture: 'garden_plot', icon: '💧', skill: 'gardening', xp: 5, energyCost: 2 },
+    harvest_crop: { label: 'Harvest Crop',       duration: 20,  needs: { fun: 15 },     room: 'garden',   furniture: 'garden_plot', icon: '🌾', skill: 'gardening', xp: 20, moodlet: { name: 'Bountiful Harvest', value: 5, duration: 180, icon: '🥕' } },
     paint:        { label: 'Paint',          duration: 60,  needs: { fun: 15 },     room: 'study',    furniture: null,     icon: '🎨', skill: 'creativity', xp: 15, moodlet: { name: 'Creatively Fulfilled', value: 6, duration: 180, icon: '🎨' } },
     relax_sofa:   { label: 'Relax on Sofa',  duration: 30,  needs: { comfort: 20, fun: 8 }, room: 'living', furniture: 'sofa', icon: '🛋️', moodlet: { name: 'Cozy', value: 4, duration: 120, icon: '🛋️' } },
     sit_garden:   { label: 'Enjoy Garden',   duration: 20,  needs: { fun: 12, comfort: 8 }, room: 'garden', furniture: 'garden_bench', icon: '🌸', moodlet: { name: 'At Peace', value: 5, duration: 150, icon: '🌸' } },

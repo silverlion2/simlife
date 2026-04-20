@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "easystarjs": "^0.4.4",
+    "navmesh": "^2.3.1",
+    "phaser3-rex-plugins": "^1.80.17",
+    "playwright": "^1.59.1"
+  },
+  "name": "the-game",
+  "version": "1.0.0",
+  "description": "A deep browser-based life simulation game inspired by The Sims. Build your home, grow your career, make friends, and leave a lasting legacy — all from your browser.",
+  "main": "test_transitions.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/silverlion2/simlife.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/silverlion2/simlife/issues"
+  },
+  "homepage": "https://github.com/silverlion2/simlife#readme"
+}

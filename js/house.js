@@ -27,14 +27,16 @@ Game.House = (function() {
     if (w < roomCfg.minW || h < roomCfg.minH || w > roomCfg.maxW || h > roomCfg.maxH) return false;
     if (!isAreaFree(x, y, w, h)) return false;
 
+    const isSandbox = Game.State.get().ui.sandboxMode;
     const cost = roomCfg.baseCost + (w * h - roomCfg.minW * roomCfg.minH) * 100;
-    if (!Game.Economy.canAfford(cost)) return false;
+    
+    if (!isSandbox && !Game.Economy.canAfford(cost)) return false;
 
-    Game.Economy.spend(cost);
+    if (!isSandbox) Game.Economy.spend(cost);
     const id = 'room_' + house.nextRoomId++;
     house.rooms.push({ id, type, x, y, w, h });
     Game.State.get().stats.buildingsBuilt++;
-    Game.UI && Game.UI.showNotification(`🏗️ Built ${roomCfg.label}! (-$${cost})`);
+    Game.UI && Game.UI.showNotification(`🏗️ Built ${roomCfg.label}! ${isSandbox ? '(Free)' : `(-$${cost})`}`);
     if (Game.Renderer && Game.Renderer.setBgDirty) Game.Renderer.setBgDirty();
     if (Game.Renderer && Game.Renderer.spawnParticles) Game.Renderer.spawnParticles(x + w/2, y + h/2, 30, '#FFFF00');
     return true;
@@ -73,6 +75,11 @@ Game.House = (function() {
     const furnCfg = cfg.FURNITURE[furn.type];
     
     house.furniture.splice(idx, 1);
+
+    // CRITICAL FIX: Also remove from broken furniture list if it was broken
+    if (Game.Character && Game.Character.repairFurniture) {
+       Game.Character.repairFurniture(furnId);
+    }
     
     if (furnCfg) {
        const refund = Math.floor(furnCfg.cost * refundPercent);
@@ -115,13 +122,14 @@ Game.House = (function() {
       if (gridX < furn.x + fw && gridX + w > furn.x && gridY < furn.y + fh && gridY + h > furn.y) return false;
     }
 
-    if (!Game.Economy.canAfford(furnCfg.cost)) return false;
+    const isSandbox = Game.State.get().ui.sandboxMode;
+    if (!isSandbox && !Game.Economy.canAfford(furnCfg.cost)) return false;
 
-    Game.Economy.spend(furnCfg.cost);
+    if (!isSandbox) Game.Economy.spend(furnCfg.cost);
     const id = 'furn_' + house.nextFurnId++;
     house.furniture.push({ id, type: furnitureType, roomId, x: gridX, y: gridY, rotated });
     Game.State.get().stats.furnitureBought++;
-    Game.UI && Game.UI.showNotification(`🛒 Bought ${furnCfg.label}! (-$${furnCfg.cost})`);
+    Game.UI && Game.UI.showNotification(`🛒 Bought ${furnCfg.label}! ${isSandbox ? '(Free)' : `(-$${furnCfg.cost})`}`);
     if (Game.Renderer && Game.Renderer.spawnParticles) {
         Game.Renderer.spawnParticles(gridX + w/2, gridY + h/2, 20, '#00FFFF');
     }
@@ -145,7 +153,9 @@ Game.House = (function() {
     for (const furn of house.furniture) {
       const fc = cfg.FURNITURE[furn.type];
       if (!fc) continue;
-      if (gridX >= furn.x && gridX < furn.x + fc.w && gridY >= furn.y && gridY < furn.y + fc.h) return furn;
+      const fw = furn.rotated ? fc.h : fc.w;
+      const fh = furn.rotated ? fc.w : fc.h;
+      if (gridX >= furn.x && gridX < furn.x + fw && gridY >= furn.y && gridY < furn.y + fh) return furn;
     }
     return null;
   }
@@ -165,9 +175,10 @@ Game.House = (function() {
 
   // Available furniture for a room type
   function getAvailableFurniture(roomType) {
+    const isSandbox = Game.State.get().ui.sandboxMode;
     return Object.entries(cfg.FURNITURE)
       .filter(([key, f]) => f.room === roomType || f.room === '*')
-      .map(([key, f]) => ({ key, ...f, affordable: Game.Economy.canAfford(f.cost) }));
+      .map(([key, f]) => ({ key, ...f, affordable: isSandbox || Game.Economy.canAfford(f.cost) }));
   }
 
   return {

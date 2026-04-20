@@ -52,15 +52,15 @@ Game.Main = (function() {
     const deltaMinutes = delta * minutesPerSecond;
     tickAccumulator += deltaMinutes;
 
-    if (tickAccumulator >= 1) {
-      const wholeMins = Math.floor(tickAccumulator);
-      tickAccumulator -= wholeMins;
-      updateTime(wholeMins);
-      Game.Character.updateNeeds(wholeMins);
-      Game.Character.updateActivity(wholeMins);
-      Game.Events.update(wholeMins);
-      updateGarden(wholeMins);
-      updatePets(wholeMins);
+    // Process all accumulated minutes to ensure time catches up correctly after lag/backgrounding
+    while (tickAccumulator >= 1) {
+      tickAccumulator -= 1;
+      updateTime(1);
+      Game.Character && Game.Character.updateNeeds(1);
+      Game.Character && Game.Character.updateActivity(1);
+      Game.Events && Game.Events.update(1);
+      updateGarden(1);
+      updatePets(1);
     }
 
     // ---- Character Movement ----
@@ -179,14 +179,21 @@ Game.Main = (function() {
     
     activeMap.furniture.forEach(furn => {
       if (furn.type === 'garden_plot' && furn.cropState === 'growing') {
+        const cropCfg = Game.Config.CROPS[furn.cropType];
+        if (!cropCfg) return; // Fallback for undefined states
+
         // Grow slowly if thirsty, faster if watered
-        const growthRate = furn.needsWater ? 0.2 : 1.0; 
-        // 100 minutes to grow if fully watered (about 1.5 in-game hours)
-        furn.growth = (furn.growth || 0) + (minutes * growthRate);
+        const growthMultiplier = furn.needsWater ? 0.2 : 1.0; 
+        
+        // Calculate the relative % gained this tick. 
+        // Example: If growthTime is 360, and minutes is 10, gained = (10 / 360) * 100 = 2.77%
+        const percentGained = (minutes / cropCfg.growthTime) * 100 * growthMultiplier;
+        
+        furn.growth = (furn.growth || 0) + percentGained;
         if (furn.growth >= 100) {
            furn.cropState = 'ready';
            furn.growth = 100;
-           Game.UI.showNotification(`🌾 A crop is ready to harvest!`);
+           if (Game.UI) Game.UI.showNotification(`🌾 ${cropCfg.icon} Your ${cropCfg.label} is ready to harvest!`);
         }
       }
     });

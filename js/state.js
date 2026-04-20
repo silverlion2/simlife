@@ -69,11 +69,14 @@ Game.State = (function() {
             
             { id: 'furn_14', type: 'wide_bookcase', roomId: 'room_2', x: 2, y: 8 }, // w=3 (2,8 & 3,8 & 4,8)
             { id: 'furn_15', type: 'display_case', roomId: 'room_2', x: 6, y: 7 }, // h=2 (6,7 & 6,8)
+            { id: 'furn_36', type: 'arcade_machine', roomId: 'room_2', x: 6, y: 6 },
 
             // Yard / Transport
             { id: 'furn_16', type: 'garden_plot', roomId: null, x: 2, y: 10 },
             { id: 'furn_17', type: 'garden_plot', roomId: null, x: 3, y: 10 },
             { id: 'furn_18', type: 'garden_plot', roomId: null, x: 4, y: 10 },
+            { id: 'furn_37', type: 'grand_piano', roomId: null, x: 8, y: 10 },
+            { id: 'furn_38', type: 'bonsai_shrine', roomId: null, x: 11, y: 10 },
             
             { id: 'furn_19', type: 'map_portal', roomId: null, x: 4, y: 9, config: { targetMap: 'mail_room', targetX: 2, targetY: 2 } },
             { id: 'furn_20', type: 'subway_gate', roomId: null, x: 5, y: 9, config: { isHub: true } },
@@ -240,9 +243,14 @@ Game.State = (function() {
     save: function() {
       if (!activeSlotId) return false;
       try {
+        // Create a deep clone for saving so we don't modify the live state
         const saveData = JSON.parse(JSON.stringify(state));
+        
+        // Strip transient/runtime-only properties from the saved data
         delete saveData.ui;
         delete saveData.events;
+        delete saveData.npcWalkers; 
+        
         localStorage.setItem(activeSlotId, JSON.stringify(saveData));
 
         // Update index metadata
@@ -360,6 +368,59 @@ Game.State = (function() {
     },
 
     getActiveSlotId: function() { return activeSlotId; },
+
+    exportToFile: function(slotId) {
+      const targetSlot = slotId || activeSlotId;
+      if (!targetSlot) return false;
+      if (targetSlot === activeSlotId) this.save(); // ensure local storage is up to date
+      
+      const saveData = JSON.parse(localStorage.getItem(targetSlot));
+      if (!saveData) return false;
+
+      let idx = getIndex();
+      const meta = idx.find(s => s.id === targetSlot);
+      
+      const exportObject = {
+          metadata: meta,
+          state: saveData
+      };
+      
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject));
+      const downloadAnchorNode = document.createElement('a');
+      downloadAnchorNode.setAttribute("href", dataStr);
+      downloadAnchorNode.setAttribute("download", "simlife_save_" + (meta ? meta.name.replace(/\s+/g, '_') : 'world') + ".json");
+      document.body.appendChild(downloadAnchorNode); 
+      downloadAnchorNode.click();
+      downloadAnchorNode.remove();
+      return true;
+    },
+
+    importFromFile: function(fileContent) {
+      try {
+        const importObject = JSON.parse(fileContent);
+        if (!importObject.metadata || !importObject.state) {
+            console.error('Invalid save file format.');
+            return false;
+        }
+        
+        let idx = getIndex();
+        // Generate a new slot ID to avoid collisions
+        const newSlotId = 'save_' + Date.now();
+        importObject.metadata.id = newSlotId;
+        importObject.metadata.lastPlayed = Date.now();
+        
+        // Add to index
+        idx.push(importObject.metadata);
+        saveIndex(idx);
+        
+        // Save state payload
+        localStorage.setItem(newSlotId, JSON.stringify(importObject.state));
+        return true;
+      } catch (e) {
+        console.error('Failed to import save:', e);
+        return false;
+      }
+    },
 
     // Apply prestige bonuses to a new state
     applyPrestige: function(prestigeData) {

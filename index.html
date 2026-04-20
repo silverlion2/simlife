@@ -24,6 +24,13 @@
     <div class="menu-btn-group">
       <button id="btn-mm-new">✨ New Game</button>
       <button id="btn-mm-load">📂 Load Game</button>
+      
+      <div style="display: flex; gap: 10px; margin-top: 15px;">
+        <button id="btn-mm-export" style="background:#2E7D32; color:white; border-color:#1B5E20; flex:1">💾 Export</button>
+        <button id="btn-mm-import" style="background:#0288D1; color:white; border-color:#01579B; flex:1">📥 Import</button>
+      </div>
+      <input type="file" id="file-import" accept=".json" style="display:none">
+
       <button id="btn-mm-wipe" style="background:#cc3333; color:white; border-color:#990000; margin-top: 15px;">🗑️ Wipe All Data</button>
     </div>
   </div>
@@ -146,6 +153,7 @@
       <div class="hud-box zoom-controls" style="margin-top: 10px;">
         <button id="btn-zoom-out" class="speed-btn" title="Zoom Out (Mouse Wheel Down)">➖</button>
         <button id="btn-zoom-in" class="speed-btn" title="Zoom In (Mouse Wheel Up)">➕</button>
+        <button id="btn-toggle-graphics" class="speed-btn" title="Toggle Graphics (L)">🔆</button>
       </div>
     </div>
     
@@ -195,7 +203,7 @@
 </div>
 
 <!-- Scripts in dependency order -->
-<script src="node_modules/navmesh/dist/navmesh.min.js"></script>
+<script src="node_modules/navmesh/dist/navmesh.js"></script>
 <script src="node_modules/phaser3-rex-plugins/dist/rexstatemanagerplugin.min.js"></script>
 <script src="js/config.js?v=2"></script>
 <script src="js/state.js?v=2"></script>
@@ -206,7 +214,7 @@
 <script src="js/events.js?v=2"></script>
 <script src="js/prestige.js?v=2"></script>
 <script src="js/audio.js?v=2"></script>
-<script src="js/renderer.js?v=2"></script>
+<script src="js/renderer.js?v=5"></script>
 <script src="js/autonomy.js?v=2"></script>
 <script src="js/interaction.js?v=2"></script>
 <script src="js/ui.js?v=2"></script>

@@ -176,47 +176,6 @@ Game.Character = (function() {
     if (!actCfg) return false;
     const activeMap = Game.State.getActiveMap();
 
-    // Check money cost
-    if (actCfg.cost && !Game.Economy.canAfford(actCfg.cost)) {
-        if (Game.UI) Game.UI.showNotification(`Not enough money for ${actCfg.label}!`);
-        return false;
-    }
-
-    // Handle instant Travel
-    if (activityKey === 'travel' && targetFurnId) {
-      const portal = activeMap.furniture.find(f => f.id === targetFurnId);
-      if (portal && portal.config && portal.config.targetMap) {
-        char.mapId = portal.config.targetMap;
-        char.position.x = portal.config.targetX || 2;
-        char.position.y = portal.config.targetY || 2;
-        char.targetPosition = null;
-        char.currentActivity = null;
-        char.activityProgress = 0;
-        char.actionQueue = [];
-        if (Game.Renderer && Game.Renderer.transitionMap) {
-           Game.Renderer.transitionMap();
-        }
-        Game.UI && Game.UI.showNotification(`🚪 Traveled!`);
-        return true;
-      }
-      return false;
-    }
-    if (actCfg.room && actCfg.room !== '*') {
-      const hasRoom = activeMap.rooms.some(r => r.type === actCfg.room);
-      if (!hasRoom) return false;
-
-      // Check furniture if needed
-      if (actCfg.furniture) {
-        const hasFurn = activeMap.furniture.some(f => f.type.includes(actCfg.furniture));
-        if (!hasFurn) return false;
-      }
-    } else if (actCfg.room === '*') {
-      if (actCfg.furniture) {
-        const hasFurn = activeMap.furniture.some(f => f.type.includes(actCfg.furniture));
-        if (!hasFurn) return false;
-      }
-    }
-
     // Check energy cost
     if (actCfg.energyCost && char.needs.energy < actCfg.energyCost) return false;
 
@@ -270,6 +229,11 @@ Game.Character = (function() {
       // Try to process queue
       processQueue();
       return;
+    }
+
+    // Wait until the Sim physically arrives at the furniture before performing the action
+    if (char.targetPosition || char.path || char.isPathfinding) {
+       return;
     }
 
     const act = char.currentActivity;
@@ -354,28 +318,29 @@ Game.Character = (function() {
       const activeMap = Game.State.getActiveMap();
       const furn = activeMap.furniture.find(f => f.id === targetFurnId);
       if (furn) {
-        if (type === 'plant_seed') {
+        if (type.startsWith('plant_')) {
           furn.cropState = 'growing';
+          furn.cropType = type.split('_')[1];
           furn.growth = 0;
           furn.needsWater = true;
         } else if (type === 'water_crop') {
           furn.needsWater = false;
         } else if (type === 'harvest_crop') {
-          // Grant Potted Flower Cultivation Reward!
           if (furn.growth >= 100) {
-            activeMap.furniture.push({
-               id: 'flower_' + Date.now(),
-               type: 'potted_flower',
-               x: Math.floor(char.position.x),
-               y: Math.floor(char.position.y) + 1,
-               roomId: null,
-               rotated: false
-            });
-            if (Game.UI) Game.UI.showNotification('🌸 Harvested a beautiful Potted Flower! Enter Build Mode to decorate with it.');
-            if (Game.Renderer && Game.Renderer.requestFullSync) Game.Renderer.requestFullSync();
+            const cropCfg = Game.Config.CROPS[furn.cropType];
+            if (cropCfg) {
+              Game.Economy.addMoney(cropCfg.sellPrice);
+              if (Game.UI) Game.UI.showNotification(`🌾 Harvested ${cropCfg.label} and sold it for $${cropCfg.sellPrice}!`);
+              if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
+                 Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 1.0, `+$${cropCfg.sellPrice}`, '#FFD700', '💰');
+              }
+            } else {
+              if (Game.UI) Game.UI.showNotification('🌾 Harvested unknown crop!');
+            }
           }
 
           furn.cropState = 'empty';
+          furn.cropType = null;
           furn.growth = 0;
           furn.needsWater = false;
         } else if (type === 'fill_bowl') {
@@ -460,6 +425,8 @@ Game.Character = (function() {
     const char = getState();
     char.currentActivity = null;
     char.activityProgress = 0;
+    char.targetPosition = null;
+    char.path = null;
   }
 
   function isAvailableActivity(activityKey) {
@@ -471,7 +438,8 @@ Game.Character = (function() {
     if (actCfg.room && actCfg.room !== '*') {
       if (!activeMap.rooms.some(r => r.type === actCfg.room)) return false;
       if (actCfg.furniture) {
-        // Check for non-broken furniture
+        // Check for non-broken furniture. We use includes() because activity required-type (e.g. 'bed')
+        // matches specific furniture IDs (e.g. 'basic_bed', 'luxury_bed').
         if (!activeMap.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
       }
     } else if (actCfg.room === '*') {
@@ -570,7 +538,7 @@ Game.Character = (function() {
     const dy = targetY - char.position.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    const speed = Math.max(3, 5) * delta; // Set robust walking speed
+    const speed = 5 * delta; // Set robust walking speed
     
     if (dist < speed) {
       // Reached this node

@@ -161,7 +161,6 @@ Game.Interaction = (function() {
       locked: false,
       lockReason: '',
       callback: () => {
-        Game.Character.repairFurniture(furn.id);
         Game.House.sellFurniture(furn.id);
       }
     });
@@ -226,7 +225,7 @@ Game.Interaction = (function() {
     if (furnType === 'garden_plot') {
        const state = furn.cropState || 'empty';
        if (state === 'empty') {
-         list = list.filter(a => a.key === 'plant_seed');
+         list = list.filter(a => a.key.startsWith('plant_'));
        } else if (state === 'growing') {
          if (furn.needsWater) list = list.filter(a => a.key === 'water_crop');
          else list = []; 

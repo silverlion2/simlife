@@ -1,3 +1,11 @@
 node_modules/
 browser_*.txt
 *.py
+
+# Antigravity Persistent Memory
+.gemini/
+test_*.png
+pack_atlas_output.txt
+test_transitions.js
+simlife_final_fix.png
+js/sprites_dump/
