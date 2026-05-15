@@ -137,12 +137,16 @@ Game.Config = {
     basic_sofa:    { label: 'Basic Sofa',     icon: '🛋️', room: 'living', cost: 200,  quality: 1, needBonus: { comfort: 10, fun: 5 }, comfort: 3,  w: 2, h: 1 },
     nice_sofa:     { label: 'Sectional Sofa', icon: '🛋️', room: 'living', cost: 800,  quality: 2, needBonus: { comfort: 18, fun: 8 }, comfort: 6,  w: 2, h: 1 },
     cushion:       { label: 'Floor Cushion',  icon: '🟣', room: 'living', cost: 50,   quality: 1, needBonus: { comfort: 8, fun: 2 },  comfort: 2, w: 1, h: 1 },
+    rustic_armchair: { label: 'Rustic Armchair', icon: '🪑', room: 'living', cost: 130,  quality: 1, needBonus: { comfort: 12 },             comfort: 3,  w: 1, h: 1 },
     basic_tv:      { label: 'Small TV',       icon: '📺', room: 'living', cost: 250,  quality: 1, needBonus: { fun: 15 },              comfort: 0,  w: 1, h: 1 },
     big_tv:        { label: 'Flat Screen TV', icon: '📺', room: 'living', cost: 900,  quality: 2, needBonus: { fun: 25 },              comfort: 0,  w: 2, h: 1 },
+    vintage_tv:    { label: 'Vintage TV',     icon: '📺', room: 'living', cost: 200,  quality: 1, needBonus: { fun: 12 },              comfort: 0,  w: 1, h: 1 },
     bookshelf:     { label: 'Bookshelf',      icon: '📚', room: 'living', cost: 150,  quality: 1, needBonus: { fun: 8 },               comfort: 1,  w: 1, h: 1, skill: 'logic' },
     wide_bookcase: { label: 'Wide Bookcase',  icon: '🏛️', room: 'living', cost: 600,  quality: 2, needBonus: { fun: 15 },              comfort: 0,  w: 3, h: 1, skill: 'logic' },
+    bookcase:      { label: 'Rustic Bookshelf',icon: '📚', room: 'living', cost: 120,  quality: 1, needBonus: { fun: 6 },               comfort: 0,  w: 2, h: 1, skill: 'logic' },
     coffee_table:  { label: 'Coffee Table',   icon: '☕', room: 'living', cost: 80,   quality: 1, needBonus: {},                       comfort: 2,  w: 1, h: 1 },
     stereo:        { label: 'Stereo System',  icon: '📻', room: 'living', cost: 350,  quality: 1, needBonus: { fun: 20 },              comfort: 0,  w: 1, h: 1 },
+    vintage_stereo:{ label: 'Vintage Stereo', icon: '📻', room: 'living', cost: 250,  quality: 1, needBonus: { fun: 15 },              comfort: 0,  w: 2, h: 1 },
     decorated_table:{ label: 'Decorated Table',icon: '🕯️', room: 'living', cost: 400,  quality: 2, needBonus: { comfort: 10 },          comfort: 2,  w: 2, h: 1 },
     grand_piano:   { label: 'Grand Piano',    icon: '🎹', room: 'living', cost: 2500, quality: 3, needBonus: { fun: 45, social: 10 },  comfort: 0,  w: 2, h: 2, texture: 'grandPiano_se' },
     fireplace:     { label: 'Fireplace',      icon: '🔥', room: 'living', cost: 1200, quality: 3, needBonus: { comfort: 15 },          comfort: 5,  w: 2, h: 1 },
@@ -419,9 +423,52 @@ Game.Config = {
   },
 
   // ----------------------------------------------------------
+  // Careers (Map-based Workplaces)
+  // ----------------------------------------------------------
+  CAREERS: {
+    tech: {
+      label: 'Tech Corp', 
+      keySkill: 'tech', 
+      mapId: 'tech_office',
+      actionKey: 'work_tech',
+      levels: [
+        { title: 'Helpdesk', salary: 80, skillReq: 0, scheduleStart: 9, scheduleEnd: 17 },
+        { title: 'Junior Dev', salary: 200, skillReq: 3, scheduleStart: 9, scheduleEnd: 17 },
+        { title: 'Senior Dev', salary: 600, skillReq: 6, scheduleStart: 10, scheduleEnd: 18 }
+      ]
+    },
+    culinary: {
+      label: 'Gourmet Kitchen', 
+      keySkill: 'cooking', 
+      mapId: 'culinary_kitchen',
+      actionKey: 'work_culinary',
+      levels: [
+        { title: 'Dishwasher', salary: 50, skillReq: 0, scheduleStart: 12, scheduleEnd: 20 },
+        { title: 'Line Cook', salary: 150, skillReq: 3, scheduleStart: 14, scheduleEnd: 22 },
+        { title: 'Executive Chef', salary: 500, skillReq: 6, scheduleStart: 16, scheduleEnd: 24 }
+      ]
+    },
+    business: {
+      label: 'Business HQ', 
+      keySkill: 'logic', 
+      mapId: 'business_hq',
+      actionKey: 'work_business',
+      levels: [
+        { title: 'Mailroom', salary: 60, skillReq: 0, scheduleStart: 8, scheduleEnd: 16 },
+        { title: 'Manager', salary: 180, skillReq: 3, scheduleStart: 9, scheduleEnd: 17 },
+        { title: 'Executive', salary: 800, skillReq: 7, scheduleStart: 10, scheduleEnd: 16 }
+      ]
+    }
+  },
+
+  // ----------------------------------------------------------
   // Activities (things you can do with furniture/rooms)
   // ----------------------------------------------------------
   ACTIVITIES: {
+    browse_jobs:  { label: 'Browse Jobs',    duration: 30,  needs: { fun: 5 },      room: 'study',    furniture: 'computer', icon: '💼' },
+    work_tech:    { label: 'Coding',         duration: 480, needs: { energy: -20 }, room: '*',        furniture: 'computer', icon: '💻', skill: 'tech', xp: 5 },
+    work_culinary:{ label: 'Cooking Prep',   duration: 480, needs: { energy: -25 }, room: '*',        furniture: 'smart_stove', icon: '🍳', skill: 'cooking', xp: 5 },
+    work_business:{ label: 'Meeting',        duration: 480, needs: { energy: -15 }, room: '*',        furniture: 'basic_desk', icon: '📈', skill: 'logic', xp: 5 },
     sleep:        { label: 'Sleep',          duration: 480, needs: { energy: 80 },  room: 'bedroom',  furniture: 'bed',    icon: '💤', moodlet: { name: 'Well Rested', value: 8, duration: 240, icon: '😴' } },
     nap:          { label: 'Take a Nap',     duration: 120, needs: { energy: 30 },  room: 'bedroom',  furniture: 'bed',    icon: '😴', moodlet: { name: 'Refreshed', value: 4, duration: 120, icon: '💤' } },
     cook:         { label: 'Cook a Meal',    duration: 30,  needs: { hunger: 25 },  room: 'kitchen',  furniture: 'stove',  icon: '🍳', skill: 'cooking', xp: 15, moodlet: { name: 'Home Cooked', value: 6, duration: 180, icon: '🍳' } },

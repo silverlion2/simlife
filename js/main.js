@@ -111,6 +111,7 @@ Game.Main = (function() {
     while (time.minute >= 60) {
       time.minute -= 60;
       time.hour++;
+      checkWorkSchedule(time.hour);
     }
 
     while (time.hour >= 24) {
@@ -148,12 +149,45 @@ Game.Main = (function() {
     if (timeEl) timeEl.textContent = `${sc.icon} ${sc.label} ${dayInSeason} — ${displayHour}:${displayMin} ${ampm}`;
   }
 
+  function checkWorkSchedule(newHour) {
+    if (!Game.Economy) return;
+    const career = Game.Economy.getCareerInfo();
+    if (!career || !career.levelConfig) return;
+    
+    // Shift Start
+    if (newHour === career.levelConfig.scheduleStart) {
+      const char = Game.State.get().character;
+      char.mapId = career.config.mapId;
+      char.position.x = 4;
+      char.position.y = 8;
+      char.targetPosition = null;
+      char.actionQueue = [];
+      if (Game.Renderer && Game.Renderer.transitionMap) Game.Renderer.transitionMap();
+      
+      Game.Character.cancelActivity();
+      setTimeout(() => Game.Character.startActivity(career.config.actionKey, true), 1000);
+      Game.UI && Game.UI.showNotification(`🏢 Time for work! Commuting to ${career.config.label}...`);
+    }
+    
+    // Shift End
+    if (newHour === career.levelConfig.scheduleEnd || (newHour === 0 && career.levelConfig.scheduleEnd === 24)) {
+      Game.Economy.processWorkDay();
+      const char = Game.State.get().character;
+      char.mapId = 'house';
+      char.position.x = 5;
+      char.position.y = 9;
+      char.targetPosition = null;
+      char.actionQueue = [];
+      if (Game.Renderer && Game.Renderer.transitionMap) Game.Renderer.transitionMap();
+      
+      Game.Character.cancelActivity();
+      Game.UI && Game.UI.showNotification(`🏡 Shift over! Traveling back home.`);
+    }
+  }
+
   function onNewDay() {
     const time = Game.State.get().time;
     Game.Social.decayRelationships();
-    if (Game.Economy.isWorkHours(9)) {
-      Game.Economy.processWorkDay();
-    }
     if (time.day % 7 === 0) {
       Game.Economy.processBills();
     }
@@ -280,8 +314,20 @@ Game.Main = (function() {
     // Zoom buttons
     const btnZoomOut = document.getElementById('btn-zoom-out');
     const btnZoomIn = document.getElementById('btn-zoom-in');
+    const btnToggleGraphics = document.getElementById('btn-toggle-graphics');
     if (btnZoomOut && Game.Renderer.adjustZoom) btnZoomOut.addEventListener('click', () => Game.Renderer.adjustZoom(-0.25));
     if (btnZoomIn && Game.Renderer.adjustZoom) btnZoomIn.addEventListener('click', () => Game.Renderer.adjustZoom(0.25));
+    if (btnToggleGraphics) btnToggleGraphics.addEventListener('click', toggleGraphicsMode);
+  }
+
+  function toggleGraphicsMode() {
+    const lowGraphics = document.body.classList.toggle('low-graphics');
+    const btn = document.getElementById('btn-toggle-graphics');
+    if (btn) {
+      btn.classList.toggle('active', !lowGraphics);
+      btn.title = lowGraphics ? 'Enable Enhanced Graphics (L)' : 'Disable Enhanced Graphics (L)';
+    }
+    Game.UI && Game.UI.showNotification(lowGraphics ? 'Graphics: performance mode' : 'Graphics: enhanced mode');
   }
 
   // ---- NPC Walker System ----
@@ -395,6 +441,10 @@ Game.Main = (function() {
           const char = Game.State.get().character;
           char.autonomy.enabled = !char.autonomy.enabled;
           Game.UI.showNotification(char.autonomy.enabled ? '🤖 Autonomy ON' : '🎮 Autonomy OFF (manual control)');
+          break;
+        case 'l':
+        case 'L':
+          toggleGraphicsMode();
           break;
         case 'ArrowUp':
         case 'w':

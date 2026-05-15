@@ -138,6 +138,39 @@ Game.State = (function() {
             { id: 'furn_1', type: 'language_book', roomId: 'room_0', x: 19, y: 2 }
           ],
           nextRoomId: 1, nextFurnId: 2, brokenFurniture: []
+        },
+        tech_office: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'study', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'computer', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'basic_desk', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_2', type: 'coffee_table', roomId: 'room_0', x: 4, y: 4 },
+            { id: 'furn_3', type: 'wide_bookcase', roomId: 'room_0', x: 4, y: 12 }
+          ],
+          nextRoomId: 1, nextFurnId: 4, brokenFurniture: []
+        },
+        culinary_kitchen: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'kitchen', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'smart_stove', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'smart_fridge', roomId: 'room_0', x: 6, y: 8 },
+            { id: 'furn_2', type: 'counter', roomId: 'room_0', x: 10, y: 8 },
+            { id: 'furn_3', type: 'espresso', roomId: 'room_0', x: 10, y: 8 }
+          ],
+          nextRoomId: 1, nextFurnId: 4, brokenFurniture: []
+        },
+        business_hq: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'office', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'basic_desk', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'nice_sofa', roomId: 'room_0', x: 4, y: 12 },
+            { id: 'furn_2', type: 'big_tv', roomId: 'room_0', x: 4, y: 4 },
+            { id: 'furn_3', type: 'indoor_tree', roomId: 'room_0', x: 12, y: 4 }
+          ],
+          nextRoomId: 1, nextFurnId: 4, brokenFurniture: []
         }
       },
       economy: {

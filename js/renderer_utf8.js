@@ -622,7 +622,7 @@ Game.Renderer = (function() {
        blocker.on('pointerdown', () => this.closePieMenu());
        
        const bg = this.add.circle(0, 0, 20, 0x000000, 0.7).setInteractive();
-       const cancel = this.add.text(0, 0, '鉁?, { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
+       const cancel = this.add.text(0, 0, 'x', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
        this.pieMenu.add([blocker, bg, cancel]);
        
        bg.on('pointerdown', () => this.closePieMenu());

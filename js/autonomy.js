@@ -16,7 +16,7 @@ Game.Autonomy = (function() {
        return;
     }
 
-    fsm = new rexstatemanagerplugin.FSM({
+    fsm = new RexPlugins.StateManager({
       start: 'idle',
       states: {
         idle: {

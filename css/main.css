@@ -323,6 +323,9 @@ body {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   z-index: 1;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(123, 160, 83, 0.32), transparent 34%),
+    linear-gradient(180deg, #243f1e 0%, #162613 100%);
 }
 
 #game-canvas {
@@ -366,15 +369,39 @@ body {
 
 /* ---- Cozy Overlays ---- */
 #vignette-overlay {
-  display: none; /* Removed harsh vignette */
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 48%, transparent 42%, rgba(6, 10, 6, 0.16) 72%, rgba(0, 0, 0, 0.34) 100%);
+  mix-blend-mode: multiply;
 }
 
 #color-grading-overlay {
-  display: none; /* Removed heavy color grading */
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 225, 151, 0.07), transparent 36%),
+    linear-gradient(0deg, rgba(40, 21, 8, 0.10), transparent 46%);
+  mix-blend-mode: soft-light;
 }
 
 #tilt-shift-overlay {
-  display: none; /* Removed tilt-shift blur */
+  position: fixed;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,0.14), transparent 18%, transparent 76%, rgba(0,0,0,0.22));
+}
+
+body.low-graphics #vignette-overlay,
+body.low-graphics #color-grading-overlay,
+body.low-graphics #tilt-shift-overlay {
+  display: none;
 }
 
 /* ---- RPG HUD Shared ---- */
@@ -382,10 +409,63 @@ body {
   position: absolute;
   left: 0; right: 0;
   z-index: 10;
+  box-sizing: border-box;
   pointer-events: none; /* Let clicks pass through empty space */
   display: flex;
   justify-content: space-between;
   padding: 0.5rem 1rem;
+}
+
+@media (max-width: 820px) {
+  .rpg-hud-top {
+    gap: 8px;
+    padding: 0.5rem;
+  }
+
+  .game-title {
+    font-size: 22px;
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+
+  .hud-box {
+    box-sizing: border-box;
+    font-size: 12px;
+    padding: 4px 7px;
+    max-width: 100%;
+  }
+
+  .hud-right {
+    align-items: flex-end;
+  }
+
+  .rpg-hud-bottom {
+    display: grid;
+    grid-template-columns: minmax(132px, 0.9fr) minmax(120px, 1fr);
+    gap: 8px;
+    padding: 0.5rem 0.5rem 1rem;
+  }
+
+  .needs-section-rpg {
+    width: 100%;
+  }
+
+  .action-panel {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: center;
+  }
+
+  .menu-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    min-width: 0;
+  }
+
+  .panel-btn {
+    font-size: 12px;
+    padding: 5px 7px;
+  }
 }
 
 .rpg-hud-top > *, .rpg-hud-bottom > * {
@@ -403,6 +483,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 0;
 }
 
 .hud-center {
@@ -619,6 +700,9 @@ body {
   border: 2px solid var(--gold-trim);
   border-bottom: 3px solid var(--gold-dim);
   color: var(--text-main);
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
   padding: 6px 10px;
   font-family: var(--font-serif);
   font-size: 14px;
@@ -629,6 +713,9 @@ body {
   transition: all 0.1s;
   text-transform: capitalize;
   letter-spacing: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .panel-btn:active {
   transform: translateY(2px);

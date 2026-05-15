@@ -374,6 +374,14 @@ Game.Character = (function() {
        }
     }
 
+    if (type === 'browse_jobs') {
+       if (Game.UI && Game.UI.togglePanel) {
+           Game.UI.togglePanel('career');
+       } else {
+           Game.UI && Game.UI.showNotification('🏢 Job Board opening... (WIP)');
+       }
+    }
+
     if (type === 'invite_over') {
        if (Game.Main && Game.Main.spawnNPCWalker) {
           Game.Main.spawnNPCWalker();
