@@ -219,16 +219,21 @@ function checkResources() {
     .flatMap(item => Object.values(item.textures));
   const expectedAvatarKeySet = new Set(expectedAvatarKeys);
   const avatarAssetKeySet = new Set(avatarAssetKeys);
+  const expectedAvatarPngNames = expectedAvatarKeys.map(key => `${key}.png`);
+  const expectedAvatarPngNameSet = new Set(expectedAvatarPngNames);
   const furnitureKeys = Object.keys(context.Game.Config.FURNITURE || {});
   const pngCount = countFiles(path.join(root, 'assets'), '.png');
-  const avatarLayerPngCount = countPngFiles(path.join(root, 'assets', 'avatar_layers'));
+  const avatarLayerPngNames = listPngFiles(path.join(root, 'assets', 'avatar_layers'));
+  const avatarLayerPngNameSet = new Set(avatarLayerPngNames);
 
   if (assetKeys.length < 40) fail(`Expected at least 40 embedded render assets, found ${assetKeys.length}`);
   if (furnitureKeys.length < 70) fail(`Expected at least 70 furniture types, found ${furnitureKeys.length}`);
   if (pngCount < 1000) fail(`Expected an abundant PNG resource library, found ${pngCount}`);
-  if (avatarLayerPngCount !== expectedAvatarKeys.length) {
-    fail(`Expected ${expectedAvatarKeys.length} generated avatar layer PNGs, found ${avatarLayerPngCount}`);
-  }
+  const missingAvatarPngs = expectedAvatarPngNames.filter(name => !avatarLayerPngNameSet.has(name));
+  if (missingAvatarPngs.length) fail(`Missing avatar layer PNGs: ${missingAvatarPngs.join(', ')}`);
+
+  const extraAvatarPngs = avatarLayerPngNames.filter(name => !expectedAvatarPngNameSet.has(name));
+  if (extraAvatarPngs.length) fail(`Unexpected avatar layer PNGs: ${extraAvatarPngs.join(', ')}`);
 
   const requiredTextureKeys = [
     'floor',
@@ -258,7 +263,7 @@ function checkResources() {
   return {
     assetKeys: assetKeys.length,
     avatarAssetKeys: avatarAssetKeys.length,
-    avatarLayerPngs: avatarLayerPngCount,
+    avatarLayerPngs: avatarLayerPngNames.length,
     furnitureTypes: furnitureKeys.length,
     pngResources: pngCount,
   };
@@ -274,11 +279,11 @@ function countFiles(dir, ext) {
   return count;
 }
 
-function countPngFiles(dir) {
-  if (!fs.existsSync(dir)) return 0;
+function listPngFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
   return fs.readdirSync(dir, { withFileTypes: true })
     .filter(entry => entry.isFile() && path.extname(entry.name).toLowerCase() === '.png')
-    .length;
+    .map(entry => entry.name);
 }
 
 async function checkElectronRuntime() {
