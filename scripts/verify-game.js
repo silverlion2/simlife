@@ -212,12 +212,14 @@ function checkAppearanceHelpers() {
 }
 
 function checkResources() {
-  const context = loadBrowserGlobals(['js/assets.js', 'js/config.js']);
+  const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_assets.js', 'js/config.js']);
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
+  const avatarAssetKeys = Object.keys(context.SIM_AVATAR_ASSETS || {});
   const furnitureKeys = Object.keys(context.Game.Config.FURNITURE || {});
   const pngCount = countFiles(path.join(root, 'assets'), '.png');
 
   if (assetKeys.length < 40) fail(`Expected at least 40 embedded render assets, found ${assetKeys.length}`);
+  if (avatarAssetKeys.length < 250) fail(`Expected at least 250 avatar layer assets, found ${avatarAssetKeys.length}`);
   if (furnitureKeys.length < 70) fail(`Expected at least 70 furniture types, found ${furnitureKeys.length}`);
   if (pngCount < 1000) fail(`Expected an abundant PNG resource library, found ${pngCount}`);
 
@@ -240,7 +242,18 @@ function checkResources() {
   const missing = requiredTextureKeys.filter(key => !context.SIM_ASSETS[key]);
   if (missing.length) fail(`Missing embedded texture keys: ${missing.join(', ')}`);
 
-  return { assetKeys: assetKeys.length, furnitureTypes: furnitureKeys.length, pngResources: pngCount };
+  const requiredAvatarKeys = [
+    'avatar_human_body_average_S',
+    'avatar_human_top_hoodie_S',
+    'avatar_witch_hat_witch_hat_S',
+    'avatar_robot_chassis_round_S',
+    'avatar_cat_coat_tabby_S',
+    'avatar_banana_peel_classic_S',
+  ];
+  const missingAvatar = requiredAvatarKeys.filter(key => !context.SIM_AVATAR_ASSETS[key]);
+  if (missingAvatar.length) fail(`Missing avatar texture keys: ${missingAvatar.join(', ')}`);
+
+  return { assetKeys: assetKeys.length, avatarAssetKeys: avatarAssetKeys.length, furnitureTypes: furnitureKeys.length, pngResources: pngCount };
 }
 
 function countFiles(dir, ext) {
