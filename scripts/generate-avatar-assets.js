@@ -160,6 +160,7 @@ function textureEntries(catalog) {
 
 async function writePngs(entries) {
   fs.mkdirSync(outputDir, { recursive: true });
+  // assets/avatar_layers is fully generated from the catalog and owned by this script.
   for (const file of fs.readdirSync(outputDir)) {
     if (file.endsWith('.png')) fs.unlinkSync(path.join(outputDir, file));
   }

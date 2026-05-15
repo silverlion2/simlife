@@ -212,16 +212,23 @@ function checkAppearanceHelpers() {
 }
 
 function checkResources() {
-  const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_assets.js', 'js/config.js']);
+  const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_catalog.js', 'js/avatar_assets.js', 'js/config.js']);
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
   const avatarAssetKeys = Object.keys(context.SIM_AVATAR_ASSETS || {});
+  const expectedAvatarKeys = Object.values(context.Game.AvatarCatalog.ITEMS)
+    .flatMap(item => Object.values(item.textures));
+  const expectedAvatarKeySet = new Set(expectedAvatarKeys);
+  const avatarAssetKeySet = new Set(avatarAssetKeys);
   const furnitureKeys = Object.keys(context.Game.Config.FURNITURE || {});
   const pngCount = countFiles(path.join(root, 'assets'), '.png');
+  const avatarLayerPngCount = countPngFiles(path.join(root, 'assets', 'avatar_layers'));
 
   if (assetKeys.length < 40) fail(`Expected at least 40 embedded render assets, found ${assetKeys.length}`);
-  if (avatarAssetKeys.length < 250) fail(`Expected at least 250 avatar layer assets, found ${avatarAssetKeys.length}`);
   if (furnitureKeys.length < 70) fail(`Expected at least 70 furniture types, found ${furnitureKeys.length}`);
   if (pngCount < 1000) fail(`Expected an abundant PNG resource library, found ${pngCount}`);
+  if (avatarLayerPngCount !== expectedAvatarKeys.length) {
+    fail(`Expected ${expectedAvatarKeys.length} generated avatar layer PNGs, found ${avatarLayerPngCount}`);
+  }
 
   const requiredTextureKeys = [
     'floor',
@@ -242,18 +249,19 @@ function checkResources() {
   const missing = requiredTextureKeys.filter(key => !context.SIM_ASSETS[key]);
   if (missing.length) fail(`Missing embedded texture keys: ${missing.join(', ')}`);
 
-  const requiredAvatarKeys = [
-    'avatar_human_body_average_S',
-    'avatar_human_top_hoodie_S',
-    'avatar_witch_hat_witch_hat_S',
-    'avatar_robot_chassis_round_S',
-    'avatar_cat_coat_tabby_S',
-    'avatar_banana_peel_classic_S',
-  ];
-  const missingAvatar = requiredAvatarKeys.filter(key => !context.SIM_AVATAR_ASSETS[key]);
+  const missingAvatar = expectedAvatarKeys.filter(key => !avatarAssetKeySet.has(key));
   if (missingAvatar.length) fail(`Missing avatar texture keys: ${missingAvatar.join(', ')}`);
 
-  return { assetKeys: assetKeys.length, avatarAssetKeys: avatarAssetKeys.length, furnitureTypes: furnitureKeys.length, pngResources: pngCount };
+  const extraAvatar = avatarAssetKeys.filter(key => !expectedAvatarKeySet.has(key));
+  if (extraAvatar.length) fail(`Unexpected avatar texture keys: ${extraAvatar.join(', ')}`);
+
+  return {
+    assetKeys: assetKeys.length,
+    avatarAssetKeys: avatarAssetKeys.length,
+    avatarLayerPngs: avatarLayerPngCount,
+    furnitureTypes: furnitureKeys.length,
+    pngResources: pngCount,
+  };
 }
 
 function countFiles(dir, ext) {
@@ -264,6 +272,13 @@ function countFiles(dir, ext) {
     if (entry.isFile() && path.extname(entry.name).toLowerCase() === ext) count++;
   }
   return count;
+}
+
+function countPngFiles(dir) {
+  if (!fs.existsSync(dir)) return 0;
+  return fs.readdirSync(dir, { withFileTypes: true })
+    .filter(entry => entry.isFile() && path.extname(entry.name).toLowerCase() === '.png')
+    .length;
 }
 
 async function checkElectronRuntime() {
