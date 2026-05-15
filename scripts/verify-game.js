@@ -32,12 +32,13 @@ function checkSyntax() {
 
 function loadBrowserGlobals(files) {
   const context = { console };
+  const localStorageData = {};
   context.window = context;
   context.document = {};
   context.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
+    getItem: key => Object.prototype.hasOwnProperty.call(localStorageData, key) ? localStorageData[key] : null,
+    setItem: (key, value) => { localStorageData[key] = String(value); },
+    removeItem: key => { delete localStorageData[key]; },
   };
   vm.createContext(context);
 
@@ -211,6 +212,31 @@ function checkAppearanceHelpers() {
   }
 }
 
+function checkStateAppearanceMigration() {
+  const context = loadBrowserGlobals([
+    'js/config.js',
+    'js/avatar_catalog.js',
+    'js/appearance.js',
+    'js/state.js',
+  ]);
+
+  const state = context.Game.State.get();
+  if (!state.character.appearance) fail('Expected new state character.appearance');
+  if (state.character.appearance.form !== 'witch') fail(`Expected default form witch, found ${state.character.appearance.form}`);
+
+  const slotId = context.Game.State.createSave('World', {
+    name: 'Tester',
+    trait: 'neat',
+    form: 'robot',
+    color: '#44aaee',
+    appearance: context.Game.Appearance.setForm(state.character.appearance, 'robot'),
+  });
+  if (!slotId) fail('Expected createSave to return slot id');
+  const created = context.Game.State.get().character;
+  if (created.appearance.form !== 'robot') fail(`Expected created appearance robot, found ${created.appearance.form}`);
+  if (created.name !== 'Tester') fail(`Expected character name Tester, found ${created.name}`);
+}
+
 function checkResources() {
   const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_catalog.js', 'js/avatar_assets.js', 'js/config.js']);
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
@@ -355,6 +381,7 @@ async function checkElectronRuntime() {
   checkRendererMathHelpers();
   checkRendererDataHelpers();
   checkAppearanceHelpers();
+  checkStateAppearanceMigration();
   const resources = checkResources();
   const runtime = await checkElectronRuntime();
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));

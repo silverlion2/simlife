@@ -22,7 +22,9 @@ Game.State = (function() {
         career: null,
         lifeStage: 'young_adult',
         trait: Object.keys(cfg.TRAITS || {})[Math.floor(Math.random() * Object.keys(cfg.TRAITS || {}).length)] || 'neat',
+        form: 'online_witch',
         color: 0x88CCFF, // Default corn tint
+        appearance: Game.Appearance ? Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF }) : null,
         currentActivity: null,
         activityProgress: 0,
         actionQueue: [],
@@ -329,6 +331,12 @@ Game.State = (function() {
         if (saved.character && !saved.character.mapId) {
           saved.character.mapId = 'house';
         }
+        if (Game.Appearance) {
+          if (!saved.character) saved.character = {};
+          saved.character.appearance = saved.character.appearance
+            ? Game.Appearance.normalizeAppearance(saved.character.appearance)
+            : Game.Appearance.fromLegacy(saved.character);
+        }
 
         state = deepMerge(fresh, saved);
         state.ui = fresh.ui;
@@ -341,6 +349,7 @@ Game.State = (function() {
         
         // Ensure legacy saves get a color if missing
         if (!state.character.color) state.character.color = 0x88CCFF;
+        if (Game.Appearance) state.character.appearance = Game.Appearance.normalizeAppearance(state.character.appearance);
         
         activeSlotId = slotId;
         return true;
@@ -354,14 +363,22 @@ Game.State = (function() {
       const fresh = createNewState();
       // Apply Char Data
       if (characterData) {
-        fresh.character.name = characterData.name;
-        fresh.character.trait = characterData.trait;
+        fresh.character.name = characterData.name || fresh.character.name;
+        fresh.character.trait = characterData.trait || fresh.character.trait;
+
         // Parse hex color (e.g. "#FF0000" to 0xFF0000)
         let c = characterData.color || '#88CCFF';
         if (typeof c === 'string' && c.startsWith('#')) {
           c = parseInt(c.replace('#', '0x'), 16);
         }
         fresh.character.color = c;
+        fresh.character.form = characterData.form || fresh.character.form || 'online_witch';
+
+        if (Game.Appearance) {
+          fresh.character.appearance = characterData.appearance
+            ? Game.Appearance.normalizeAppearance(characterData.appearance)
+            : Game.Appearance.fromLegacy({ form: fresh.character.form, color: fresh.character.color });
+        }
       }
       state = fresh;
       activeSlotId = 'save_' + Date.now();
