@@ -63,12 +63,20 @@ Game.Appearance = (function() {
 
   function normalizeFormState(form, formState) {
     const defaults = defaultFormState(form);
-    const slots = { ...defaults.slots, ...(formState && formState.slots ? formState.slots : {}) };
-    const colors = { ...defaults.colors, ...(formState && formState.colors ? formState.colors : {}) };
+    const inputSlots = formState && formState.slots ? formState.slots : {};
+    const slots = {};
     for (const slot of catalog.FORMS[form].slots) {
-      const itemId = slots[slot];
+      const itemId = inputSlots[slot] || defaults.slots[slot];
       const item = catalog.ITEMS[itemId];
-      if (!item || item.form !== form || item.slot !== slot) slots[slot] = defaults.slots[slot];
+      slots[slot] = item && item.form === form && item.slot === slot ? itemId : defaults.slots[slot];
+    }
+
+    const inputColors = formState && formState.colors ? formState.colors : {};
+    const colors = {};
+    for (const channel of getValidColorChannels(form)) {
+      const defaultValue = defaults.colors[channel];
+      const inputValue = inputColors[channel] !== undefined ? inputColors[channel] : defaultValue;
+      colors[channel] = isValidColorValue(inputValue) ? inputValue : defaultValue;
     }
     return { slots, colors };
   }
@@ -95,7 +103,9 @@ Game.Appearance = (function() {
 
   function setColor(appearance, channel, value) {
     const normalized = normalizeAppearance(appearance);
-    normalized.forms[normalized.form].colors[channel] = value;
+    if (getValidColorChannels(normalized.form).includes(channel) && isValidColorValue(value)) {
+      normalized.forms[normalized.form].colors[channel] = value;
+    }
     return normalizeAppearance(normalized);
   }
 
@@ -106,9 +116,13 @@ Game.Appearance = (function() {
   function getRenderLayers(appearance, direction) {
     const normalized = normalizeAppearance(appearance);
     const formState = normalized.forms[normalized.form];
+    const allowedSlots = catalog.FORMS[normalized.form].slots;
     const dir = catalog.DIRECTIONS.includes(direction) ? direction : catalog.FORMS[normalized.form].defaultDirection;
     return Object.entries(formState.slots)
-      .map(([slot, itemId]) => catalog.ITEMS[itemId])
+      .filter(([slot]) => allowedSlots.includes(slot))
+      .map(([slot, itemId]) => ({ slot, item: catalog.ITEMS[itemId] }))
+      .filter(entry => entry.item && entry.item.form === normalized.form && entry.item.slot === entry.slot)
+      .map(entry => entry.item)
       .filter(Boolean)
       .filter(item => item.value !== 'none')
       .map(item => ({
@@ -120,6 +134,23 @@ Game.Appearance = (function() {
         colors: formState.colors,
       }))
       .sort((a, b) => a.order - b.order);
+  }
+
+  function getValidColorChannels(form) {
+    const channels = new Set(Object.keys((catalog.DEFAULTS[form] && catalog.DEFAULTS[form].colors) || {}));
+    for (const item of Object.values(catalog.ITEMS)) {
+      if (item.form === form) {
+        for (const channel of item.colorChannels || []) channels.add(channel);
+      }
+    }
+    return Array.from(channels);
+  }
+
+  function isValidColorValue(value) {
+    return typeof value === 'string' && (
+      /^#[0-9a-f]{6}$/i.test(value) ||
+      Object.prototype.hasOwnProperty.call(catalog.COLOR_VALUES, value)
+    );
   }
 
   return {

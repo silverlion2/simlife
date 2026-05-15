@@ -153,6 +153,62 @@ function checkAppearanceHelpers() {
   if (!layers.every(layer => layer.textureKey && layer.slot && Number.isFinite(layer.order))) {
     fail(`Invalid render layers: ${JSON.stringify(layers)}`);
   }
+
+  const injectedSlots = appearance.normalizeAppearance({
+    form: 'human',
+    forms: {
+      human: {
+        slots: {
+          ...human.forms.human.slots,
+          coat: 'cat_coat_tabby',
+          madeUp: 'human_top_jacket',
+        },
+      },
+    },
+  });
+  if (Object.prototype.hasOwnProperty.call(injectedSlots.forms.human.slots, 'coat')) {
+    fail(`Expected invalid cross-form slot to be pruned: ${JSON.stringify(injectedSlots.forms.human.slots)}`);
+  }
+  if (Object.prototype.hasOwnProperty.call(injectedSlots.forms.human.slots, 'madeUp')) {
+    fail(`Expected unknown slot to be pruned: ${JSON.stringify(injectedSlots.forms.human.slots)}`);
+  }
+
+  const injectedLayers = appearance.getRenderLayers({
+    form: 'human',
+    forms: {
+      human: {
+        slots: {
+          ...human.forms.human.slots,
+          coat: 'cat_coat_tabby',
+          top: 'cat_coat_tabby',
+        },
+      },
+    },
+  }, 'S');
+  if (injectedLayers.some(layer => layer.id === 'cat_coat_tabby' || layer.slot === 'coat')) {
+    fail(`Expected cross-form injected layers to be filtered: ${JSON.stringify(injectedLayers)}`);
+  }
+
+  const invalidChannel = appearance.setColor(human, 'notAChannel', '#123456');
+  if (Object.prototype.hasOwnProperty.call(invalidChannel.forms.human.colors, 'notAChannel')) {
+    fail(`Expected invalid color channel to be ignored: ${JSON.stringify(invalidChannel.forms.human.colors)}`);
+  }
+
+  const invalidValue = appearance.setColor(human, 'primary', 'not_a_color');
+  if (invalidValue.forms.human.colors.primary !== human.forms.human.colors.primary) {
+    fail(`Expected invalid color value to be ignored, found ${invalidValue.forms.human.colors.primary}`);
+  }
+
+  const tokenValue = appearance.setColor(human, 'primary', 'steel_blue');
+  if (tokenValue.forms.human.colors.primary !== 'steel_blue') fail('Expected known palette token color to be accepted');
+
+  for (const [paletteName, tokens] of Object.entries(catalog.PALETTES)) {
+    for (const token of tokens) {
+      if (!catalog.COLOR_VALUES[token] || !/^#[0-9a-f]{6}$/i.test(catalog.COLOR_VALUES[token])) {
+        fail(`Palette token ${paletteName}.${token} does not resolve to a concrete color`);
+      }
+    }
+  }
 }
 
 function checkResources() {

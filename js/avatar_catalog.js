@@ -57,6 +57,11 @@ Game.AvatarCatalog = (function() {
     sky_denim: '#3f7fb8', forest_gold: '#2f6f52', charcoal_red: '#26313a', cream_navy: '#e8dcc3',
     plum_teal: '#6c4a8d', mint_coral: '#65b8a6', rust_blue: '#a55232', black_white: '#1b1f24',
     pink_gray: '#d77fa1', green_black: '#396b45', yellow_violet: '#d7b83f', white_gold: '#f2ede0',
+    steel_blue: '#6f8798', white_orange: '#f3efe6', black_lime: '#202820', navy_cyan: '#20395d',
+    red_gold: '#9f3e35', gray_purple: '#6e687b', green_silver: '#54745f', copper_teal: '#a7653d',
+    tabby: '#b57942', tuxedo: '#1f252b', calico: '#d09255', ginger: '#d98034', gray: '#888f96', cream: '#ead6ae', white: '#f4f1e7',
+    classic: '#f0cf4f', ripe_spots: '#d8ad35', green_tip: '#b4c84f', golden: '#f4b83b',
+    sunset: '#e27a3f', neon: '#dfff50', chocolate: '#6f4428', stickered: '#f2d84b',
   };
 
   const ITEM_GROUPS = {
