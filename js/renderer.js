@@ -2,19 +2,23 @@
 // ============================================================
 // SimLife — Phaser 3 Isometric Renderer
 // ============================================================
-// Phase 1 Migration: Basic Grid & Isometric Projections
-
 window.Game = window.Game || {};
 
 Game.Renderer = (function() {
+  const RendererMath = Game.RendererMath;
+  const RendererHelpers = Game.RendererHelpers;
+  if (!RendererMath || !RendererHelpers) {
+    throw new Error('Game.Renderer requires Game.RendererMath and Game.RendererHelpers to be loaded first');
+  }
+
   let phaserGame = null;
   let mainScene = null;
   let easyStar = null;
   let currentGrid = null;
   
   // Grid metrics
-  const TILE_W = 64;
-  const TILE_H = 32;
+  const TILE_W = RendererMath.TILE_W;
+  const TILE_H = RendererMath.TILE_H;
 
   let spriteMap = new Map();
   let shadowMap = new Map();
@@ -35,50 +39,6 @@ Game.Renderer = (function() {
           this.textures.addImage(key, window.SIM_PRELOADED_IMAGES[key]);
       }
 
-      // -------------------------------------------------------------
-      // PHASE 3 INTEGRATION: Real Asset Loading (Kenney.nl)
-      // -------------------------------------------------------------
-      // We load the 256x512 Kenney Isometric Farm assets
-      // this.load.image('floor', 'assets/kenney_minifarm/Isometric/dirt_E.png'); (migrated to base64)
-      // this.load.image('planks', 'assets/kenney_minifarm/Isometric/planks_E.png'); (migrated to base64)
-      // this.load.image('wall_e', 'assets/kenney_minifarm/Isometric/woodWall_E.png'); (migrated to base64)
-      // this.load.image('wall_n', 'assets/kenney_minifarm/Isometric/woodWall_N.png'); (migrated to base64)
-      // this.load.image('character', 'assets/kenney_minifarm/Isometric/corn_E.png'); (migrated to base64) // legacy fallback
-      // this.load.image('new_iso_human', 'assets/characters/new_iso_human.png'); (migrated to base64) // new genuine 3D char
-      // this.load.image('hay', 'assets/kenney_minifarm/Isometric/hayBales_E.png'); (migrated to base64)
-      // this.load.image('hayStack', 'assets/kenney_minifarm/Isometric/hayBalesStacked_E.png'); (migrated to base64)
-      // this.load.image('crate', 'assets/kenney_minifarm/Isometric/sacksCrate_E.png'); (migrated to base64)
-      // this.load.image('chimney', 'assets/kenney_minifarm/Isometric/chimneyTop_E.png'); (migrated to base64)
-      // this.load.image('fence', 'assets/kenney_minifarm/Isometric/fenceLow_E.png'); (migrated to base64)
-
-      // NEW Kenney Asset Packs
-      // Library Pack
-      // this.load.image('longTable', 'assets/kenney_library/Isometric/longTable_E.png'); (migrated to base64)
-      // this.load.image('libraryChair', 'assets/kenney_library/Isometric/libraryChair_E.png'); (migrated to base64)
-      // this.load.image('bookcaseWideBooks', 'assets/kenney_library/Isometric/bookcaseWideBooks_E.png'); (migrated to base64)
-      // this.load.image('floorCarpet', 'assets/kenney_library/Isometric/floorCarpet_E.png'); (migrated to base64)
-      // this.load.image('displayCase', 'assets/kenney_library/Isometric/displayCase_E.png'); (migrated to base64)
-
-      // Dungeon Pack
-      // this.load.image('chestClosed', 'assets/kenney_dungeon/Isometric/chestClosed_E.png'); (migrated to base64)
-      // this.load.image('tableShort', 'assets/kenney_dungeon/Isometric/tableShort_E.png'); (migrated to base64)
-      // this.load.image('barrel', 'assets/kenney_dungeon/Isometric/barrel_E.png'); (migrated to base64)
-      // Library Specifics (displayCase already loaded above)
-      // this.load.image('candleStand', 'assets/kenney_library/Isometric/candleStand_E.png'); (migrated to base64)
-      // this.load.image('decoratedTable', 'assets/kenney_library/Isometric/longTableDecorated_E.png'); (migrated to base64)
-      // this.load.image('wideBookcase', 'assets/kenney_library/Isometric/bookcaseWideBooks_E.png'); (migrated to base64)
-
-      // Load new custom SVG forms
-      // this.load.image('human_iso', 'assets/characters/human.svg'); (migrated to base64)
-      // this.load.image('robot_iso', 'assets/characters/robot.svg'); (migrated to base64)
-      // this.load.image('cat_iso', 'assets/characters/cat.svg'); (migrated to base64)
-      // this.load.image('banana_iso', 'assets/characters/banana.svg'); (migrated to base64)
-      // this.load.image('online_witch_iso', 'assets/characters/online_witch.png'); (migrated to base64)
-      // this.load.image('online_witch_N_iso', 'assets/characters/online_witch_N.png'); (migrated to base64)
-      // this.load.image('online_witch_S_iso', 'assets/characters/online_witch_S.png'); (migrated to base64)
-      // this.load.image('online_witch_E_iso', 'assets/characters/online_witch_E.png'); (migrated to base64)
-      // this.load.image('online_witch_NE_iso', 'assets/characters/online_witch_NE.png'); (migrated to base64)
-      // this.load.image('online_witch_SE_iso', 'assets/characters/online_witch_SE.png'); (migrated to base64)
     }
 
     create() {
@@ -1339,26 +1299,19 @@ Game.Renderer = (function() {
   }
 
   // Cached isometric projection offsets (recalculated on resize)
-  let _isoOffsetX = window.innerWidth / 2;
-  const _isoOffsetY = 200;
-  window.addEventListener('resize', () => { _isoOffsetX = window.innerWidth / 2; });
+  RendererMath.setOffset(window.innerWidth / 2, 200);
+  window.addEventListener('resize', () => {
+    RendererMath.setOffset(window.innerWidth / 2, RendererMath.getOffset().y);
+  });
 
   // Pure Isometric Math: Cartesian (gridX, gridY, gridZ) to Screen (scX, scY)
   function isoProject(gx, gy, gz = 0) {
-    return {
-      x: _isoOffsetX + (gx - gy) * (TILE_W / 2),
-      y: _isoOffsetY + (gx + gy) * (TILE_H / 2) - (gz * TILE_H)
-    };
+    return RendererMath.isoProject(gx, gy, gz);
   }
   
   // Inverse: Screen (scX, scY) to Cartesian (gridX, gridY)
   function isoUnproject(sx, sy, gz = 0) {
-    const dx = sx - _isoOffsetX;
-    const dy = sy - _isoOffsetY + (gz * TILE_H);
-    return {
-      x: (dy / (TILE_H / 2) + dx / (TILE_W / 2)) / 2,
-      y: (dy / (TILE_H / 2) - dx / (TILE_W / 2)) / 2
-    };
+    return RendererMath.isoUnproject(sx, sy, gz);
   }
 
   function pickGroundTint(x, y, outer) {
@@ -1483,29 +1436,16 @@ function startPhaser(canvasEl) {
   }
 
   function hitTestFurniture(gx, gy) {
-    const activeMap = Game.State.getActiveMap();
-    if (!activeMap) return null;
-    for (const furn of activeMap.furniture) {
-      const fc = Game.Config.FURNITURE[furn.type];
-      if (!fc) continue;
-      const w = furn.rotated ? fc.h : fc.w;
-      const h = furn.rotated ? fc.w : fc.h;
-      if (gx >= furn.x && gx < furn.x + w && gy >= furn.y && gy < furn.y + h) {
-        return { ...furn, config: fc };
-      }
-    }
-    return null;
+    return RendererHelpers.hitTestFurniture(
+      Game.State.getActiveMap(),
+      Game.Config.FURNITURE,
+      gx,
+      gy
+    );
   }
 
   function hitTestRoom(gx, gy) {
-    const activeMap = Game.State.getActiveMap();
-    if (!activeMap) return null;
-    for (const room of activeMap.rooms) {
-      if (gx >= room.x && gx < room.x + room.w && gy >= room.y && gy < room.y + room.h) {
-        return room;
-      }
-    }
-    return null;
+    return RendererHelpers.hitTestRoom(Game.State.getActiveMap(), gx, gy);
   }
 
   function getRandomRoomPosition() {
@@ -1531,34 +1471,8 @@ function startPhaser(canvasEl) {
     const activeMap = Game.State.getActiveMap();
     if (!activeMap) return;
     
-    const w = activeMap.lotWidth || 10;
-    const h = activeMap.lotHeight || 10;
-    const grid = [];
-    
-    for (let y = 0; y < h; y++) {
-      grid[y] = [];
-      for (let x = 0; x < w; x++) grid[y][x] = 0;
-    }
-    
-    if (activeMap.furniture) {
-      for (const furn of activeMap.furniture) {
-         const fc = Game.Config.FURNITURE[furn.type];
-         if (!fc) continue;
-         for (let fy = 0; fy < fc.h; fy++) {
-           for (let fx = 0; fx < fc.w; fx++) {
-             const px = Math.floor(furn.x) + fx;
-             const py = Math.floor(furn.y) + fy;
-             if (px >= 0 && py >= 0 && px < w && py < h) {
-               if (!furn.type.includes('rug') && !furn.type.includes('portal') && !furn.type.includes('door') && !furn.type.includes('mat')) {
-                 grid[py][px] = 1;
-               }
-             }
-           }
-         }
-      }
-    }
-    currentGrid = grid;
-    easyStar.setGrid(grid);
+    currentGrid = RendererHelpers.buildPathGrid(activeMap, Game.Config.FURNITURE);
+    easyStar.setGrid(currentGrid);
     easyStar.setAcceptableTiles([0]);
     easyStar.enableDiagonals();
     easyStar.disableCornerCutting();
