@@ -115,6 +115,46 @@ function checkRendererDataHelpers() {
   if (grid[3][1] !== 0 || grid[3][2] !== 0) fail(`Expected rug-like furniture not to block path: ${JSON.stringify(grid[3])}`);
 }
 
+function checkAppearanceHelpers() {
+  const context = loadBrowserGlobals(['js/avatar_catalog.js', 'js/appearance.js']);
+  const catalog = context.Game.AvatarCatalog;
+  const appearance = context.Game.Appearance;
+
+  if (!catalog) fail('Expected Game.AvatarCatalog to be defined');
+  if (!appearance) fail('Expected Game.Appearance to be defined');
+
+  const forms = Object.keys(catalog.FORMS);
+  const expectedForms = ['human', 'witch', 'robot', 'cat', 'banana'];
+  for (const form of expectedForms) {
+    if (!forms.includes(form)) fail(`Missing avatar form: ${form}`);
+    const normalized = appearance.normalizeAppearance({ form });
+    if (normalized.form !== form) fail(`Expected normalized form ${form}, found ${normalized.form}`);
+    if (!normalized.forms[form]) fail(`Expected form state for ${form}`);
+  }
+
+  const migrated = appearance.fromLegacy({ form: 'online_witch', color: 0x3366aa });
+  if (migrated.form !== 'witch') fail(`Expected online_witch to migrate to witch, found ${migrated.form}`);
+  if (migrated.forms.witch.colors.primary !== '#3366aa') {
+    fail(`Expected legacy color #3366aa, found ${migrated.forms.witch.colors.primary}`);
+  }
+
+  const human = appearance.normalizeAppearance({ form: 'human' });
+  const changed = appearance.setSlot(human, 'top', 'human_top_jacket');
+  if (changed.forms.human.slots.top !== 'human_top_jacket') {
+    fail(`Expected top to change, found ${changed.forms.human.slots.top}`);
+  }
+
+  const cat = appearance.setForm(changed, 'cat');
+  if (cat.form !== 'cat') fail(`Expected active form cat, found ${cat.form}`);
+  if (cat.forms.human.slots.top !== 'human_top_jacket') fail('Expected human slot selections to persist across form switch');
+
+  const layers = appearance.getRenderLayers(cat, 'S');
+  if (!layers.length) fail('Expected cat render layers');
+  if (!layers.every(layer => layer.textureKey && layer.slot && Number.isFinite(layer.order))) {
+    fail(`Invalid render layers: ${JSON.stringify(layers)}`);
+  }
+}
+
 function checkResources() {
   const context = loadBrowserGlobals(['js/assets.js', 'js/config.js']);
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
@@ -225,6 +265,7 @@ async function checkElectronRuntime() {
   checkSyntax();
   checkRendererMathHelpers();
   checkRendererDataHelpers();
+  checkAppearanceHelpers();
   const resources = checkResources();
   const runtime = await checkElectronRuntime();
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));
