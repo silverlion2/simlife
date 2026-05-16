@@ -348,7 +348,7 @@ Game.State = (function() {
         if (!state.maps.university) state.maps.university = fresh.maps.university;
         
         // Ensure legacy saves get a color if missing
-        if (!state.character.color) state.character.color = 0x88CCFF;
+        if (state.character.color === undefined || state.character.color === null) state.character.color = 0x88CCFF;
         if (Game.Appearance) state.character.appearance = Game.Appearance.normalizeAppearance(state.character.appearance);
         
         activeSlotId = slotId;
@@ -367,7 +367,7 @@ Game.State = (function() {
         fresh.character.trait = characterData.trait || fresh.character.trait;
 
         // Parse hex color (e.g. "#FF0000" to 0xFF0000)
-        let c = characterData.color || '#88CCFF';
+        let c = characterData.color === undefined || characterData.color === null ? '#88CCFF' : characterData.color;
         if (typeof c === 'string' && c.startsWith('#')) {
           c = parseInt(c.replace('#', '0x'), 16);
         }

@@ -235,6 +235,34 @@ function checkStateAppearanceMigration() {
   const created = context.Game.State.get().character;
   if (created.appearance.form !== 'robot') fail(`Expected created appearance robot, found ${created.appearance.form}`);
   if (created.name !== 'Tester') fail(`Expected character name Tester, found ${created.name}`);
+
+  const blackSlotId = context.Game.State.createSave('Black World', {
+    name: 'Black',
+    trait: 'neat',
+    form: 'robot',
+    color: 0x000000,
+  });
+  if (!blackSlotId) fail('Expected black createSave to return slot id');
+  const blackCreated = context.Game.State.get().character;
+  if (blackCreated.color !== 0x000000) fail(`Expected created black color 0, found ${blackCreated.color}`);
+  if (blackCreated.appearance.forms.robot.colors.primary !== '#000000') {
+    fail(`Expected created black appearance #000000, found ${blackCreated.appearance.forms.robot.colors.primary}`);
+  }
+
+  context.localStorage.setItem('legacy_black', JSON.stringify({
+    character: {
+      name: 'Legacy Black',
+      trait: 'neat',
+      form: 'robot',
+      color: 0x000000,
+    },
+  }));
+  if (!context.Game.State.loadSlot('legacy_black')) fail('Expected legacy black slot to load');
+  const blackLoaded = context.Game.State.get().character;
+  if (blackLoaded.color !== 0x000000) fail(`Expected loaded black color 0, found ${blackLoaded.color}`);
+  if (blackLoaded.appearance.forms.robot.colors.primary !== '#000000') {
+    fail(`Expected loaded black appearance #000000, found ${blackLoaded.appearance.forms.robot.colors.primary}`);
+  }
 }
 
 function checkResources() {
