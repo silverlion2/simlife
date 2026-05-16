@@ -869,6 +869,20 @@ async function checkElectronRuntime() {
   try {
     await step('wait for Electron DOMContentLoaded', () => page.waitForLoadState('domcontentloaded', { timeout: STARTUP_TIMEOUT }));
 
+    await page.evaluate(() => {
+      if (!window.Phaser || !window.Phaser.Game || window.__SIM_PERF_GAME_WRAPPED) return;
+      const OriginalGame = window.Phaser.Game;
+      function WrappedGame(config) {
+        const game = new OriginalGame(config);
+        window.__SIM_PHASER_GAME = game;
+        return game;
+      }
+      WrappedGame.prototype = OriginalGame.prototype;
+      Object.setPrototypeOf(WrappedGame, OriginalGame);
+      window.Phaser.Game = WrappedGame;
+      window.__SIM_PERF_GAME_WRAPPED = true;
+    });
+
     await click(page, 'start new game from main menu', '#btn-mm-new');
     await waitForSelector(page, 'wait for character creation screen', '#char-creation-screen:not(.hidden)', { timeout: UI_TIMEOUT });
     await waitForSelector(page, 'wait for character creation avatar editor', '#cc-avatar-editor .avatar-editor', { timeout: UI_TIMEOUT });
@@ -887,6 +901,15 @@ async function checkElectronRuntime() {
     }, null, { timeout: STARTUP_TIMEOUT });
 
     const canvasNonBlank = await waitForCanvasNonBlank(page);
+    const outOfBoundsPathResult = await page.evaluate(() => new Promise(resolve => {
+      try {
+        window.Game.Renderer.findPath(999, 999, 1000, 1000, path => {
+          resolve({ threw: false, path });
+        });
+      } catch (err) {
+        resolve({ threw: true, message: String(err && (err.message || err)) });
+      }
+    }));
     const result = await page.evaluate(() => {
       const canvas = document.getElementById('game-canvas');
       const canvases = [...document.querySelectorAll('canvas')].map(item => ({
@@ -900,6 +923,7 @@ async function checkElectronRuntime() {
         canvases,
         assetKeys: Object.keys(window.SIM_ASSETS || {}).length,
         preloadedKeys: Object.keys(window.SIM_PRELOADED_IMAGES || {}).length,
+        sceneChildren: window.__SIM_PHASER_GAME?.scene?.scenes?.[0]?.children?.list?.length || 0,
         initialAvatarDebug: window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug(),
         activeFurniture: window.Game.State.getActiveMap().furniture.length,
         activeRooms: window.Game.State.getActiveMap().rooms.length,
@@ -908,6 +932,7 @@ async function checkElectronRuntime() {
       };
     });
     result.canvasNonBlank = canvasNonBlank;
+    result.outOfBoundsPathResult = outOfBoundsPathResult;
 
     await saveInGameAvatarForm(page, 'cat');
     await openEditAvatarEditor(page);
@@ -935,6 +960,12 @@ async function checkElectronRuntime() {
     }
     if (result.preloadedKeys !== result.assetKeys) {
       fail(`Expected all embedded assets to preload (${result.assetKeys}), loaded ${result.preloadedKeys}`);
+    }
+    if (result.sceneChildren > 2000) {
+      fail(`Expected starter scene to stay under 2000 Phaser children, found ${result.sceneChildren}`);
+    }
+    if (result.outOfBoundsPathResult.threw) {
+      fail(`Expected out-of-bounds path requests to fail gracefully: ${result.outOfBoundsPathResult.message}`);
     }
     if (!result.initialAvatarDebug || result.initialAvatarDebug.layerCount <= 0) {
       fail(`Expected initial robot avatar to render layers: ${JSON.stringify(result.initialAvatarDebug)}`);

@@ -211,27 +211,14 @@ Game.Renderer = (function() {
       }
       this.gridSprites = [];
       this.frontWalls = []; // Track obscuring walls
-      
-      const pad = activeMap === Game.State.get().maps.house
-        ? Math.max(28, Math.floor(Math.max(w, h) * 0.9))
-        : Math.min(10, Math.max(4, Math.floor(Math.max(w, h) / 4)));
-      for(let y=-pad; y<h+pad; y++){
-        for(let x=-pad; x<w+pad; x++){
-          if (x >= 0 && y >= 0 && x < w && y < h) continue;
-          const pt = isoProject(x, y);
-          const tile = this.add.image(pt.x, pt.y, 'floor');
-          this.gridSprites.push(tile);
-          tile.setScale(0.25);
-          tile.setOrigin(0.5, 0.75);
-          tile.setAlpha(0.64);
-          tile.setTint(pickGroundTint(x, y, true));
-          tile.depth = (x + y) * 10 - 12;
-        }
-      }
+
+      const tileKeys = this.getRenderedGroundTileKeys(activeMap, w, h);
+      const tileCoords = Array.from(tileKeys)
+        .map(key => key.split(',').map(Number))
+        .sort((a, b) => (a[1] - b[1]) || (a[0] - b[0]));
 
       // Draw a grid of floor tiles
-      for(let y=0; y<h; y++){
-        for(let x=0; x<w; x++){
+      for (const [x, y] of tileCoords) {
           const pt = isoProject(x, y);
           const tile = this.add.image(pt.x, pt.y, 'floor');
           this.gridSprites.push(tile);
@@ -305,10 +292,57 @@ Game.Renderer = (function() {
             tile.setTexture('floor');
             tile.setTint(pickGroundTint(x, y, false));
           }
-        }
       }
 
       this.drawAmbientScenery(activeMap, w, h);
+    }
+
+    getRenderedGroundTileKeys(activeMap, w, h) {
+      const keys = new Set();
+      const fullMapBudget = 1600;
+      const contentMargin = activeMap === Game.State.get().maps.house ? 5 : 3;
+
+      const addTile = (x, y) => {
+        if (x < 0 || y < 0 || x >= w || y >= h) return;
+        keys.add(`${x},${y}`);
+      };
+      const addRect = (x, y, rectW, rectH, margin = 0) => {
+        const minX = Math.max(0, Math.floor(x - margin));
+        const minY = Math.max(0, Math.floor(y - margin));
+        const maxX = Math.min(w, Math.ceil(x + rectW + margin));
+        const maxY = Math.min(h, Math.ceil(y + rectH + margin));
+        for (let ty = minY; ty < maxY; ty++) {
+          for (let tx = minX; tx < maxX; tx++) {
+            addTile(tx, ty);
+          }
+        }
+      };
+
+      if (w * h <= fullMapBudget) {
+        addRect(0, 0, w, h, 0);
+        return keys;
+      }
+
+      for (const room of activeMap.rooms || []) {
+        addRect(room.x, room.y, room.w, room.h, contentMargin);
+      }
+
+      for (const furn of activeMap.furniture || []) {
+        const def = Game.Config.FURNITURE[furn.type] || {};
+        const footprint = RendererHelpers.getFurnitureFootprint
+          ? RendererHelpers.getFurnitureFootprint(furn, def)
+          : { w: def.w || 1, h: def.h || 1 };
+        addRect(furn.x, furn.y, footprint.w || 1, footprint.h || 1, contentMargin);
+      }
+
+      const state = Game.State.get();
+      if (state.character && state.character.mapId && activeMap === Game.State.getActiveMap()) {
+        const pos = state.character.position || { x: 0, y: 0 };
+        addRect(pos.x, pos.y, 1, 1, contentMargin + 2);
+      }
+
+      if (keys.size === 0) addRect(0, 0, Math.min(w, 12), Math.min(h, 12), 0);
+      return keys;
     }
 
     drawAmbientScenery(activeMap, w, h) {
@@ -374,7 +408,7 @@ Game.Renderer = (function() {
        if (type === 'furniture') {
            const sprite = spriteMap.get(obj.id);
            if (sprite) {
-               if (!sprite.glowFx) {
+               if (!sprite.glowFx && sprite.preFX && sprite.preFX.addGlow) {
                    sprite.glowFx = sprite.preFX.addGlow(0xffffff, 2, 0, false, 0.1, 10);
                }
            }
@@ -1140,7 +1174,7 @@ Game.Renderer = (function() {
 
     syncActivityGlow(charObj, depthBase) {
       const active = !!(charObj && charObj.currentActivity);
-      const canUsePreFx = !!(characterSprite && characterSprite.preFX && this.game.renderer.type === Phaser.WEBGL);
+      const canUsePreFx = !!(characterSprite && characterSprite.preFX && characterSprite.preFX.addGlow && this.game.renderer.type === Phaser.WEBGL);
 
       if (canUsePreFx) {
         if (this._avatarActivityGlow) this._avatarActivityGlow.setVisible(false);
@@ -1641,6 +1675,21 @@ function startPhaser(canvasEl) {
   function findPath(sx, sy, ex, ey, callback) {
     if (!easyStar || !currentGrid) {
        callback([{x: ex, y: ey}]); // Fallback
+       return;
+    }
+
+    const isInsideGrid = (x, y) => (
+      Number.isFinite(x) &&
+      Number.isFinite(y) &&
+      y >= 0 &&
+      y < currentGrid.length &&
+      x >= 0 &&
+      currentGrid[y] &&
+      x < currentGrid[y].length
+    );
+
+    if (!isInsideGrid(sx, sy) || !isInsideGrid(ex, ey)) {
+       callback(null);
        return;
     }
     
