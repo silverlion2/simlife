@@ -43,7 +43,13 @@ Game.Renderer = (function() {
           this.textures.addImage(key, window.SIM_PRELOADED_IMAGES[key]);
       }
       for (const key in window.SIM_PRELOADED_AVATAR_IMAGES || {}) {
-          this.textures.addImage(key, window.SIM_PRELOADED_AVATAR_IMAGES[key]);
+          const image = window.SIM_PRELOADED_AVATAR_IMAGES[key];
+          if (image && (image.naturalWidth > 0 || image.width > 0)) {
+            this.textures.addImage(key, image);
+          } else {
+            console.error('Skipping invalid avatar image for key:', key);
+            delete window.SIM_PRELOADED_AVATAR_IMAGES[key];
+          }
       }
 
     }
@@ -688,6 +694,9 @@ Game.Renderer = (function() {
                if (this.charLabel) this.charLabel.depth = r.sprite.depth + 0.1;
                if (this.charMarker) this.charMarker.depth = r.sprite.depth - 0.1;
                if (charShadowSprite) charShadowSprite.depth = r.sprite.depth - 0.2;
+               if (this._avatarActivityGlow && this._avatarActivityGlowActive) {
+                 this._avatarActivityGlow.depth = r.sprite.depth + 0.25;
+               }
                if (this.thoughtBubbleContainer) this.thoughtBubbleContainer.depth = r.sprite.depth + 10;
             } else if (r.type === 'pet' && this.petShadowMap && this.petShadowMap.has(r.id)) {
                this.petShadowMap.get(r.id).depth = r.sprite.depth - 0.2;
@@ -1185,7 +1194,8 @@ Game.Renderer = (function() {
 
       this._avatarActivityGlow.setVisible(true);
       this._avatarActivityGlow.setPosition(characterSprite.x, characterSprite.y - 26);
-      this._avatarActivityGlow.setDepth(depthBase + 0.25);
+      const glowDepthBase = Number.isFinite(characterSprite.depth) ? characterSprite.depth : depthBase;
+      this._avatarActivityGlow.setDepth(glowDepthBase + 0.25);
       this._avatarActivityGlowActive = true;
     }
 
@@ -1466,8 +1476,8 @@ Game.Renderer = (function() {
     window.SIM_PRELOADED_AVATAR_IMAGES = window.SIM_PRELOADED_AVATAR_IMAGES || {};
 
     const entries = [
-      ...Object.entries(window.SIM_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_IMAGES })),
-      ...Object.entries(window.SIM_AVATAR_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_AVATAR_IMAGES })),
+      ...Object.entries(window.SIM_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_IMAGES, isAvatar: false })),
+      ...Object.entries(window.SIM_AVATAR_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_AVATAR_IMAGES, isAvatar: true })),
     ];
 
     if (entries.length === 0) {
@@ -1486,7 +1496,11 @@ Game.Renderer = (function() {
         };
         img.onerror = () => {
             console.error('Failed to load image for key:', entry.key);
-            entry.target[entry.key] = new Image();
+            if (!entry.isAvatar) {
+              entry.target[entry.key] = new Image();
+            } else {
+              delete entry.target[entry.key];
+            }
             loadedCount++;
             if (loadedCount === entries.length) {
                 startPhaser(canvasEl);
@@ -1762,6 +1776,14 @@ function startPhaser(canvasEl) {
         flipX: avatarFlipX,
         activityGlowActive: !!(mainScene && (mainScene._avatarActivityGlowActive || mainScene._legacyActivityGlowActive)),
         missingTextureKeys: avatarRenderer ? (avatarRenderer.missingTextureKeys || []) : [],
+        layers: avatarRenderer ? (avatarRenderer.layers || []).map(layer => {
+          const image = avatarRenderer.layerMap && avatarRenderer.layerMap.get(layer.slot);
+          return {
+            slot: layer.slot,
+            textureKey: layer.textureKey,
+            tint: image && image._avatarTint !== undefined ? image._avatarTint : null,
+          };
+        }) : [],
       };
     }
   };

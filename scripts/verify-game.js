@@ -30,11 +30,11 @@ function checkSyntax() {
   }
 }
 
-function loadBrowserGlobals(files) {
-  const context = { console };
+function loadBrowserGlobals(files, globals = {}) {
+  const context = { console, ...globals };
   const localStorageData = {};
   context.window = context;
-  context.document = {};
+  context.document = context.document || {};
   context.localStorage = {
     getItem: key => Object.prototype.hasOwnProperty.call(localStorageData, key) ? localStorageData[key] : null,
     setItem: (key, value) => { localStorageData[key] = String(value); },
@@ -354,6 +354,65 @@ function checkAvatarRendererBehavior() {
   }
 }
 
+function checkRendererAvatarPreloadFailures() {
+  const addedTextures = {};
+  const context = loadBrowserGlobals(['js/renderer_math.js', 'js/renderer_helpers.js', 'js/renderer.js'], {
+    console: { log: () => {}, error: () => {}, warn: () => {} },
+    SIM_ASSETS: { base_missing: 'base-missing.png' },
+    SIM_AVATAR_ASSETS: { avatar_missing: 'avatar-missing.png' },
+    SIM_PRELOADED_IMAGES: {},
+    SIM_PRELOADED_AVATAR_IMAGES: { avatar_blank: { naturalWidth: 0, width: 0 } },
+    innerWidth: 800,
+    addEventListener: () => {},
+    document: {
+      body: { clientWidth: 800, clientHeight: 600 },
+      querySelector: () => null,
+      getElementById: () => ({
+        style: {},
+        parentElement: { clientWidth: 800, clientHeight: 600 },
+      }),
+    },
+    Phaser: {
+      WEBGL: 'WEBGL',
+      Scale: { RESIZE: 'RESIZE', CENTER_BOTH: 'CENTER_BOTH' },
+      Scene: class {},
+      Game: class {
+        constructor(config) {
+          this.config = config;
+          const scene = new config.scene();
+          scene.textures = {
+            addImage: (key, image) => {
+              addedTextures[key] = image;
+            },
+          };
+          scene.preload();
+        }
+      },
+    },
+    Image: class {
+      set src(value) {
+        this._src = value;
+        if (this.onerror) this.onerror(new Error(`mock failed: ${value}`));
+      }
+    },
+  });
+
+  vm.runInContext('Game.Renderer.init(document.getElementById("game-canvas"));', context);
+
+  if (!Object.prototype.hasOwnProperty.call(context.window.SIM_PRELOADED_IMAGES, 'base_missing')) {
+    fail('Expected failed base asset to keep legacy blank-image fallback');
+  }
+  if (Object.prototype.hasOwnProperty.call(context.window.SIM_PRELOADED_AVATAR_IMAGES, 'avatar_missing')) {
+    fail('Expected failed avatar asset to remain absent from preloaded avatar images');
+  }
+  if (Object.prototype.hasOwnProperty.call(addedTextures, 'avatar_blank')) {
+    fail('Expected blank avatar image to be skipped during Phaser preload');
+  }
+  if (Object.prototype.hasOwnProperty.call(context.window.SIM_PRELOADED_AVATAR_IMAGES, 'avatar_blank')) {
+    fail('Expected blank avatar image to be removed during Phaser preload');
+  }
+}
+
 function checkStateAppearanceMigration() {
   const context = loadBrowserGlobals([
     'js/config.js',
@@ -576,7 +635,6 @@ async function checkElectronRuntime() {
         canvases,
         assetKeys: Object.keys(window.SIM_ASSETS || {}).length,
         preloadedKeys: Object.keys(window.SIM_PRELOADED_IMAGES || {}).length,
-        avatarDebug: window.Game.Renderer.getAvatarDebug ? window.Game.Renderer.getAvatarDebug() : null,
         activeFurniture: window.Game.State.getActiveMap().furniture.length,
         activeRooms: window.Game.State.getActiveMap().rooms.length,
         gameCanvasVisible: canvas.clientWidth > 0 && canvas.clientHeight > 0,
@@ -588,7 +646,14 @@ async function checkElectronRuntime() {
     await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
     await page.click('#ec-avatar-editor [data-avatar-form="cat"]');
     await page.click('#btn-ec-save');
-    await page.waitForFunction(() => window.Game.State.get().character.appearance.form === 'cat', null, { timeout: 10000 });
+    await page.waitForFunction(() => {
+      const character = window.Game.State.get().character;
+      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
+      return character.appearance.form === 'cat' &&
+        debug &&
+        debug.layerCount > 0 &&
+        debug.layers.some(layer => layer.textureKey && layer.textureKey.startsWith('avatar_cat_'));
+    }, null, { timeout: 10000 });
     await page.evaluate(() => Game.UI.openEditModal());
     await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
     await page.click('#ec-avatar-editor [data-avatar-form="robot"]');
@@ -597,10 +662,19 @@ async function checkElectronRuntime() {
     await page.evaluate(() => Game.UI.openEditModal());
     await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
     await page.click('#ec-avatar-editor [data-avatar-form="witch"]');
+    await page.click('#ec-avatar-editor [data-avatar-tab="colors"]');
+    await page.click('#ec-avatar-editor [data-color-channel="primary"]');
     await page.click('#btn-ec-save');
     await page.waitForFunction(() => {
       const character = window.Game.State.get().character;
-      return character.appearance.form === 'witch' && character.form === 'online_witch';
+      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
+      return character.appearance.form === 'witch' &&
+        character.form === 'online_witch' &&
+        character.appearance.forms.witch.colors.primary === 'sky_denim' &&
+        debug &&
+        debug.layerCount > 0 &&
+        debug.layers.some(layer => layer.textureKey && layer.textureKey.startsWith('avatar_witch_')) &&
+        debug.layers.some(layer => layer.slot === 'top' && layer.tint === 0x3f7fb8);
     }, null, { timeout: 10000 });
 
     if (pageErrors.length) fail(`Page errors:\n${pageErrors.join('\n')}`);
@@ -610,10 +684,6 @@ async function checkElectronRuntime() {
     if (result.preloadedKeys !== result.assetKeys) {
       fail(`Expected all embedded assets to preload (${result.assetKeys}), loaded ${result.preloadedKeys}`);
     }
-    if (!result.avatarDebug || result.avatarDebug.layerCount < 1) {
-      fail(`Expected rendered avatar layers, found ${JSON.stringify(result.avatarDebug)}`);
-    }
-
     await page.evaluate(() => {
       const character = window.Game.State.get().character;
       character.targetPosition = {
@@ -659,6 +729,7 @@ async function checkElectronRuntime() {
   checkRendererDataHelpers();
   checkAppearanceHelpers();
   checkAvatarRendererBehavior();
+  checkRendererAvatarPreloadFailures();
   checkStateAppearanceMigration();
   const resources = checkResources();
   const runtime = await checkElectronRuntime();

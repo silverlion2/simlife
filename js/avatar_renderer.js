@@ -12,6 +12,7 @@ Game.AvatarRenderer = (function() {
       layers: [],
       lastSignature: '',
       layerCount: 0,
+      missingTextureKeys: [],
     };
   }
 
