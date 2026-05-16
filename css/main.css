@@ -828,9 +828,410 @@ body.low-graphics #tilt-shift-overlay {
   border-color: var(--gold-trim);
   background: rgba(212, 175, 55, 0.1);
 }
+.build-item.locked {
+  cursor: not-allowed;
+  opacity: 0.46;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+}
+.build-item.locked:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+}
+.build-item.stored {
+  border-color: rgba(76, 175, 80, 0.58);
+  background: rgba(46, 125, 50, 0.18);
+}
 .build-item-icon { font-size: 32px; margin-bottom: 8px; filter: drop-shadow(0 2px 4px #000); }
 .build-item-name { font-weight: 600; font-size: 14px; }
 .build-item-cost { color: var(--green); font-family: var(--font-serif); margin-top: 4px; }
+.market-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+}
+.market-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.market-item {
+  display: grid;
+  gap: 6px;
+  min-height: 166px;
+  padding: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.34);
+  text-align: center;
+}
+.market-item-icon {
+  font-size: 32px;
+  filter: drop-shadow(0 2px 4px #000);
+}
+.market-item-name {
+  font-weight: 700;
+  line-height: 1.2;
+}
+.market-item-room {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.market-item button {
+  align-self: end;
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--text-light);
+  padding: 7px 8px;
+  cursor: pointer;
+}
+.market-item button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.crafting-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+.crafting-item {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(76, 175, 80, 0.34);
+  border-radius: 6px;
+  background: rgba(46, 125, 50, 0.14);
+}
+.crafting-item.locked {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.24);
+}
+.crafting-item-icon {
+  font-size: 28px;
+  text-align: center;
+}
+.crafting-item small {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-dim);
+}
+.crafting-item button {
+  grid-column: 1 / -1;
+  border: 1px solid rgba(76, 175, 80, 0.45);
+  border-radius: 6px;
+  background: rgba(76, 175, 80, 0.18);
+  color: var(--text-light);
+  padding: 7px 9px;
+  cursor: pointer;
+}
+.crafting-item button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+.goal-list {
+  display: grid;
+  gap: 10px;
+}
+.goal-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.28);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.32);
+}
+.goal-card.complete {
+  border-color: rgba(76, 175, 80, 0.62);
+  background: rgba(46, 125, 50, 0.16);
+}
+.goal-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.goal-card-header span {
+  color: var(--gold-trim);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.goal-card p {
+  margin: 0;
+  color: var(--text-light);
+}
+.goal-card small {
+  color: var(--text-dim);
+}
+.goal-card button {
+  justify-self: start;
+  border: 1px solid var(--gold-dim);
+  border-radius: 6px;
+  background: rgba(212, 175, 55, 0.16);
+  color: var(--text-light);
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.goal-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.collection-summary {
+  display: grid;
+  gap: 3px;
+  margin: 8px 0 12px;
+  padding: 10px;
+  border: 1px solid rgba(129, 199, 132, 0.28);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+}
+.collection-summary span {
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.collection-grid {
+  display: grid;
+  gap: 10px;
+}
+.collection-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.collection-card.complete {
+  border-color: rgba(76, 175, 80, 0.58);
+  background: rgba(46, 125, 50, 0.15);
+}
+.collection-card.claimed {
+  border-color: rgba(212, 175, 55, 0.42);
+}
+.collection-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.collection-card-header small,
+.collection-card > small {
+  display: block;
+  color: var(--text-dim);
+}
+.collection-card-header span {
+  color: var(--gold-trim);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+.collection-card p {
+  margin: 0;
+}
+.collection-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.collection-item-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 5px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  opacity: 0.58;
+}
+.collection-item-chip.owned {
+  border-color: rgba(129, 199, 132, 0.62);
+  background: rgba(76, 175, 80, 0.18);
+  opacity: 1;
+}
+.collection-item-chip small {
+  color: var(--text-light);
+  font-size: 11px;
+}
+.collection-card button {
+  justify-self: start;
+  border: 1px solid rgba(76, 175, 80, 0.45);
+  border-radius: 6px;
+  background: rgba(76, 175, 80, 0.18);
+  color: var(--text-light);
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.collection-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.family-member-row {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.family-member-row small {
+  color: var(--text-dim);
+}
+.family-assignment-list {
+  display: grid;
+  gap: 5px;
+  margin-top: 2px;
+}
+.family-assignment-btn.active {
+  border-color: rgba(129, 199, 132, 0.85);
+  background: rgba(76, 175, 80, 0.28);
+  color: var(--text-light);
+}
+.home-growth-card {
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.home-growth-card > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.home-growth-meter {
+  height: 6px;
+  margin: 8px 0 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+}
+.home-growth-meter span {
+  display: block;
+  height: 100%;
+  background: var(--gold-trim);
+}
+.floor-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 12px;
+}
+.floor-controls button {
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-light);
+  padding: 6px 9px;
+  cursor: pointer;
+}
+.floor-controls button.active {
+  background: rgba(212, 175, 55, 0.25);
+  border-color: var(--gold-trim);
+}
+.floor-controls .travel-floor-btn {
+  color: var(--green);
+  border-color: rgba(76, 175, 80, 0.45);
+}
+.floor-controls .travel-floor-btn.active {
+  color: var(--text-light);
+  background: rgba(76, 175, 80, 0.28);
+  border-color: rgba(129, 199, 132, 0.85);
+}
+.floor-controls button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.lot-expansion-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 12px;
+  padding: 9px 10px;
+  border: 1px solid rgba(129, 199, 132, 0.32);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+}
+.lot-expansion-card small {
+  display: block;
+  color: var(--text-dim);
+}
+.lot-expansion-card button {
+  border: 1px solid rgba(76, 175, 80, 0.45);
+  border-radius: 6px;
+  background: rgba(76, 175, 80, 0.16);
+  color: var(--text-light);
+  padding: 7px 10px;
+  cursor: pointer;
+}
+.lot-expansion-card button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.store-mode-btn {
+  margin-left: 5px;
+  padding: 6px 12px;
+  border: 1px solid rgba(76, 175, 80, 0.45);
+  border-radius: 4px;
+  background: rgba(76, 175, 80, 0.16);
+  color: var(--text-light);
+  cursor: pointer;
+  font-weight: bold;
+}
+.store-mode-btn.active {
+  background: rgba(76, 175, 80, 0.35);
+  border-color: rgba(129, 199, 132, 0.85);
+}
+.renovation-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.renovation-room {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid rgba(212, 175, 55, 0.26);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.26);
+}
+.renovation-room small {
+  display: block;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+.renovation-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.renovation-actions button {
+  min-width: 34px;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-light);
+  padding: 5px 6px;
+  cursor: pointer;
+}
+.renovation-actions [data-furnish-preset] {
+  min-width: 76px;
+  border-color: rgba(76, 175, 80, 0.45);
+  background: rgba(76, 175, 80, 0.15);
+}
+.renovation-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 
 /* ---- Pie Menu (In-game Overlays) ---- */
 #pie-menu {

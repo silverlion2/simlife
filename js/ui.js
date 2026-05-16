@@ -582,6 +582,9 @@ Game.UI = (function() {
     const closeHtml = `<button class="panel-close" onclick="Game.UI.togglePanel('${panelName}')">✕</button>`;
     switch (panelName) {
       case 'build': buildBuildPanel(panel, closeHtml); break;
+      case 'market': buildMarketPanel(panel, closeHtml); break;
+      case 'collections': buildCollectionsPanel(panel, closeHtml); break;
+      case 'goals': buildGoalsPanel(panel, closeHtml); break;
       case 'activities': buildActivitiesPanel(panel, closeHtml); break;
       case 'career': buildCareerPanel(panel, closeHtml); break;
       case 'social': buildSocialPanel(panel, closeHtml); break;
@@ -596,33 +599,253 @@ Game.UI = (function() {
     // Sell mode toggle
     const sellActive = Game.State.get().ui.mode === 'sell';
     html += `<button class="sell-mode-btn ${sellActive ? 'active' : ''}" onclick="Game.UI.toggleSellMode()">🗑️ ${sellActive ? 'Exit Sell Mode' : 'Sell Mode'}</button>`;
+    const storeActive = Game.State.get().ui.mode === 'store';
+    html += `<button class="store-mode-btn ${storeActive ? 'active' : ''}" data-action="store-mode" onclick="Game.UI.toggleStoreMode()">Storage ${storeActive ? 'ON' : 'Mode'}</button>`;
     // Sandbox mode toggle
     const sandboxActive = Game.State.get().ui.sandboxMode;
+    let growthHtml = '';
+    if (Game.HomeGrowth) {
+      const growth = Game.HomeGrowth.ensureState();
+      const levelInfo = Game.HomeGrowth.getCurrentLevelInfo();
+      const floorInfo = Game.HomeGrowth.getFloorInfo();
+      const nextText = growth.nextLevelValue
+        ? `$${Math.max(0, growth.nextLevelValue - growth.homeValue).toLocaleString()} to next level`
+        : 'Max home level';
+      const meterMax = growth.nextLevelValue || growth.homeValue || 1;
+      growthHtml += `<div class="home-growth-card">
+        <div><strong>${levelInfo.label}</strong> <span>Level ${growth.level}</span></div>
+        <div class="home-growth-meter"><span style="width:${Math.min(100, Math.round((growth.homeValue / meterMax) * 100))}%"></span></div>
+        <small>Home value $${growth.homeValue.toLocaleString()} - ${nextText}</small>
+      </div>`;
+      growthHtml += '<div class="floor-controls">';
+      for (const floor of floorInfo.floors) {
+        const householdFloor = Game.State.get().character.floor || 0;
+        growthHtml += `<button class="${floor.active ? 'active' : ''}" onclick="Game.UI.setBuildFloor(${floor.level})">${floor.label}</button>`;
+        growthHtml += `<button class="travel-floor-btn ${householdFloor === floor.level ? 'active' : ''}" data-travel-floor="${floor.level}" onclick="Game.UI.travelToFloor(${floor.level})">${householdFloor === floor.level ? 'Here' : 'Go'}</button>`;
+      }
+      growthHtml += `<button ${floorInfo.canAddFloor ? '' : 'disabled'} title="${floorInfo.addFloorReason || 'Add another story'}" onclick="Game.UI.buyFloor()">+ Floor ${floorInfo.canAddFloor ? '$' + floorInfo.addFloorCost.toLocaleString() : ''}</button>`;
+      growthHtml += '</div>';
+      if (Game.HomeGrowth.getLotInfo) {
+        const lotInfo = Game.HomeGrowth.getLotInfo();
+        growthHtml += `<div class="lot-expansion-card">
+          <div>
+            <strong>Land</strong>
+            <small>${lotInfo.width}x${lotInfo.height} lot</small>
+          </div>
+          <button data-action="expand-lot" ${lotInfo.canExpand ? '' : 'disabled'} title="${lotInfo.expandReason || 'Expand buildable land'}" onclick="Game.UI.expandLot()">${lotInfo.canExpand ? `Expand $${lotInfo.expandCost.toLocaleString()}` : lotInfo.expandReason}</button>
+        </div>`;
+      }
+    }
     html += `<button class="sandbox-mode-btn ${sandboxActive ? 'active' : ''}" onclick="Game.UI.toggleSandboxMode()" style="margin-left:5px; padding:6px 12px; background: ${sandboxActive ? '#FFCC00' : 'rgba(255,255,255,0.1)'}; color: ${sandboxActive ? '#000' : '#FFF'}; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">🏖️ ${sandboxActive ? 'Sandbox ON' : 'Sandbox OFF'}</button>`;
+    html += growthHtml;
     // Broken furniture indicator
     const activeMap = Game.State.getActiveMap();
     const broken = activeMap && activeMap.brokenFurniture ? activeMap.brokenFurniture.length : 0;
     if (broken > 0) {
-      html += `<div class="broken-alert">⚠️ ${broken} broken item${broken > 1 ? 's' : ''} — click them to repair!</div>`;
+      html += `<div class="broken-alert">⚠️ ${broken} broken item${broken > 1 ? 's' : ''} - click them to repair!</div>`;
+    }
+    const activeFloor = Game.HomeGrowth && Game.HomeGrowth.getActiveFloor ? Game.HomeGrowth.getActiveFloor(activeMap) : (activeMap.activeFloor || 0);
+    const renovationRooms = (activeMap.rooms || []).filter(room => (room.floor || 0) === activeFloor);
+    if (renovationRooms.length) {
+      html += '<h4 class="build-category">Renovation</h4><div class="renovation-list">';
+      for (const room of renovationRooms) {
+        const roomCfg = Game.Config.ROOMS[room.type] || { label: room.type };
+        const furnishingOptions = Game.House.getFurnishingOptions ? Game.House.getFurnishingOptions(room.id) : [];
+        html += `<div class="renovation-room">
+          <div>
+            <strong>${roomCfg.label}</strong>
+            <small>${room.w}x${room.h}</small>
+          </div>
+          <div class="renovation-actions">
+            <button data-renovate-action="w-minus" onclick="Game.UI.resizeRoom('${room.id}', -1, 0)">-W</button>
+            <button data-renovate-action="w-plus" onclick="Game.UI.resizeRoom('${room.id}', 1, 0)">+W</button>
+            <button data-renovate-action="h-minus" onclick="Game.UI.resizeRoom('${room.id}', 0, -1)">-H</button>
+            <button data-renovate-action="h-plus" onclick="Game.UI.resizeRoom('${room.id}', 0, 1)">+H</button>
+            ${furnishingOptions.map(option => `<button data-furnish-preset="${option.key}" ${option.available ? '' : 'disabled'} title="${option.reason || option.label}" onclick="Game.UI.furnishRoom('${room.id}','${option.key}')">${option.available ? `Furnish $${option.cost.toLocaleString()}` : option.label}</button>`).join('')}
+          </div>
+        </div>`;
+      }
+      html += '</div>';
     }
     html += '<h4 class="build-category">Rooms</h4><div class="build-grid">';
     for (const [key, room] of Object.entries(Game.Config.ROOMS)) {
-      html += `<div class="build-item" onclick="Game.UI.startBuild('room','${key}')">
+      const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isRoomUnlocked(key));
+      const lockReason = locked && Game.HomeGrowth.getRoomLockReason ? Game.HomeGrowth.getRoomLockReason(key) : '';
+      html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('room','${key}')"`}>
         <div class="build-item-icon">${room.icon}</div>
         <div class="build-item-name">${room.label}</div>
-        <div class="build-item-cost">${sandboxActive ? 'Free' : '$' + room.baseCost}</div>
+        <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + room.baseCost)}</div>
       </div>`;
     }
     html += '</div><h4 class="build-category">Furniture</h4><div class="build-grid">';
     for (const [key, furn] of Object.entries(Game.Config.FURNITURE)) {
-      html += `<div class="build-item" onclick="Game.UI.startBuild('furniture','${key}')">
+      const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isFurnitureUnlocked(key));
+      const lockReason = locked && Game.HomeGrowth.getFurnitureLockReason ? Game.HomeGrowth.getFurnitureLockReason(key) : '';
+      html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('furniture','${key}')"`}>
         <div class="build-item-icon">${furn.icon}</div>
         <div class="build-item-name">${furn.label}</div>
-        <div class="build-item-cost">${sandboxActive ? 'Free' : '$' + furn.cost}</div>
+        <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + furn.cost)}</div>
       </div>`;
+    }
+    const storedObjects = Game.HomeGrowth && Game.HomeGrowth.getInventoryObjects ? Game.HomeGrowth.getInventoryObjects() : [];
+    if (storedObjects.length) {
+      html += '</div><h4 class="build-category">Stored Objects</h4><div class="build-grid">';
+      for (const object of storedObjects) {
+        const furn = Game.Config.FURNITURE[object.type];
+        if (!furn) continue;
+        html += `<div class="build-item stored" onclick="Game.UI.startBuild('stored','${object.id}')">
+          <div class="build-item-icon">${furn.icon}</div>
+          <div class="build-item-name">${furn.label}</div>
+          <div class="build-item-cost">Owned</div>
+        </div>`;
+      }
     }
     html += '</div></div>';
     panel.innerHTML = html;
+  }
+
+  function buildMarketPanel(panel, closeHtml) {
+    const offers = Game.ObjectMarket ? Game.ObjectMarket.getDailyOffers() : [];
+    const storedCount = Game.HomeGrowth && Game.HomeGrowth.getInventoryObjects ? Game.HomeGrowth.getInventoryObjects().length : 0;
+    let html = (closeHtml || '') + '<h3>Object Market</h3>';
+    html += `<div class="market-summary">
+      <strong>Daily Finds</strong>
+      <span>${storedCount} stored object${storedCount === 1 ? '' : 's'}</span>
+    </div>`;
+    html += '<div class="market-grid">';
+    for (const offer of offers) {
+      const furn = Game.Config.FURNITURE[offer.type];
+      if (!furn) continue;
+      const affordable = Game.Economy && Game.Economy.canAfford(offer.price);
+      html += `<div class="market-item">
+        <div class="market-item-icon">${furn.icon}</div>
+        <div class="market-item-name">${furn.label}</div>
+        <div class="market-item-room">${Game.Config.ROOMS[furn.room]?.label || furn.room}</div>
+        <button ${affordable ? '' : 'disabled'} onclick="Game.UI.buyMarketOffer('${offer.id}')">
+          ${affordable ? 'Buy' : 'Need'} $${offer.price.toLocaleString()}
+        </button>
+      </div>`;
+    }
+    if (!offers.length) {
+      html += '<p class="empty-msg">New object offers arrive tomorrow.</p>';
+    }
+    html += '</div>';
+    if (Game.ObjectCrafting && Game.ObjectCrafting.getAvailableRecipes) {
+      const recipes = Game.ObjectCrafting.getAvailableRecipes();
+      html += '<h4 class="build-category">Workshop Crafting</h4><div class="crafting-grid">';
+      for (const recipe of recipes) {
+        html += `<div class="crafting-item ${recipe.available ? '' : 'locked'}">
+          <div class="crafting-item-icon">${recipe.outputIcon}</div>
+          <div>
+            <strong>${recipe.label}</strong>
+            <small>${recipe.outputLabel} - $${recipe.cost.toLocaleString()} materials</small>
+          </div>
+          <button ${recipe.available ? '' : 'disabled'} onclick="Game.UI.craftObject('${recipe.id}')">${recipe.available ? 'Craft' : recipe.reason}</button>
+        </div>`;
+      }
+      html += '</div>';
+    }
+    panel.innerHTML = html;
+  }
+
+  function buyMarketOffer(offerId) {
+    if (!Game.ObjectMarket) return;
+    const result = Game.ObjectMarket.buyOffer(offerId);
+    showNotification(result.success ? 'Object added to storage.' : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'market') {
+      buildMarketPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('market')">✕</button>`);
+    }
+  }
+
+  function craftObject(recipeId) {
+    if (!Game.ObjectCrafting || !Game.ObjectCrafting.craftObject) return;
+    const result = Game.ObjectCrafting.craftObject(recipeId);
+    showNotification(result.success ? 'Crafted object moved to storage.' : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'market') {
+      buildMarketPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('market')">✕</button>`);
+    }
+  }
+
+  function buildGoalsPanel(panel, closeHtml) {
+    const goals = Game.HomeGoals ? Game.HomeGoals.getActiveGoals() : [];
+    let html = (closeHtml || '') + '<h3>Household Goals</h3>';
+    html += '<div class="goal-list">';
+    for (const goal of goals) {
+      const rewardNames = (goal.rewardObjects || [])
+        .map(type => Game.Config.FURNITURE[type]?.label || type)
+        .join(', ');
+      html += `<div class="goal-card ${goal.complete ? 'complete' : ''}">
+        <div class="goal-card-header">
+          <strong>${goal.title}</strong>
+          <span>${goal.complete ? 'Ready' : 'Open'}</span>
+        </div>
+        <p>${goal.desc}</p>
+        <small>$${goal.rewardMoney.toLocaleString()}${rewardNames ? ` + ${rewardNames}` : ''}</small>
+        <button ${goal.complete ? '' : 'disabled'} onclick="Game.UI.claimHomeGoal('${goal.id}')">${goal.complete ? 'Claim' : 'In Progress'}</button>
+      </div>`;
+    }
+    if (!goals.length) html += '<p class="empty-msg">No open goals right now.</p>';
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  function claimHomeGoal(goalId) {
+    if (!Game.HomeGoals) return;
+    const result = Game.HomeGoals.claimGoal(goalId);
+    showNotification(result.success ? 'Goal rewards delivered.' : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'goals') {
+      buildGoalsPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('goals')">✕</button>`);
+    }
+  }
+
+  function buildCollectionsPanel(panel, closeHtml) {
+    const collections = Game.HomeCollections && Game.HomeCollections.getCollections ? Game.HomeCollections.getCollections() : [];
+    const completedCount = collections.filter(item => item.claimed).length;
+    let html = (closeHtml || '') + '<h3>Home Collections</h3>';
+    html += `<div class="collection-summary">
+      <strong>${completedCount}/${collections.length} complete</strong>
+      <span>Finish furniture sets to earn new objects.</span>
+    </div>`;
+    html += '<div class="collection-grid">';
+    for (const collection of collections) {
+      const rewardNames = (collection.rewardObjects || [])
+        .map(type => Game.Config.FURNITURE[type]?.label || type)
+        .join(', ');
+      html += `<div class="collection-card ${collection.complete ? 'complete' : ''} ${collection.claimed ? 'claimed' : ''}">
+        <div class="collection-card-header">
+          <div>
+            <strong>${collection.title}</strong>
+            <small>${collection.owned}/${collection.total} found</small>
+          </div>
+          <span>${collection.claimed ? 'Claimed' : (collection.complete ? 'Ready' : 'Open')}</span>
+        </div>
+        <p>${collection.desc}</p>
+        <div class="collection-items">
+          ${collection.items.map(item => `<div class="collection-item-chip ${item.owned ? 'owned' : ''}" title="${item.label}">
+            <span>${item.icon}</span>
+            <small>${item.label}${item.needed > 1 ? ` ${item.count}/${item.needed}` : ''}</small>
+          </div>`).join('')}
+        </div>
+        <small>$${collection.rewardMoney.toLocaleString()}${rewardNames ? ` + ${rewardNames}` : ''}</small>
+        <button ${collection.claimable ? '' : 'disabled'} onclick="Game.UI.claimCollection('${collection.key}')">${collection.claimed ? 'Claimed' : (collection.complete ? 'Claim' : 'In Progress')}</button>
+      </div>`;
+    }
+    if (!collections.length) html += '<p class="empty-msg">No collections are available yet.</p>';
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  function claimCollection(collectionKey) {
+    if (!Game.HomeCollections || !Game.HomeCollections.claimCollection) return;
+    const result = Game.HomeCollections.claimCollection(collectionKey);
+    showNotification(result.success ? 'Collection rewards delivered.' : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'collections') {
+      buildCollectionsPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('collections')">鉁?/button>`);
+    }
   }
 
   function startBuild(type, key) {
@@ -630,14 +853,26 @@ Game.UI = (function() {
     ui.mode = 'build';
     if (type === 'room') {
       const r = Game.Config.ROOMS[key];
+      if (Game.HomeGrowth && !Game.HomeGrowth.isRoomUnlocked(key)) {
+        showNotification(Game.HomeGrowth.getRoomLockReason(key));
+        return;
+      }
       ui.buildGhost = { type: 'room', key, x: 1, y: 1, w: r.minW, h: r.minH };
     } else {
-      const f = Game.Config.FURNITURE[key];
+      const storedObject = type === 'stored' && Game.HomeGrowth && Game.HomeGrowth.getInventoryObjects
+        ? Game.HomeGrowth.getInventoryObjects().find(item => item.id === key)
+        : null;
+      const furnKey = storedObject ? storedObject.type : key;
+      const f = Game.Config.FURNITURE[furnKey];
       if (!f) {
         console.warn('Game.UI.startBuild: Invalid furniture key ->', key);
         return;
       }
-      ui.buildGhost = { type: 'furniture', key, x: 1, y: 1, w: f.w, h: f.h };
+      if (type !== 'stored' && Game.HomeGrowth && !Game.HomeGrowth.isFurnitureUnlocked(furnKey)) {
+        showNotification(Game.HomeGrowth.getFurnitureLockReason(furnKey));
+        return;
+      }
+      ui.buildGhost = { type: type === 'stored' ? 'stored' : 'furniture', key: furnKey, sourceObjectId: storedObject ? storedObject.id : null, x: 1, y: 1, w: f.w, h: f.h };
     }
 
     // Target the Phaser container, not the hidden vanilla canvas
@@ -703,7 +938,10 @@ Game.UI = (function() {
         showNotification(`❌ Place furniture inside a room!`);
         return;
       }
-      if (Game.House.placeFurniture(ghost.key, room.id, gp.x, gp.y, ghost.rotated)) {
+      const placed = ghost.type === 'stored'
+        ? Game.House.placeStoredFurniture(ghost.sourceObjectId, room.id, gp.x, gp.y, ghost.rotated)
+        : Game.House.placeFurniture(ghost.key, room.id, gp.x, gp.y, ghost.rotated);
+      if (placed) {
         showNotification(`🪑 Placed ${Game.Config.FURNITURE[ghost.key].label}!`);
       } else {
         showNotification(`❌ Can't place here!`);
@@ -723,6 +961,67 @@ Game.UI = (function() {
     container.removeEventListener('mousemove', handleBuildMove);
     container.removeEventListener('click', handleBuildClick);
     Game.UI.togglePanel('build');
+  }
+
+  function setBuildFloor(floor) {
+    if (!Game.HomeGrowth || !Game.HomeGrowth.setActiveFloor(floor)) return;
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">鉁?/button>`);
+    }
+  }
+
+  function buyFloor() {
+    if (!Game.HomeGrowth) return;
+    const result = Game.HomeGrowth.addFloor();
+    if (!result.success) showNotification(result.reason || 'Cannot add another floor yet.');
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">鉁?/button>`);
+    }
+  }
+
+  function expandLot() {
+    if (!Game.HomeGrowth || !Game.HomeGrowth.expandLot) return;
+    const result = Game.HomeGrowth.expandLot();
+    showNotification(result.success ? `Lot expanded to ${result.width}x${result.height}.` : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">鉁?/button>`);
+    }
+  }
+
+  function travelToFloor(floor) {
+    if (!Game.HomeGrowth || !Game.HomeGrowth.travelToFloor) return;
+    const result = Game.HomeGrowth.travelToFloor(floor);
+    showNotification(result.success ? 'Household moved floors.' : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+    }
+  }
+
+  function resizeRoom(roomId, dW, dH) {
+    if (!Game.House || !Game.House.resizeRoom) return;
+    const house = Game.House.getHouse();
+    const room = house.rooms.find(item => item.id === roomId);
+    if (!room) return;
+    const resized = Game.House.resizeRoom(roomId, room.w + dW, room.h + dH);
+    showNotification(resized ? 'Room renovated.' : 'Cannot resize room here.');
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+    }
+  }
+
+  function furnishRoom(roomId, presetKey) {
+    if (!Game.House || !Game.House.applyFurnishingPreset) return;
+    const result = Game.House.applyFurnishingPreset(roomId, presetKey);
+    showNotification(result.success ? 'Room furnished.' : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">鉁?/button>`);
+    }
   }
 
   function toggleSellMode() {
@@ -791,6 +1090,35 @@ Game.UI = (function() {
       }
       html += '</div></div>';
     }
+    if (Game.Family) {
+      const members = Game.Family.getMembers();
+      const familyCheck = Game.Family.canStartFamily();
+      html += `<div class="npc-card family-card">
+        <div class="npc-header">Family Household (${members.length})</div>
+        <div class="npc-interactions">
+          <button class="int-btn" ${familyCheck.allowed ? 'onclick="Game.UI.startFamily()"' : 'disabled'}>${familyCheck.allowed ? 'Start Family' : familyCheck.reason}</button>
+      </div>`;
+      for (const member of members.filter(item => item.role !== 'self')) {
+        const actions = Game.Family.getCareActions ? Game.Family.getCareActions(member.id) : [];
+        const assignments = Game.Family.getAssignments ? Game.Family.getAssignments(member.id) : [];
+        const activeAssignment = assignments.find(item => item.active);
+        html += `<div class="family-member-row">
+          <strong>${member.name}</strong>
+          <small>${member.role} - ${member.lifeStage}</small>
+          <div class="npc-interactions">
+            ${actions.map(action => `<button class="int-btn" onclick="Game.UI.doFamilyCare('${member.id}','${action.key}')">${action.label}</button>`).join('')}
+          </div>
+          <div class="family-assignment-list" data-family-member="${member.id}">
+            <small>Routine${activeAssignment ? ` - ${activeAssignment.label}` : ''}</small>
+            <div class="npc-interactions">
+              ${assignments.map(item => `<button class="int-btn family-assignment-btn ${item.active ? 'active' : ''}" data-routine-key="${item.key}" ${item.available ? `onclick="Game.UI.assignFamilyRoutine('${member.id}','${item.key}')"` : 'disabled'} title="${item.reason || item.desc}">${item.label}</button>`).join('')}
+            </div>
+          </div>
+        </div>`;
+      }
+      html += `<small>${members.map(member => `${member.name} - ${member.lifeStage}`).join('<br>')}</small>
+      </div>`;
+    }
     html += '</div>';
     panel.innerHTML = html;
   }
@@ -799,6 +1127,36 @@ Game.UI = (function() {
     const result = Game.Social.interact(npcId, intKey);
     showNotification(result.msg);
     togglePanel('social'); // refresh
+  }
+
+  function startFamily() {
+    if (!Game.Family) return;
+    const result = Game.Family.tryForChild();
+    showNotification(result.success ? `${result.child.name} joined the family.` : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'social') {
+      buildSocialPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('social')">鉁?/button>`);
+    }
+  }
+
+  function doFamilyCare(memberId, actionKey) {
+    if (!Game.Family || !Game.Family.performCare) return;
+    const result = Game.Family.performCare(memberId, actionKey);
+    showNotification(result.success ? `${result.action.label} helped ${result.member.name}.` : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'social') {
+      buildSocialPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('social')">✕</button>`);
+    }
+  }
+
+  function assignFamilyRoutine(memberId, routineKey) {
+    if (!Game.Family || !Game.Family.assignRoutine) return;
+    const result = Game.Family.assignRoutine(memberId, routineKey);
+    showNotification(result.success ? `${result.member.name} routine updated.` : result.reason);
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'social') {
+      buildSocialPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('social')">鉁?/button>`);
+    }
   }
 
   function buildSkillsPanel(panel, closeHtml) {
@@ -894,8 +1252,22 @@ Game.UI = (function() {
     togglePanel,
     startBuild,
     cancelBuild,
+    buyMarketOffer,
+    craftObject,
+    claimHomeGoal,
+    claimCollection,
     doSocialInteraction,
+    doFamilyCare,
+    assignFamilyRoutine,
+    startFamily,
+    setBuildFloor,
+    buyFloor,
+    expandLot,
+    travelToFloor,
+    resizeRoom,
+    furnishRoom,
     toggleSellMode,
+    toggleStoreMode,
     toggleSandboxMode,
     playAnnouncer,
   };
@@ -929,12 +1301,32 @@ Game.UI = (function() {
       container.removeEventListener('click', handleSellClick);
       Game.UI.showNotification('🚪 Exited sell mode');
     } else {
+      container.removeEventListener('click', handleStoreClick);
       ui.mode = 'sell';
       Game.UI.showNotification('🗑️ Sell Mode: Click furniture to sell, rooms to demolish');
       // Set up sell click handler on the Phaser container
       container.addEventListener('click', handleSellClick);
     }
     // Refresh build panel
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+    }
+  }
+
+  function toggleStoreMode() {
+    const ui = Game.State.get().ui;
+    const container = document.querySelector('.canvas-area');
+    if (ui.mode === 'store') {
+      ui.mode = 'live';
+      container.removeEventListener('click', handleStoreClick);
+      Game.UI.showNotification('Storage mode off');
+    } else {
+      container.removeEventListener('click', handleSellClick);
+      ui.mode = 'store';
+      Game.UI.showNotification('Storage Mode: click furniture to move it into storage');
+      container.addEventListener('click', handleStoreClick);
+    }
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
       buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
@@ -982,6 +1374,27 @@ Game.UI = (function() {
       e.stopPropagation();
       return;
     }
+  }
+
+  function handleStoreClick(e) {
+    const ui = Game.State.get().ui;
+    if (ui.mode !== 'store') {
+      const container = document.querySelector('.canvas-area');
+      container.removeEventListener('click', handleStoreClick);
+      return;
+    }
+
+    const container = document.querySelector('.canvas-area');
+    const rect = container.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const gp = Game.Renderer.getGridPos(cx, cy);
+    const furn = Game.House.getFurnitureAt(gp.x, gp.y);
+    if (!furn) return;
+
+    const result = Game.House.storeFurniture(furn.id);
+    Game.UI.showNotification(result && result.success ? 'Object moved to storage.' : 'Cannot store that object.');
+    e.stopPropagation();
   }
 
 })();

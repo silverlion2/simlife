@@ -553,6 +553,335 @@ function checkStateAppearanceMigration() {
   }
 }
 
+function checkHomeGrowthAndFamilySystems() {
+  const context = loadBrowserGlobals([
+    'js/config.js',
+    'js/avatar_catalog.js',
+    'js/appearance.js',
+    'js/state.js',
+    'js/economy.js',
+    'js/home_growth.js',
+    'js/house.js',
+    'js/social.js',
+    'js/family.js',
+  ]);
+  const objectMarketPath = path.join(root, 'js', 'object_market.js');
+  if (fs.existsSync(objectMarketPath)) {
+    vm.runInContext(fs.readFileSync(objectMarketPath, 'utf8'), context, { filename: 'js/object_market.js' });
+  }
+  const homeGoalsPath = path.join(root, 'js', 'home_goals.js');
+  if (fs.existsSync(homeGoalsPath)) {
+    vm.runInContext(fs.readFileSync(homeGoalsPath, 'utf8'), context, { filename: 'js/home_goals.js' });
+  }
+  const objectCraftingPath = path.join(root, 'js', 'object_crafting.js');
+  if (fs.existsSync(objectCraftingPath)) {
+    vm.runInContext(fs.readFileSync(objectCraftingPath, 'utf8'), context, { filename: 'js/object_crafting.js' });
+  }
+  const homeCollectionsPath = path.join(root, 'js', 'home_collections.js');
+  if (fs.existsSync(homeCollectionsPath)) {
+    vm.runInContext(fs.readFileSync(homeCollectionsPath, 'utf8'), context, { filename: 'js/home_collections.js' });
+  }
+
+  context.Game.UI = { showNotification: () => {} };
+  context.Game.Renderer = { setBgDirty: () => {}, spawnParticles: () => {}, updatePathGrid: () => {} };
+  context.Game.Character = { repairFurniture: () => {}, invalidateComfortCache: () => {} };
+
+  const state = context.Game.State.get();
+  const house = state.maps.house;
+  const growth = context.Game.HomeGrowth.ensureState();
+
+  if (!growth || growth.level !== 1) fail(`Expected starter home growth level 1, found ${JSON.stringify(growth)}`);
+  if (house.unlockedFloors !== 1 || house.activeFloor !== 0 || !Array.isArray(house.floors)) {
+    fail(`Expected starter house to have one active floor: ${JSON.stringify({ unlockedFloors: house.unlockedFloors, activeFloor: house.activeFloor, floors: house.floors })}`);
+  }
+  if (house.nextFurnId <= 38) fail(`Expected migrated nextFurnId to avoid starter id collisions, found ${house.nextFurnId}`);
+
+  if (!context.Game.HomeGrowth.isRoomUnlocked('bedroom')) fail('Expected bedroom to be unlocked in starter home');
+  if (context.Game.HomeGrowth.isRoomUnlocked('nursery')) fail('Expected nursery to be locked before home growth level 2');
+  if (!context.Game.HomeGrowth.isFurnitureUnlocked('basic_bed')) fail('Expected Simple Bed to be unlocked in starter home');
+  if (context.Game.HomeGrowth.isFurnitureUnlocked('luxury_bed')) fail('Expected Luxury Bed to be locked before home growth level 3');
+
+  const unavailableLuxury = context.Game.House.placeFurniture('luxury_bed', 'room_0', 2, 2);
+  if (unavailableLuxury !== false) fail('Expected locked luxury bed placement to fail');
+
+  const bedroomFurniture = context.Game.House.getAvailableFurniture('bedroom');
+  const luxuryEntry = bedroomFurniture.find(item => item.key === 'luxury_bed');
+  if (!luxuryEntry || !luxuryEntry.locked || !luxuryEntry.lockReason) {
+    fail(`Expected bedroom furniture list to expose locked luxury bed: ${JSON.stringify(luxuryEntry)}`);
+  }
+
+  if (!context.Game.HomeCollections) fail('Expected household furniture collections system to be available');
+  const collectionState = context.Game.HomeCollections.ensureState();
+  if (!collectionState || !Array.isArray(collectionState.completed)) {
+    fail(`Expected home collections state to initialize: ${JSON.stringify(collectionState)}`);
+  }
+  const collections = context.Game.HomeCollections.getCollections();
+  if (collections.length < 4) fail(`Expected several furniture collections, found ${JSON.stringify(collections)}`);
+  const starterCollection = collections.find(item => item.key === 'starter_comfort');
+  if (!starterCollection || !starterCollection.complete || starterCollection.claimed) {
+    fail(`Expected starter furniture collection to be ready and unclaimed: ${JSON.stringify(starterCollection)}`);
+  }
+  if (starterCollection.items.some(item => !item.owned || item.count < 1 || !item.label)) {
+    fail(`Expected starter collection items to expose owned progress: ${JSON.stringify(starterCollection.items)}`);
+  }
+  const moneyBeforeCollection = state.economy.money;
+  const objectsBeforeCollection = state.inventory.objects.length;
+  const claimedCollection = context.Game.HomeCollections.claimCollection('starter_comfort');
+  if (!claimedCollection.success) fail(`Expected starter furniture collection claim to succeed: ${JSON.stringify(claimedCollection)}`);
+  if (state.economy.money <= moneyBeforeCollection) fail('Expected collection claim to pay money');
+  if (state.inventory.objects.length <= objectsBeforeCollection || !state.inventory.objects.some(item => item.source === 'collection_starter_comfort')) {
+    fail(`Expected collection claim to add stored object reward: ${JSON.stringify(state.inventory.objects)}`);
+  }
+  if (!state.homeCollections.completed.includes('starter_comfort')) fail(`Expected completed collection key in state: ${JSON.stringify(state.homeCollections)}`);
+  if (!state.character.collection.includes('starter_comfort')) fail(`Expected legacy collection showcase to include completion: ${JSON.stringify(state.character.collection)}`);
+  if (context.Game.HomeCollections.claimCollection('starter_comfort').success) fail('Expected already claimed collection to be rejected');
+
+  context.Game.Economy.addMoney(100000);
+  house.furniture.push({ id: `furn_${house.nextFurnId++}`, type: 'grand_piano', roomId: null, x: 9, y: 9, floor: 0 });
+  house.furniture.push({ id: `furn_${house.nextFurnId++}`, type: 'hot_tub', roomId: null, x: 12, y: 9, floor: 0 });
+  const grown = context.Game.HomeGrowth.refresh();
+  if (grown.level < 3) fail(`Expected expensive home items to raise growth level, found ${JSON.stringify(grown)}`);
+  if (!context.Game.HomeGrowth.isFurnitureUnlocked('luxury_bed')) fail('Expected Luxury Bed to unlock after home growth');
+  if (!state.inventory || !Array.isArray(state.inventory.objects)) fail('Expected home growth to initialize object inventory');
+  const rewardedTypes = state.inventory.objects.map(item => item.type);
+  if (!rewardedTypes.includes('hammock') || !rewardedTypes.includes('crib')) {
+    fail(`Expected home growth milestone rewards to add obtainables, found ${JSON.stringify(state.inventory.objects)}`);
+  }
+  if (!context.Game.ObjectMarket) fail('Expected continuous object market system to be available');
+  const offers = context.Game.ObjectMarket.getDailyOffers();
+  if (offers.length < 4) fail(`Expected several daily object offers, found ${JSON.stringify(offers)}`);
+  if (offers.some(offer => !context.Game.HomeGrowth.isFurnitureUnlocked(offer.type))) {
+    fail(`Expected daily offers to respect home-growth unlocks, found ${JSON.stringify(offers)}`);
+  }
+  const moneyBeforeOffer = state.economy.money;
+  const boughtOffer = context.Game.ObjectMarket.buyOffer(offers[0].id);
+  if (!boughtOffer.success || !boughtOffer.object || boughtOffer.object.type !== offers[0].type) {
+    fail(`Expected buying a market offer to create a stored object: ${JSON.stringify(boughtOffer)}`);
+  }
+  if (state.economy.money >= moneyBeforeOffer) fail('Expected buying an object offer to spend money');
+  if (!state.inventory.objects.some(item => item.id === boughtOffer.object.id)) {
+    fail(`Expected bought market object in inventory: ${JSON.stringify(state.inventory.objects)}`);
+  }
+  const remainingOfferIds = context.Game.ObjectMarket.getDailyOffers().map(offer => offer.id);
+  if (remainingOfferIds.includes(offers[0].id)) fail('Expected bought offer to be removed from daily market');
+  const dayOneOfferIds = context.Game.ObjectMarket.getDailyOffers().map(offer => offer.id).join(',');
+  state.time.day += 1;
+  const refreshedOfferIds = context.Game.ObjectMarket.refreshDailyOffers().map(offer => offer.id).join(',');
+  if (refreshedOfferIds === dayOneOfferIds) fail('Expected market offers to refresh on a new day');
+
+  if (!context.Game.HomeGoals) fail('Expected household goals system to be available');
+  const starterGoals = context.Game.HomeGoals.getActiveGoals();
+  if (starterGoals.length < 3) fail(`Expected household goals to keep several active projects, found ${JSON.stringify(starterGoals)}`);
+  const diningGoal = starterGoals.find(goal => goal.key === 'build_dining_room');
+  if (!diningGoal) fail(`Expected household goals to include a dining room project, found ${JSON.stringify(starterGoals)}`);
+  if (context.Game.HomeGoals.claimGoal(diningGoal.id).success) fail('Expected incomplete dining room goal to be unclaimable');
+  const diningBuiltForGoal = context.Game.House.buildRoom('dining', 26, 26, 2, 2);
+  if (!diningBuiltForGoal) fail('Expected dining room build to satisfy a household goal');
+  const diningRoom = house.rooms.find(room => room.type === 'dining');
+  const moneyBeforeResize = state.economy.money;
+  const resizedDining = context.Game.House.resizeRoom(diningRoom.id, 4, 3);
+  if (!resizedDining) fail('Expected built rooms to be resizable for renovation');
+  if (diningRoom.w !== 4 || diningRoom.h !== 3) fail(`Expected dining room to resize to 4x3, found ${JSON.stringify(diningRoom)}`);
+  if (state.economy.money >= moneyBeforeResize) fail('Expected room expansion to spend money');
+  const chairPlacedForResize = context.Game.House.placeFurniture('dining_chairs', diningRoom.id, diningRoom.x + 3, diningRoom.y + 2);
+  if (!chairPlacedForResize) fail('Expected furniture placement in expanded dining room');
+  const unsafeShrink = context.Game.House.resizeRoom(diningRoom.id, 2, 2);
+  if (unsafeShrink) fail('Expected room shrink to fail when furniture would be outside the new footprint');
+  const moneyBeforeGoalClaim = state.economy.money;
+  const objectsBeforeGoalClaim = state.inventory.objects.length;
+  const claimedDiningGoal = context.Game.HomeGoals.claimGoal(diningGoal.id);
+  if (!claimedDiningGoal.success) fail(`Expected completed dining room goal to be claimable: ${JSON.stringify(claimedDiningGoal)}`);
+  if (state.economy.money <= moneyBeforeGoalClaim) fail('Expected claimed household goal to pay money');
+  if (state.inventory.objects.length <= objectsBeforeGoalClaim) fail(`Expected claimed household goal to add stored object rewards: ${JSON.stringify(state.inventory.objects)}`);
+  if (context.Game.HomeGoals.getActiveGoals().some(goal => goal.id === diningGoal.id)) fail('Expected claimed goal to leave active goals');
+  if (!state.homeGoals.completed.includes('build_dining_room')) fail(`Expected claimed goal key in completed history: ${JSON.stringify(state.homeGoals)}`);
+
+  if (!context.Game.ObjectCrafting) fail('Expected workshop object crafting system to be available');
+  const noWorkbenchCraft = context.Game.ObjectCrafting.craftObject('plant_box');
+  if (noWorkbenchCraft.success) fail('Expected crafting to require a workshop workbench first');
+
+  const patioBuilt = context.Game.House.buildRoom('patio', 30, 30, 2, 2);
+  if (!patioBuilt) fail('Expected patio build to support placing obtained objects');
+  const patio = house.rooms.find(room => room.type === 'patio');
+  const hammockReward = state.inventory.objects.find(item => item.type === 'hammock');
+  const storedPlaced = context.Game.House.placeStoredFurniture(hammockReward.id, patio.id, patio.x, patio.y);
+  if (!storedPlaced) fail('Expected stored hammock reward to place without buying another item');
+  if (state.inventory.objects.some(item => item.id === hammockReward.id)) fail('Expected placed stored object to be consumed from inventory');
+  if (!house.furniture.some(item => item.type === 'hammock' && item.roomId === patio.id)) fail('Expected placed stored hammock to appear in house furniture');
+  const placedHammock = house.furniture.find(item => item.type === 'hammock' && item.roomId === patio.id);
+  const storedBack = context.Game.House.storeFurniture(placedHammock.id);
+  if (!storedBack || !storedBack.object || storedBack.object.type !== 'hammock') {
+    fail(`Expected placed furniture to move back into object storage: ${JSON.stringify(storedBack)}`);
+  }
+  if (house.furniture.some(item => item.id === placedHammock.id)) fail('Expected stored furniture to be removed from the house');
+  if (!state.inventory.objects.some(item => item.id === storedBack.object.id && item.type === 'hammock')) {
+    fail(`Expected stored furniture object in inventory: ${JSON.stringify(state.inventory.objects)}`);
+  }
+
+  const addFloorResult = context.Game.HomeGrowth.addFloor();
+  if (!addFloorResult.success) fail(`Expected addFloor to succeed after growth: ${JSON.stringify(addFloorResult)}`);
+  if (house.unlockedFloors !== 2 || house.activeFloor !== 1) {
+    fail(`Expected second floor to become active after purchase: ${JSON.stringify({ unlockedFloors: house.unlockedFloors, activeFloor: house.activeFloor })}`);
+  }
+  const staircaseReward = state.inventory.objects.find(item => item.type === 'staircase' && item.source === 'floor_1_unlock');
+  if (!staircaseReward) fail(`Expected adding a second floor to deliver a stored staircase, found ${JSON.stringify(state.inventory.objects)}`);
+  const upstairsRoomBuilt = context.Game.House.buildRoom('bedroom', 40, 40, 2, 2);
+  if (!upstairsRoomBuilt) fail('Expected bedroom build on second floor to support vertical expansion');
+  const upstairsRoom = house.rooms.find(room => room.floor === 1 && room.x === 40 && room.y === 40);
+  const staircasePlaced = context.Game.House.placeStoredFurniture(staircaseReward.id, upstairsRoom.id, upstairsRoom.x, upstairsRoom.y);
+  if (!staircasePlaced) fail('Expected stored staircase to place inside an upstairs room');
+  if (state.inventory.objects.some(item => item.id === staircaseReward.id)) fail('Expected placed staircase reward to be consumed from storage');
+  const upstairsTravel = context.Game.HomeGrowth.travelToFloor(1);
+  if (!upstairsTravel.success) fail(`Expected staircase to let household travel upstairs: ${JSON.stringify(upstairsTravel)}`);
+  if (state.character.floor !== 1 || house.activeFloor !== 1) {
+    fail(`Expected household travel to update character and active floor: ${JSON.stringify({ characterFloor: state.character.floor, activeFloor: house.activeFloor })}`);
+  }
+  const upstairsFamilyRenderables = context.Game.Family.getRenderableMembers();
+  if (upstairsFamilyRenderables.some(member => member.floor !== 1 || member.position.floor !== 1)) {
+    fail(`Expected family renderables to inherit household floor: ${JSON.stringify(upstairsFamilyRenderables)}`);
+  }
+  const invalidTravel = context.Game.HomeGrowth.travelToFloor(5);
+  if (invalidTravel.success) fail('Expected travel to locked floor to fail');
+  if (!context.Game.HomeGrowth.setActiveFloor(0) || context.Game.HomeGrowth.getActiveFloor() !== 0) {
+    fail('Expected switching back to ground floor to succeed');
+  }
+  if (!context.Game.HomeGrowth.getLotInfo || !context.Game.HomeGrowth.expandLot) {
+    fail('Expected home growth to expose land expansion APIs');
+  }
+  const lotBefore = context.Game.HomeGrowth.getLotInfo();
+  if (!lotBefore.canExpand || lotBefore.width !== house.lotWidth || lotBefore.height !== house.lotHeight) {
+    fail(`Expected grown household to be eligible for lot expansion: ${JSON.stringify(lotBefore)}`);
+  }
+  const moneyBeforeLot = state.economy.money;
+  const expandedLot = context.Game.HomeGrowth.expandLot();
+  if (!expandedLot.success) fail(`Expected lot expansion to succeed: ${JSON.stringify(expandedLot)}`);
+  if (house.lotWidth <= lotBefore.width || house.lotHeight <= lotBefore.height) {
+    fail(`Expected lot dimensions to grow after expansion: ${JSON.stringify({ before: lotBefore, after: context.Game.HomeGrowth.getLotInfo() })}`);
+  }
+  if (state.economy.money >= moneyBeforeLot) fail('Expected lot expansion to spend money');
+  if ((state.stats.lotExpansions || 0) < 1) fail(`Expected lot expansion stat to update: ${JSON.stringify(state.stats)}`);
+  const edgeBedroom = context.Game.House.buildRoom('bedroom', lotBefore.width + 1, lotBefore.height + 1, 2, 2);
+  if (!edgeBedroom) fail('Expected expanded land to allow building beyond the previous lot edge');
+  const emptyBedroom = house.rooms.find(room => room.type === 'bedroom' && room.x === lotBefore.width + 1 && room.y === lotBefore.height + 1);
+  if (!context.Game.House.getFurnishingOptions || !context.Game.House.applyFurnishingPreset) {
+    fail('Expected room furnishing preset APIs to be available');
+  }
+  const bedroomFurnishingOptions = context.Game.House.getFurnishingOptions(emptyBedroom.id);
+  const starterBedroomPreset = bedroomFurnishingOptions.find(option => option.key === 'bedroom_starter');
+  if (!starterBedroomPreset || !starterBedroomPreset.available || starterBedroomPreset.cost <= 0) {
+    fail(`Expected starter bedroom furnishing preset to be available for empty room: ${JSON.stringify(bedroomFurnishingOptions)}`);
+  }
+  const furnitureBeforePreset = house.furniture.length;
+  const moneyBeforePreset = state.economy.money;
+  const furnishedBedroom = context.Game.House.applyFurnishingPreset(emptyBedroom.id, 'bedroom_starter');
+  if (!furnishedBedroom.success) fail(`Expected starter bedroom preset to furnish room: ${JSON.stringify(furnishedBedroom)}`);
+  if (house.furniture.length <= furnitureBeforePreset) fail('Expected furnishing preset to add room furniture');
+  for (const type of ['basic_bed', 'lamp', 'dresser']) {
+    if (!house.furniture.some(item => item.roomId === emptyBedroom.id && item.type === type)) {
+      fail(`Expected furnished bedroom to contain ${type}: ${JSON.stringify(house.furniture.filter(item => item.roomId === emptyBedroom.id))}`);
+    }
+  }
+  if (state.economy.money >= moneyBeforePreset) fail('Expected furnishing preset to spend money');
+  if ((state.stats.roomsFurnished || 0) < 1) fail(`Expected room furnishing stat to update: ${JSON.stringify(state.stats)}`);
+
+  const workshopBuilt = context.Game.House.buildRoom('workshop', 36, 36, 2, 2);
+  if (!workshopBuilt) fail('Expected workshop build to unlock crafting');
+  const workshop = house.rooms.find(room => room.type === 'workshop');
+  const workbenchPlaced = context.Game.House.placeFurniture('workbench', workshop.id, workshop.x, workshop.y);
+  if (!workbenchPlaced) fail('Expected workbench placement in workshop');
+  state.character.skills.handiness = 2;
+  const recipes = context.Game.ObjectCrafting.getAvailableRecipes();
+  if (!recipes.some(recipe => recipe.id === 'plant_box' && recipe.available)) {
+    fail(`Expected plant_box crafting recipe after placing workbench: ${JSON.stringify(recipes)}`);
+  }
+  const moneyBeforeCraft = state.economy.money;
+  const crafted = context.Game.ObjectCrafting.craftObject('plant_box');
+  if (!crafted.success || !crafted.object || crafted.object.type !== 'plant') {
+    fail(`Expected crafting to add a stored plant object: ${JSON.stringify(crafted)}`);
+  }
+  if (state.economy.money >= moneyBeforeCraft) fail('Expected crafting to spend material money');
+  if (!state.inventory.objects.some(item => item.id === crafted.object.id && item.source === 'crafted')) {
+    fail(`Expected crafted object to appear in storage: ${JSON.stringify(state.inventory.objects)}`);
+  }
+
+  const nurseryBuilt = context.Game.House.buildRoom('nursery', 20, 20, 2, 2);
+  if (!nurseryBuilt) fail('Expected nursery build to succeed after home growth');
+  const nursery = house.rooms.find(room => room.type === 'nursery');
+  if (!nursery || nursery.floor !== 0) fail(`Expected nursery to be built on active floor 0, found ${JSON.stringify(nursery)}`);
+  const cribPlaced = context.Game.House.placeFurniture('crib', nursery.id, nursery.x, nursery.y);
+  if (!cribPlaced) fail('Expected crib placement in nursery to succeed');
+
+  if (context.Game.Family.canStartFamily().allowed) fail('Expected family start to require marriage first');
+  state.social.married = true;
+  state.social.romanticTarget = 'npc_alex';
+  state.character.spouse = 'npc_alex';
+  const familyReady = context.Game.Family.canStartFamily();
+  if (!familyReady.allowed) fail(`Expected married household with nursery and crib to start family: ${JSON.stringify(familyReady)}`);
+  const spouse = context.Game.Family.getMembers().find(member => member.role === 'spouse');
+  if (!spouse || spouse.name !== 'Alex Chen') fail(`Expected spouse member to sync from social state, found ${JSON.stringify(context.Game.Family.getMembers())}`);
+  const childResult = context.Game.Family.tryForChild('Luna');
+  if (!childResult.success) fail(`Expected child creation to succeed: ${JSON.stringify(childResult)}`);
+  if (state.family.members.length !== 3 || !state.family.members.some(member => member.name === 'Luna')) {
+    fail(`Expected family member Luna to be added: ${JSON.stringify(state.family)}`);
+  }
+
+  const baby = state.family.members.find(member => member.name === 'Luna');
+  const hungerBefore = baby.needs.hunger;
+  context.Game.Family.update(1440 * 4);
+  if (baby.lifeStage !== 'child') fail(`Expected baby to age into child after 4 days, found ${JSON.stringify(baby)}`);
+  if (!(baby.needs.hunger < hungerBefore)) fail(`Expected child needs to decay over time, found ${JSON.stringify(baby.needs)}`);
+  if (!state.inventory.objects.some(item => item.type === 'toy_chest' && item.source === 'family_child_age_up')) {
+    fail(`Expected child age-up to add a family object reward, found ${JSON.stringify(state.inventory.objects)}`);
+  }
+  const hungerAfterAge = baby.needs.hunger;
+  const careActions = context.Game.Family.getCareActions(baby.id);
+  if (!careActions.some(action => action.key === 'feed')) fail(`Expected child care actions to include feeding, found ${JSON.stringify(careActions)}`);
+  const careResult = context.Game.Family.performCare(baby.id, 'feed');
+  if (!careResult.success) fail(`Expected feeding a child to succeed: ${JSON.stringify(careResult)}`);
+  if (!(baby.needs.hunger > hungerAfterAge)) fail(`Expected family care to improve hunger, found ${JSON.stringify(baby.needs)}`);
+  if ((state.stats.familyCareActions || 0) < 1) fail(`Expected family care actions to update stats, found ${JSON.stringify(state.stats)}`);
+
+  if (!context.Game.Family.getAssignments || !context.Game.Family.assignRoutine) {
+    fail('Expected family household routine assignment APIs to be available');
+  }
+  const spouseAssignments = context.Game.Family.getAssignments(spouse.id);
+  if (!spouseAssignments.some(item => item.key === 'collect_objects' && item.available)) {
+    fail(`Expected spouse to be available for object collecting routine: ${JSON.stringify(spouseAssignments)}`);
+  }
+  const childAssignments = context.Game.Family.getAssignments(baby.id);
+  if (!childAssignments.some(item => item.key === 'homework' && item.available)) {
+    fail(`Expected child to be available for homework routine: ${JSON.stringify(childAssignments)}`);
+  }
+  if (context.Game.Family.assignRoutine(baby.id, 'collect_objects').success) {
+    fail('Expected child to be blocked from adult object collecting routine');
+  }
+  const objectsBeforeRoutine = state.inventory.objects.length;
+  const collectAssigned = context.Game.Family.assignRoutine(spouse.id, 'collect_objects');
+  if (!collectAssigned.success) fail(`Expected spouse object collecting routine assignment to succeed: ${JSON.stringify(collectAssigned)}`);
+  context.Game.Family.update(1440);
+  if (!spouse.assignment || spouse.assignment.key !== 'collect_objects' || spouse.assignment.completions < 1) {
+    fail(`Expected spouse collecting routine to complete after a day: ${JSON.stringify(spouse.assignment)}`);
+  }
+  if (state.inventory.objects.length <= objectsBeforeRoutine || !state.inventory.objects.some(item => item.source === 'family_collect_objects')) {
+    fail(`Expected completed family routine to add a stored object: ${JSON.stringify(state.inventory.objects)}`);
+  }
+  const educationBefore = baby.education || 0;
+  const homeworkAssigned = context.Game.Family.assignRoutine(baby.id, 'homework');
+  if (!homeworkAssigned.success) fail(`Expected child homework routine assignment to succeed: ${JSON.stringify(homeworkAssigned)}`);
+  context.Game.Family.update(1440);
+  if (!((baby.education || 0) > educationBefore)) {
+    fail(`Expected child homework routine to build education progress: ${JSON.stringify(baby)}`);
+  }
+  if ((state.stats.familyRoutineCompletions || 0) < 2) {
+    fail(`Expected family routine completions to update stats: ${JSON.stringify(state.stats)}`);
+  }
+
+  const renderables = context.Game.Family.getRenderableMembers();
+  if (renderables.length < 2 || !renderables.some(member => member.role === 'child')) {
+    fail(`Expected spouse/child renderable household members, found ${JSON.stringify(renderables)}`);
+  }
+}
+
 function checkResources() {
   const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_catalog.js', 'js/avatar_assets.js', 'js/config.js']);
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
@@ -803,6 +1132,256 @@ async function waitForCanvasNonBlank(page) {
   return handle.jsonValue();
 }
 
+async function checkCameraControls(page) {
+  const initial = await step('read initial camera debug', async () => {
+    const debug = await page.evaluate(() => window.Game.Renderer.getCameraDebug ? window.Game.Renderer.getCameraDebug() : null);
+    if (!debug) fail('Expected camera debug API');
+    return debug;
+  });
+
+  if (!initial.scrollFinite || !initial.focusFinite || !initial.targetScrollFinite) {
+    fail(`Expected finite initial camera debug values: ${JSON.stringify(initial)}`);
+  }
+  if (initial.nativeFollowActive) {
+    fail(`Expected custom camera follow to avoid Phaser native follow: ${JSON.stringify(initial)}`);
+  }
+
+  await step('pan camera manually', () => page.evaluate(() => window.Game.Renderer.setCameraOffset(80, 0)));
+  const afterPanHandle = await waitForGameFunction(page, 'wait for manual pan to disable camera follow', () => {
+    const debug = window.Game.Renderer.getCameraDebug && window.Game.Renderer.getCameraDebug();
+    return debug && debug.followsCharacter === false ? debug : false;
+  }, null, { timeout: RENDER_TIMEOUT });
+  const afterPan = await afterPanHandle.jsonValue();
+  if (afterPan.nativeFollowActive) {
+    fail(`Expected manual pan to clear Phaser native follow: ${JSON.stringify(afterPan)}`);
+  }
+
+  await step('recenter camera on character', () => page.evaluate(() => window.Game.Renderer.centerCameraOnCharacter()));
+  const afterCenterHandle = await waitForGameFunction(page, 'wait for camera recenter to resume follow', () => {
+    const debug = window.Game.Renderer.getCameraDebug && window.Game.Renderer.getCameraDebug();
+    if (!debug || debug.followsCharacter !== true) return false;
+    if (!debug.scrollFinite || !debug.focusFinite || !debug.targetScrollFinite) return false;
+    return debug;
+  }, null, { timeout: RENDER_TIMEOUT });
+  const afterCenter = await afterCenterHandle.jsonValue();
+  if (afterCenter.nativeFollowActive) {
+    fail(`Expected recentered camera to keep using custom follow: ${JSON.stringify(afterCenter)}`);
+  }
+
+  return { initial, afterPan, afterCenter };
+}
+
+async function checkObjectMarketPanel(page) {
+  await click(page, 'open Object Market panel', '[data-panel="market"]');
+  await waitForSelector(page, 'wait for Object Market panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+
+  const initial = await step('read Object Market panel state', async () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    const offers = window.Game.ObjectMarket.getDailyOffers();
+    const items = [...document.querySelectorAll('#side-panel .market-item')];
+    const affordableButtons = [...document.querySelectorAll('#side-panel .market-item button:not([disabled])')];
+    return {
+      activePanel: panel && panel.dataset.active,
+      title: panel ? panel.textContent : '',
+      offers: offers.length,
+      items: items.length,
+      craftingItems: document.querySelectorAll('#side-panel .crafting-item').length,
+      affordable: affordableButtons.length,
+      inventoryBefore: window.Game.HomeGrowth.getInventoryObjects().length,
+    };
+  }));
+
+  if (initial.activePanel !== 'market') fail(`Expected Market panel to be active: ${JSON.stringify(initial)}`);
+  if (!initial.title.includes('Object Market')) fail(`Expected Market panel title, found ${JSON.stringify(initial.title)}`);
+  if (initial.offers < 4 || initial.items < 4) fail(`Expected rendered market offers: ${JSON.stringify(initial)}`);
+  if (initial.craftingItems < 3) fail(`Expected crafting recipes to render in Market panel: ${JSON.stringify(initial)}`);
+  if (initial.affordable < 1) fail(`Expected at least one affordable market offer: ${JSON.stringify(initial)}`);
+
+  const firstAffordable = page.locator('#side-panel .market-item button:not([disabled])').first();
+  await firstAffordable.click({ timeout: UI_TIMEOUT });
+  const boughtHandle = await waitForGameFunction(page, 'wait for bought market object in storage', (before) => {
+    const inventory = window.Game.HomeGrowth.getInventoryObjects();
+    const panel = document.getElementById('side-panel');
+    return inventory.length > before && panel && panel.dataset.active === 'market'
+      ? {
+          inventoryAfter: inventory.length,
+          marketItemsAfter: document.querySelectorAll('#side-panel .market-item').length,
+        }
+      : false;
+  }, initial.inventoryBefore, { timeout: UI_TIMEOUT });
+  const bought = await boughtHandle.jsonValue();
+
+  return { ...initial, ...bought };
+}
+
+async function checkGoalsPanel(page) {
+  await click(page, 'open Household Goals panel', '[data-panel="goals"]');
+  await waitForSelector(page, 'wait for Household Goals panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+  const result = await step('read Household Goals panel state', async () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    const goals = window.Game.HomeGoals.getActiveGoals();
+    return {
+      activePanel: panel && panel.dataset.active,
+      title: panel ? panel.textContent : '',
+      goals: goals.length,
+      cards: document.querySelectorAll('#side-panel .goal-card').length,
+      disabledClaimButtons: document.querySelectorAll('#side-panel .goal-card button:disabled').length,
+    };
+  }));
+
+  if (result.activePanel !== 'goals') fail(`Expected Goals panel to be active: ${JSON.stringify(result)}`);
+  if (!result.title.includes('Household Goals')) fail(`Expected Goals panel title, found ${JSON.stringify(result.title)}`);
+  if (result.goals < 2 || result.cards < 2) fail(`Expected starter household goals to render: ${JSON.stringify(result)}`);
+  return result;
+}
+
+async function checkCollectionsPanel(page) {
+  await click(page, 'open Collections panel', '[data-panel="collections"]');
+  await waitForSelector(page, 'wait for Collections panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+  const initial = await step('read Collections panel state', async () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    const collections = window.Game.HomeCollections.getCollections();
+    return {
+      activePanel: panel && panel.dataset.active,
+      title: panel ? panel.textContent : '',
+      collections: collections.length,
+      completeCollections: collections.filter(item => item.complete).length,
+      cards: document.querySelectorAll('#side-panel .collection-card').length,
+      itemChips: document.querySelectorAll('#side-panel .collection-item-chip').length,
+      readyButtons: document.querySelectorAll('#side-panel .collection-card.complete button:not([disabled])').length,
+      completedBefore: window.Game.State.get().homeCollections?.completed?.length || 0,
+    };
+  }));
+
+  if (initial.activePanel !== 'collections') fail(`Expected Collections panel to be active: ${JSON.stringify(initial)}`);
+  if (!initial.title.includes('Home Collections')) fail(`Expected Collections panel title, found ${JSON.stringify(initial.title)}`);
+  if (initial.collections < 4 || initial.cards < 4) fail(`Expected several collection cards to render: ${JSON.stringify(initial)}`);
+  if (initial.itemChips < 8) fail(`Expected collection item progress chips to render: ${JSON.stringify(initial)}`);
+  if (initial.readyButtons < 1) fail(`Expected at least one ready starter collection: ${JSON.stringify(initial)}`);
+
+  await page.locator('#side-panel .collection-card.complete button:not([disabled])').first().click({ timeout: UI_TIMEOUT });
+  const claimedHandle = await waitForGameFunction(page, 'wait for collection claim reward', (before) => {
+    const completed = window.Game.State.get().homeCollections?.completed?.length || 0;
+    const panel = document.getElementById('side-panel');
+    return completed > before && panel && panel.dataset.active === 'collections'
+      ? {
+          completedAfter: completed,
+          disabledClaimsAfter: document.querySelectorAll('#side-panel .collection-card button:disabled').length,
+        }
+      : false;
+  }, initial.completedBefore, { timeout: UI_TIMEOUT });
+  const claimed = await claimedHandle.jsonValue();
+  await step('close Collections panel after claim check', () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    if (panel) {
+      panel.classList.add('hidden');
+      panel.dataset.active = '';
+    }
+  }));
+  return { ...initial, ...claimed };
+}
+
+async function checkBuildRenovationPanel(page) {
+  await step('close previous side panel before Build controls check', () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    if (panel && !panel.classList.contains('hidden')) {
+      panel.classList.add('hidden');
+      panel.dataset.active = '';
+    }
+  }));
+  await click(page, 'open Build panel for renovation controls', '[data-panel="build"]');
+  await waitForSelector(page, 'wait for Build panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+  const result = await step('read Build renovation controls', async () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    return {
+      activePanel: panel && panel.dataset.active,
+      title: panel ? panel.textContent : '',
+      renovationRows: document.querySelectorAll('#side-panel .renovation-room').length,
+      resizeButtons: document.querySelectorAll('#side-panel [data-renovate-action]').length,
+      furnishButtons: document.querySelectorAll('#side-panel [data-furnish-preset]').length,
+      travelButtons: document.querySelectorAll('#side-panel [data-travel-floor]').length,
+      lotControls: document.querySelectorAll('#side-panel [data-action="expand-lot"]').length,
+      hasStoreMode: Boolean(document.querySelector('#side-panel [data-action="store-mode"]')),
+    };
+  }));
+
+  if (result.activePanel !== 'build') fail(`Expected Build panel to be active: ${JSON.stringify(result)}`);
+  if (!result.title.includes('Renovation')) fail(`Expected Build panel renovation section, found ${JSON.stringify(result.title)}`);
+  if (result.renovationRows < 1 || result.resizeButtons < 2) fail(`Expected room resize controls in Build panel: ${JSON.stringify(result)}`);
+  if (result.furnishButtons < 1) fail(`Expected Build panel to expose room furnishing presets: ${JSON.stringify(result)}`);
+  if (result.travelButtons < 1) fail(`Expected Build panel to expose household floor travel controls: ${JSON.stringify(result)}`);
+  if (result.lotControls < 1) fail(`Expected Build panel to expose land expansion controls: ${JSON.stringify(result)}`);
+  if (!result.hasStoreMode) fail(`Expected Build panel to expose Store Mode: ${JSON.stringify(result)}`);
+  return result;
+}
+
+async function checkFamilyAssignmentsPanel(page) {
+  await step('seed household members for Social assignment controls', () => page.evaluate(() => {
+    const state = window.Game.State.get();
+    state.social.married = true;
+    state.social.romanticTarget = 'npc_alex';
+    state.character.spouse = 'npc_alex';
+    window.Game.Family.ensureState();
+    if (!state.family.members.some(member => member.id === 'child_ui')) {
+      state.family.members.push({
+        id: 'child_ui',
+        name: 'Mina',
+        role: 'child',
+        lifeStage: 'child',
+        dayJoined: state.time.day,
+        needs: { hunger: 80, energy: 80, hygiene: 80, fun: 80, social: 80 },
+      });
+    }
+  }));
+  await step('close previous side panel before Social family controls check', () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    if (panel && !panel.classList.contains('hidden')) {
+      panel.classList.add('hidden');
+      panel.dataset.active = '';
+    }
+  }));
+  await click(page, 'open Social panel for family assignments', '[data-panel="social"]');
+  await waitForSelector(page, 'wait for Social panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+  const initial = await step('read Social family assignment controls', async () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    return {
+      activePanel: panel && panel.dataset.active,
+      title: panel ? panel.textContent : '',
+      memberRows: document.querySelectorAll('#side-panel .family-member-row').length,
+      assignmentLists: document.querySelectorAll('#side-panel .family-assignment-list').length,
+      assignmentButtons: document.querySelectorAll('#side-panel .family-assignment-btn').length,
+      enabledAssignments: document.querySelectorAll('#side-panel .family-assignment-btn:not([disabled])').length,
+    };
+  }));
+
+  if (initial.activePanel !== 'social') fail(`Expected Social panel to be active: ${JSON.stringify(initial)}`);
+  if (initial.memberRows < 2 || initial.assignmentLists < 2) fail(`Expected family member assignment rows: ${JSON.stringify(initial)}`);
+  if (initial.assignmentButtons < 4 || initial.enabledAssignments < 2) fail(`Expected assignable family routine buttons: ${JSON.stringify(initial)}`);
+
+  const assigned = await step('assign spouse routine through Social UI', () => page.evaluate(() => {
+    const button = document.querySelector('#side-panel [data-family-member="spouse_npc_alex"] [data-routine-key="collect_objects"]');
+    if (!button) return { clicked: false, reason: 'button missing' };
+    button.click();
+    const spouse = window.Game.State.get().family.members.find(member => member.id === 'spouse_npc_alex');
+    return {
+      clicked: true,
+      activeRoutine: spouse && spouse.assignment && spouse.assignment.key,
+      activeButtons: document.querySelectorAll('#side-panel .family-assignment-btn.active').length,
+    };
+  }));
+  if (!assigned.clicked || assigned.activeRoutine !== 'collect_objects' || assigned.activeButtons < 1) {
+    fail(`Expected Social routine button to assign and render active state: ${JSON.stringify(assigned)}`);
+  }
+  await step('close Social panel after family assignment check', () => page.evaluate(() => {
+    const panel = document.getElementById('side-panel');
+    if (panel) {
+      panel.classList.add('hidden');
+      panel.dataset.active = '';
+    }
+  }));
+  return { ...initial, ...assigned };
+}
+
 async function openEditAvatarEditor(page) {
   await step('open Skills panel', async () => {
     const skillsPanelOpen = await page.evaluate(() => {
@@ -910,6 +1489,7 @@ async function checkElectronRuntime() {
         resolve({ threw: true, message: String(err && (err.message || err)) });
       }
     }));
+    const cameraControls = await checkCameraControls(page);
     const result = await page.evaluate(() => {
       const canvas = document.getElementById('game-canvas');
       const canvases = [...document.querySelectorAll('canvas')].map(item => ({
@@ -933,6 +1513,12 @@ async function checkElectronRuntime() {
     });
     result.canvasNonBlank = canvasNonBlank;
     result.outOfBoundsPathResult = outOfBoundsPathResult;
+    result.cameraControls = cameraControls;
+    result.objectMarketPanel = await checkObjectMarketPanel(page);
+    result.collectionsPanel = await checkCollectionsPanel(page);
+    result.goalsPanel = await checkGoalsPanel(page);
+    result.buildRenovationPanel = await checkBuildRenovationPanel(page);
+    result.familyAssignmentsPanel = await checkFamilyAssignmentsPanel(page);
 
     await saveInGameAvatarForm(page, 'cat');
     await openEditAvatarEditor(page);
@@ -1031,6 +1617,7 @@ async function checkElectronRuntime() {
   checkAvatarRendererBehavior();
   checkRendererAvatarPreloadFailures();
   checkStateAppearanceMigration();
+  checkHomeGrowthAndFamilySystems();
   const resources = checkResources();
   const runtime = await checkElectronRuntime();
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));

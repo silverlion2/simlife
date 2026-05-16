@@ -30,7 +30,10 @@ Game.Renderer = (function() {
   let avatarFlipX = false;
   let buildGhostSprite = null;
   let npcSpriteMap = new Map();
+  let familySpriteMap = new Map();
   let debugGraphics = null;
+  const CAMERA_FOLLOW_LERP = 0.12;
+  const CAMERA_FOCUS_FALLBACK_OFFSET = 48;
   window.DEBUG_BOUNDS = false;
 
   class MainScene extends Phaser.Scene {
@@ -56,6 +59,7 @@ Game.Renderer = (function() {
 
     create() {
       mainScene = this;
+      this.cameraFollowsCharacter = true;
       this.cameras.main.setBackgroundColor('#25451f');
 
       const backdropGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -89,6 +93,7 @@ Game.Renderer = (function() {
             return;
         }
         if (pointer.button === 1 || pointer.button === 2) {
+          this.disableCameraFollow();
           this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.cameras.main.zoom;
           this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.cameras.main.zoom;
         }
@@ -193,11 +198,73 @@ Game.Renderer = (function() {
       this.centerCameraOnCharacter();
     }
 
-    centerCameraOnCharacter() {
+    getCharacterCameraFocus() {
       const char = Game.State.get().character;
-      if (!char || !char.position) return;
+      if (!char || !char.position) return null;
+
+      if (characterSprite) {
+        const spriteX = Number.isFinite(characterSprite.x) ? characterSprite.x : null;
+        const spriteY = Number.isFinite(characterSprite.y) ? characterSprite.y : null;
+        if (spriteX === null || spriteY === null) return null;
+
+        const originY = Number.isFinite(characterSprite.originY) ? characterSprite.originY : 0.9;
+        const displayHeight = Number.isFinite(characterSprite.displayHeight) ? Math.abs(characterSprite.displayHeight) : null;
+        const spriteOffset = displayHeight ? displayHeight * Math.max(0, originY - 0.5) : CAMERA_FOCUS_FALLBACK_OFFSET;
+        const focusOffset = Number.isFinite(spriteOffset) && spriteOffset > 0 ? spriteOffset : CAMERA_FOCUS_FALLBACK_OFFSET;
+        return {
+          x: spriteX,
+          y: spriteY - focusOffset
+        };
+      }
+
       const pt = isoProject(char.position.x, char.position.y, char.position.z || 0);
-      this.cameras.main.centerOn(pt.x, pt.y - 10);
+      return { x: pt.x, y: pt.y - 48 };
+    }
+
+    getCenteredCameraScroll(focus) {
+      if (!focus || !Number.isFinite(focus.x) || !Number.isFinite(focus.y)) return null;
+      const cam = this.cameras.main;
+      const zoom = cam.zoom || 1;
+      return {
+        x: focus.x - (cam.width / (2 * zoom)),
+        y: focus.y - (cam.height / (2 * zoom))
+      };
+    }
+
+    centerCameraOnCharacter(snap = true) {
+      const focus = this.getCharacterCameraFocus();
+      if (!focus) return;
+
+      this.cameraFollowsCharacter = true;
+      this.stopNativeCameraFollow();
+      const cam = this.cameras.main;
+      const target = this.getCenteredCameraScroll(focus);
+      if (!target) return;
+
+      if (snap) {
+        cam.scrollX = target.x;
+        cam.scrollY = target.y;
+        return;
+      }
+
+      cam.scrollX = Phaser.Math.Linear(cam.scrollX, target.x, CAMERA_FOLLOW_LERP);
+      cam.scrollY = Phaser.Math.Linear(cam.scrollY, target.y, CAMERA_FOLLOW_LERP);
+    }
+
+    updateCharacterCamera() {
+      if (!this.cameraFollowsCharacter) return;
+      this.centerCameraOnCharacter(false);
+    }
+
+    stopNativeCameraFollow() {
+      const cam = this.cameras && this.cameras.main;
+      if (cam && cam.stopFollow) cam.stopFollow();
+      this._followingCharacter = false;
+    }
+
+    disableCameraFollow() {
+      this.cameraFollowsCharacter = false;
+      this.stopNativeCameraFollow();
     }
 
     drawHouseGrid() {
@@ -211,6 +278,8 @@ Game.Renderer = (function() {
       }
       this.gridSprites = [];
       this.frontWalls = []; // Track obscuring walls
+      const activeFloor = Game.HomeGrowth && Game.HomeGrowth.getActiveFloor ? Game.HomeGrowth.getActiveFloor(activeMap) : (activeMap.activeFloor || 0);
+      const visibleRooms = (activeMap.rooms || []).filter(room => (room.floor || 0) === activeFloor);
 
       const tileKeys = this.getRenderedGroundTileKeys(activeMap, w, h);
       const tileCoords = Array.from(tileKeys)
@@ -233,7 +302,7 @@ Game.Renderer = (function() {
           let isRightEdge = false;
           let isBottomEdge = false;
 
-          const roomsList = activeMap.rooms || [];
+          const roomsList = visibleRooms;
           for (const r of roomsList) {
             if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
               inRoom = true;
@@ -324,10 +393,12 @@ Game.Renderer = (function() {
       }
 
       for (const room of activeMap.rooms || []) {
+        if ((room.floor || 0) !== (activeMap.activeFloor || 0)) continue;
         addRect(room.x, room.y, room.w, room.h, contentMargin);
       }
 
       for (const furn of activeMap.furniture || []) {
+        if ((furn.floor || 0) !== (activeMap.activeFloor || 0)) continue;
         const def = Game.Config.FURNITURE[furn.type] || {};
         const footprint = RendererHelpers.getFurnitureFootprint
           ? RendererHelpers.getFurnitureFootprint(furn, def)
@@ -471,9 +542,11 @@ Game.Renderer = (function() {
       }
 
       this.syncCharacter(state.character);
+      this.updateCharacterCamera();
       this.syncFurniture(Game.State.getActiveMap());
       this.syncBuildGhost(state.ui.buildGhost);
       this.syncPets(state.pets);
+      this.syncFamilyMembers(Game.Family && Game.Family.getRenderableMembers ? Game.Family.getRenderableMembers() : []);
       this.updateCutawayWalls(state.character);
       if (this.syncNPCs) this.syncNPCs(state.npcWalkers);
       
@@ -847,7 +920,7 @@ Game.Renderer = (function() {
       
       buildGhostSprite.setVisible(true);
 
-      if (ghost.type === 'furniture') {
+      if (ghost.type === 'furniture' || ghost.type === 'stored') {
          buildGhostSprite.setTexture(this.getTextureForFurn(ghost.key));
       } else {
          buildGhostSprite.setTexture('planks'); // Minimal indicator for rooms
@@ -875,6 +948,7 @@ Game.Renderer = (function() {
                 const activeMap = Game.State.getActiveMap();
                 for (const furn of activeMap.furniture) {
                     if (furn.roomId !== room.id) continue;
+                    if ((furn.floor || 0) !== (room.floor || 0)) continue;
                     const fc = Game.Config.FURNITURE[furn.type];
                     if (!fc) continue;
                     if (ghost.x < furn.x + fc.w && ghost.x + furnCfg.w > furn.x && ghost.y < furn.y + fc.h && ghost.y + furnCfg.h > furn.y) {
@@ -978,11 +1052,6 @@ Game.Renderer = (function() {
             align: 'center'
           }).setOrigin(0.5, 1);
         }
-        if (!this._followingCharacter) {
-          this.cameras.main.startFollow(characterSprite, true, 0.05, 0.05);
-          this.cameras.main.setDeadzone(40, 40);
-          this._followingCharacter = true;
-        }
       } else {
       if(!characterSprite) {
         if (!this.charMarker) {
@@ -1010,10 +1079,6 @@ Game.Renderer = (function() {
           strokeThickness: 3,
           align: 'center'
         }).setOrigin(0.5, 1);
-        
-        // Elastic cinematic camera tracking
-        this.cameras.main.startFollow(characterSprite, true, 0.05, 0.05);
-         this.cameras.main.setDeadzone(40, 40); // Prevent micro-jitter from breathing tween
         
         // Breathing animation tween
         this.tweens.add({
@@ -1299,9 +1364,11 @@ Game.Renderer = (function() {
     syncFurniture(houseObj) {
       if(!houseObj || !houseObj.furniture) return;
       const charPos = Game.State.get().character && Game.State.get().character.position ? Game.State.get().character.position : {x: 0, y: 0};
+      const activeFloor = Game.HomeGrowth && Game.HomeGrowth.getActiveFloor ? Game.HomeGrowth.getActiveFloor(houseObj) : (houseObj.activeFloor || 0);
+      const visibleFurniture = houseObj.furniture.filter(furn => (furn.floor || 0) === activeFloor);
       
       // Sprite Leak Prevention: destroy sprites for furniture that no longer exists
-      const activeFurnIds = new Set(houseObj.furniture.map(f => f.id));
+      const activeFurnIds = new Set(visibleFurniture.map(f => f.id));
       for (const [id, sprite] of spriteMap.entries()) {
           if (!activeFurnIds.has(id)) {
               sprite.destroy();
@@ -1313,7 +1380,7 @@ Game.Renderer = (function() {
           }
       }
 
-      houseObj.furniture.forEach(furn => {
+      visibleFurniture.forEach(furn => {
         // Data-Level Culling: Off-world chunks (>40 tiles away from active bounds) are entirely skipped
         if (Math.abs(furn.x - charPos.x) > 40 || Math.abs(furn.y - charPos.y) > 40) return;
 
@@ -1430,6 +1497,53 @@ Game.Renderer = (function() {
             });
          }
       });
+    }
+
+    syncFamilyMembers(members) {
+      const activeIds = new Set((members || []).map(member => member.id));
+      for (const [id, group] of familySpriteMap.entries()) {
+        if (!activeIds.has(id)) {
+          group.destroy();
+          familySpriteMap.delete(id);
+          this._depthDirty = true;
+        }
+      }
+
+      for (const member of members || []) {
+        let group = familySpriteMap.get(member.id);
+        if (!group) {
+          const shadow = this.add.text(8, 6, member.icon || 'F', {
+            fontSize: '22px',
+            color: '#000000',
+            fontFamily: 'Nunito, sans-serif',
+          }).setOrigin(0.5, 0.5);
+          shadow.setAlpha(0.22);
+          const label = this.add.text(0, -20, member.icon || 'F', {
+            fontSize: '22px',
+            color: '#ffffff',
+            fontFamily: 'Nunito, sans-serif',
+            stroke: '#000000',
+            strokeThickness: 3,
+          }).setOrigin(0.5, 0.5);
+          const name = this.add.text(0, -38, member.name || '', {
+            fontSize: '10px',
+            color: '#ffffff',
+            fontFamily: 'Nunito, sans-serif',
+            stroke: '#000000',
+            strokeThickness: 2,
+          }).setOrigin(0.5, 1);
+          group = this.add.container(0, 0, [shadow, label, name]);
+          familySpriteMap.set(member.id, group);
+          this._depthDirty = true;
+        }
+
+        const pt = isoProject(member.position.x, member.position.y, member.position.z || 0);
+        if (group.x !== pt.x || group.y !== pt.y) {
+          group.setPosition(pt.x, pt.y);
+          this._depthDirty = true;
+        }
+        group.depth = (member.position.x + member.position.y) * 10 + 3;
+      }
     }
 
     syncNPCs(npcs) {
@@ -1611,15 +1725,46 @@ function startPhaser(canvasEl) {
   function setCameraOffset(dx, dy) {
     if(mainScene) {
       // Manual programmatic camera offset (e.g. from keyboard)
+      if (mainScene.disableCameraFollow) mainScene.disableCameraFollow();
       mainScene.cameras.main.scrollX += dx;
       mainScene.cameras.main.scrollY += dy;
+    }
+  }
+
+  function centerCameraOnCharacter() {
+    if (mainScene && mainScene.centerCameraOnCharacter) {
+      mainScene.centerCameraOnCharacter(true);
     }
   }
   
   function adjustZoom(step) {
     if(mainScene) {
       mainScene.cameras.main.zoom = Math.max(0.25, Math.min(4, mainScene.cameras.main.zoom + step));
+      if (mainScene.cameraFollowsCharacter && mainScene.centerCameraOnCharacter) {
+        mainScene.centerCameraOnCharacter(true);
+      }
     }
+  }
+
+  function getCameraDebug() {
+    if (!mainScene || !mainScene.cameras || !mainScene.cameras.main) return null;
+
+    const cam = mainScene.cameras.main;
+    const focus = mainScene.getCharacterCameraFocus ? mainScene.getCharacterCameraFocus() : null;
+    const targetScroll = mainScene.getCenteredCameraScroll ? mainScene.getCenteredCameraScroll(focus) : null;
+    const scroll = { x: cam.scrollX, y: cam.scrollY, zoom: cam.zoom || 1 };
+    const finitePoint = point => !!point && Number.isFinite(point.x) && Number.isFinite(point.y);
+
+    return {
+      followsCharacter: !!mainScene.cameraFollowsCharacter,
+      nativeFollowActive: !!cam._follow,
+      scroll,
+      focus,
+      targetScroll,
+      scrollFinite: finitePoint(scroll) && Number.isFinite(scroll.zoom),
+      focusFinite: finitePoint(focus),
+      targetScrollFinite: finitePoint(targetScroll),
+    };
   }
   
   function showPieMenu(x, y, title, items) {
@@ -1813,6 +1958,8 @@ function startPhaser(canvasEl) {
     setBgDirty,
     transitionMap,
     adjustZoom,
+    centerCameraOnCharacter,
+    getCameraDebug,
     showPieMenu,
     closePieMenu,
     spawnFloatingBubble,
@@ -1833,6 +1980,12 @@ function startPhaser(canvasEl) {
             tint: image && image._avatarTint !== undefined ? image._avatarTint : null,
           };
         }) : [],
+      };
+    },
+    getFamilyDebug: function() {
+      return {
+        spriteCount: familySpriteMap.size,
+        ids: Array.from(familySpriteMap.keys()),
       };
     }
   };

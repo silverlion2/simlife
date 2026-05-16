@@ -34,6 +34,9 @@ Game.Main = (function() {
     if (!char.actionQueue) char.actionQueue = [];
     if (!char.moodlets) char.moodlets = [];
     if (!char.autonomy) char.autonomy = { thought: null, lastAutoTime: 0, enabled: true };
+    if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState();
+    if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState();
+    if (Game.HomeCollections && Game.HomeCollections.ensureState) Game.HomeCollections.ensureState();
 
     setupCanvasEvents(canvas);
     setupKeyboardShortcuts();
@@ -59,6 +62,7 @@ Game.Main = (function() {
       Game.Character && Game.Character.updateNeeds(1);
       Game.Character && Game.Character.updateActivity(1);
       Game.Events && Game.Events.update(1);
+      Game.Family && Game.Family.update && Game.Family.update(1);
       updateGarden(1);
       updatePets(1);
     }
@@ -188,6 +192,15 @@ Game.Main = (function() {
   function onNewDay() {
     const time = Game.State.get().time;
     Game.Social.decayRelationships();
+    if (Game.ObjectMarket && Game.ObjectMarket.refreshDailyOffers) {
+      Game.ObjectMarket.refreshDailyOffers();
+    }
+    if (Game.HomeGoals && Game.HomeGoals.refresh) {
+      Game.HomeGoals.refresh();
+    }
+    if (Game.HomeCollections && Game.HomeCollections.refresh) {
+      Game.HomeCollections.refresh();
+    }
     if (time.day % 7 === 0) {
       Game.Economy.processBills();
     }
@@ -314,9 +327,11 @@ Game.Main = (function() {
     // Zoom buttons
     const btnZoomOut = document.getElementById('btn-zoom-out');
     const btnZoomIn = document.getElementById('btn-zoom-in');
+    const btnCenterCamera = document.getElementById('btn-center-camera');
     const btnToggleGraphics = document.getElementById('btn-toggle-graphics');
     if (btnZoomOut && Game.Renderer.adjustZoom) btnZoomOut.addEventListener('click', () => Game.Renderer.adjustZoom(-0.25));
     if (btnZoomIn && Game.Renderer.adjustZoom) btnZoomIn.addEventListener('click', () => Game.Renderer.adjustZoom(0.25));
+    if (btnCenterCamera && Game.Renderer.centerCameraOnCharacter) btnCenterCamera.addEventListener('click', () => Game.Renderer.centerCameraOnCharacter());
     if (btnToggleGraphics) btnToggleGraphics.addEventListener('click', toggleGraphicsMode);
   }
 
@@ -445,6 +460,11 @@ Game.Main = (function() {
         case 'l':
         case 'L':
           toggleGraphicsMode();
+          break;
+        case 'c':
+        case 'C':
+        case 'Home':
+          if (Game.Renderer.centerCameraOnCharacter) Game.Renderer.centerCameraOnCharacter();
           break;
         case 'ArrowUp':
         case 'w':

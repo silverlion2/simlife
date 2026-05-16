@@ -90,6 +90,7 @@ Game.State = (function() {
         achievements: [],
         collection: [],
         position: { x: 3, y: 3 },
+        floor: 0,
         targetPosition: null,
         spouse: null,
         autonomy: { thought: null, lastAutoTime: 0, enabled: true },
@@ -99,6 +100,11 @@ Game.State = (function() {
         house: {
           lotWidth: lotW,
           lotHeight: lotH,
+          activeFloor: 0,
+          unlockedFloors: 1,
+          floors: [
+            { level: 0, label: 'Ground Floor' }
+          ],
           rooms: [
             { id: 'room_0', type: 'bedroom', x: 2, y: 2, w: 3, h: 3 },
             { id: 'room_1', type: 'bathroom', x: 5, y: 2, w: 2, h: 3 },
@@ -164,7 +170,7 @@ Game.State = (function() {
             { id: 'furn_35', type: 'telescope', roomId: null, x: 18, y: 13 }
           ],
           nextRoomId: 3,
-          nextFurnId: 36,
+          nextFurnId: 39,
           brokenFurniture: [],
         },
         mail_room: {
@@ -240,10 +246,39 @@ Game.State = (function() {
         daysWorked: 0,
         workPerformance: 0,
       },
+      homeGrowth: {
+        level: 1,
+        homeValue: 0,
+        baselineValue: null,
+        milestones: [],
+      },
+      inventory: {
+        objects: [],
+        nextObjectId: 1,
+        market: {
+          generatedDay: null,
+          offers: [],
+        },
+      },
+      homeGoals: {
+        active: [],
+        completed: [],
+        nextGoalId: 1,
+        generatedDay: null,
+      },
+      homeCollections: {
+        completed: [],
+      },
       social: {
         relationships: {},
         romanticTarget: null,
         married: false,
+      },
+      family: {
+        members: [
+          { id: 'player', name: 'Player', role: 'self', lifeStage: 'young_adult', dayJoined: 1 }
+        ],
+        nextMemberId: 1,
       },
       time: {
         day: 1,
@@ -268,6 +303,10 @@ Game.State = (function() {
         friendsMade: 0,
         eventsHandled: 0,
         totalDaysPlayed: 0,
+        familyRoutineCompletions: 0,
+        lotExpansions: 0,
+        homeCollectionsCompleted: 0,
+        roomsFurnished: 0,
       },
       ui: {
         mode: 'live',
@@ -404,6 +443,10 @@ Game.State = (function() {
         
         // Ensure legacy saves get a color if missing
         syncLegacyAppearanceFields(state.character);
+        if (Game.HomeGrowth && Game.HomeGrowth.ensureState) Game.HomeGrowth.ensureState(state);
+        if (Game.Family && Game.Family.ensureState) Game.Family.ensureState(state);
+        if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState(state);
+        if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState(state);
         
         activeSlotId = slotId;
         return true;
@@ -430,6 +473,10 @@ Game.State = (function() {
         syncLegacyAppearanceFields(fresh.character);
       }
       state = fresh;
+      if (Game.HomeGrowth && Game.HomeGrowth.ensureState) Game.HomeGrowth.ensureState(state);
+      if (Game.Family && Game.Family.ensureState) Game.Family.ensureState(state);
+      if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState(state);
+      if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState(state);
       activeSlotId = 'save_' + Date.now();
       
       let idx = getIndex();

@@ -17,9 +17,11 @@ Game.RendererHelpers = (function() {
 
   function hitTestFurniture(activeMap, furnitureConfig, gx, gy) {
     if (!activeMap || !Array.isArray(activeMap.furniture)) return null;
+    const floor = getActiveFloor(activeMap);
 
     for (let i = activeMap.furniture.length - 1; i >= 0; i--) {
       const furniture = activeMap.furniture[i];
+      if (!isOnFloor(furniture, floor)) continue;
       const footprint = getFurnitureFootprint(furniture, furnitureConfig[furniture.type]);
       if (
         gx >= footprint.x &&
@@ -36,8 +38,10 @@ Game.RendererHelpers = (function() {
 
   function hitTestRoom(activeMap, gx, gy) {
     if (!activeMap || !Array.isArray(activeMap.rooms)) return null;
+    const floor = getActiveFloor(activeMap);
 
     return activeMap.rooms.find(room =>
+      isOnFloor(room, floor) &&
       gx >= room.x &&
       gx < room.x + room.w &&
       gy >= room.y &&
@@ -57,7 +61,9 @@ Game.RendererHelpers = (function() {
       }
     }
 
+    const floor = getActiveFloor(activeMap);
     for (const furniture of activeMap.furniture || []) {
+      if (!isOnFloor(furniture, floor)) continue;
       const config = furnitureConfig[furniture.type];
       if (!blocksPath(furniture, config)) continue;
 
@@ -88,11 +94,21 @@ Game.RendererHelpers = (function() {
     );
   }
 
+  function getActiveFloor(activeMap) {
+    return activeMap && Number.isInteger(activeMap.activeFloor) ? activeMap.activeFloor : 0;
+  }
+
+  function isOnFloor(item, floor) {
+    return (item.floor || 0) === floor;
+  }
+
   return {
     getFurnitureFootprint,
     hitTestFurniture,
     hitTestRoom,
     buildPathGrid,
     blocksPath,
+    getActiveFloor,
+    isOnFloor,
   };
 })();
