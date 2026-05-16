@@ -1588,16 +1588,17 @@ body.low-graphics #tilt-shift-overlay {
 
 .avatar-form-row,
 .avatar-tabs {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
-.avatar-form-row {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+.avatar-form-row button {
+  flex: 1 1 72px;
 }
 
-.avatar-tabs {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.avatar-tabs button {
+  flex: 1 1 78px;
 }
 
 .avatar-form-row button,

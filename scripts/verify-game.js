@@ -446,6 +446,19 @@ async function checkElectronRuntime() {
     await page.click('#ec-avatar-editor [data-avatar-form="cat"]');
     await page.click('#btn-ec-save');
     await page.waitForFunction(() => window.Game.State.get().character.appearance.form === 'cat', null, { timeout: 10000 });
+    await page.evaluate(() => Game.UI.openEditModal());
+    await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
+    await page.click('#ec-avatar-editor [data-avatar-form="robot"]');
+    await page.click('#btn-ec-close');
+    await page.waitForFunction(() => window.Game.State.get().character.appearance.form === 'cat', null, { timeout: 10000 });
+    await page.evaluate(() => Game.UI.openEditModal());
+    await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
+    await page.click('#ec-avatar-editor [data-avatar-form="witch"]');
+    await page.click('#btn-ec-save');
+    await page.waitForFunction(() => {
+      const character = window.Game.State.get().character;
+      return character.appearance.form === 'witch' && character.form === 'online_witch';
+    }, null, { timeout: 10000 });
 
     if (pageErrors.length) fail(`Page errors:\n${pageErrors.join('\n')}`);
     if (consoleErrors.length) fail(`Console errors:\n${consoleErrors.join('\n')}`);

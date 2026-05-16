@@ -8,6 +8,7 @@ Game.UI = (function() {
   const MAX_NOTIFICATIONS = 3;
   let createAvatarEditor = null;
   let editAvatarEditor = null;
+  let editDraftAppearance = null;
 
   function init() {
     buildStatusPanel();
@@ -22,6 +23,10 @@ Game.UI = (function() {
     const value = state.colors.primary || Object.values(state.colors)[0] || '#88CCFF';
     const resolved = Game.AvatarCatalog.COLOR_VALUES[value] || value;
     return parseInt(String(resolved).replace('#', '0x'), 16);
+  }
+
+  function getLegacyFormFromAppearance(appearance) {
+    return appearance && appearance.form === 'witch' ? 'online_witch' : appearance.form;
   }
 
   function setupGraphicsToggle() {
@@ -132,7 +137,7 @@ Game.UI = (function() {
       const worldName = document.getElementById('cc-world-name').value || 'My World';
       const simName = document.getElementById('cc-sim-name').value || 'Player';
       const appearance = createAvatarEditor ? createAvatarEditor.getAppearance() : Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF });
-      const form = appearance.form;
+      const form = getLegacyFormFromAppearance(appearance);
       const color = getAppearancePrimaryColor(appearance);
       const selectedTraitCard = document.querySelector('#cc-trait-grid .trait-card.selected');
       const traitKey = selectedTraitCard ? selectedTraitCard.dataset.key : 'neat';
@@ -160,14 +165,14 @@ Game.UI = (function() {
     
     document.getElementById('btn-ec-save').addEventListener('click', () => {
       const simName = document.getElementById('ec-sim-name').value;
-      const appearance = editAvatarEditor ? editAvatarEditor.getAppearance() : null;
+      const appearance = editDraftAppearance || (editAvatarEditor ? editAvatarEditor.getAppearance() : null);
       const selectedTraitCard = document.querySelector('#ec-trait-grid .trait-card.selected');
       
       const char = Game.State.get().character;
       if(simName) char.name = simName;
       if(appearance) {
         char.appearance = appearance;
-        char.form = appearance.form;
+        char.form = getLegacyFormFromAppearance(appearance);
         char.color = getAppearancePrimaryColor(appearance);
       }
       if(selectedTraitCard) {
@@ -264,12 +269,10 @@ Game.UI = (function() {
     const char = Game.State.get().character;
     document.getElementById('ec-sim-name').value = char.name;
     const startingAppearance = char.appearance || Game.Appearance.fromLegacy(char);
+    editDraftAppearance = Game.Appearance.normalizeAppearance(startingAppearance);
     editAvatarEditor = Game.AvatarEditor.mount('ec-avatar-editor', startingAppearance, {
       onChange: (appearance) => {
-        char.appearance = appearance;
-        char.form = appearance.form;
-        char.color = getAppearancePrimaryColor(appearance);
-        if (Game.Renderer && Game.Renderer.setBgDirty) Game.Renderer.setBgDirty();
+        editDraftAppearance = appearance;
       }
     });
     
@@ -291,6 +294,7 @@ Game.UI = (function() {
       modal.classList.add('hidden');
       modal.style.display = 'none';
     }
+    editDraftAppearance = null;
   }
 
   // ---- Status Bars ----
