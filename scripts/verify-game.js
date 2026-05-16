@@ -635,6 +635,7 @@ async function checkElectronRuntime() {
         canvases,
         assetKeys: Object.keys(window.SIM_ASSETS || {}).length,
         preloadedKeys: Object.keys(window.SIM_PRELOADED_IMAGES || {}).length,
+        initialAvatarDebug: window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug(),
         activeFurniture: window.Game.State.getActiveMap().furniture.length,
         activeRooms: window.Game.State.getActiveMap().rooms.length,
         gameCanvasVisible: canvas.clientWidth > 0 && canvas.clientHeight > 0,
@@ -683,6 +684,23 @@ async function checkElectronRuntime() {
     if (!result.gameCanvasVisible) fail('Expected #game-canvas to be visible and sized');
     if (result.preloadedKeys !== result.assetKeys) {
       fail(`Expected all embedded assets to preload (${result.assetKeys}), loaded ${result.preloadedKeys}`);
+    }
+    if (!result.initialAvatarDebug || result.initialAvatarDebug.layerCount <= 0) {
+      fail(`Expected initial robot avatar to render layers: ${JSON.stringify(result.initialAvatarDebug)}`);
+    }
+    const initialMissingTextureKeys = result.initialAvatarDebug.missingTextureKeys || [];
+    if (initialMissingTextureKeys.length) {
+      fail(`Expected initial robot avatar to have no missing texture keys: ${initialMissingTextureKeys.join(', ')}`);
+    }
+    const initialAvatarLayers = result.initialAvatarDebug.layers || [];
+    const initialLayersMissingTextureKeys = initialAvatarLayers
+      .filter(layer => !layer.textureKey)
+      .map(layer => layer.slot || layer.id || '<unknown>');
+    if (initialLayersMissingTextureKeys.length) {
+      fail(`Expected initial robot avatar layers to include texture keys, missing: ${initialLayersMissingTextureKeys.join(', ')}`);
+    }
+    if (!initialAvatarLayers.some(layer => layer.textureKey && layer.textureKey.startsWith('avatar_robot_'))) {
+      fail(`Expected initial robot avatar layers to include avatar_robot_ texture keys: ${JSON.stringify(initialAvatarLayers)}`);
     }
     await page.evaluate(() => {
       const character = window.Game.State.get().character;
