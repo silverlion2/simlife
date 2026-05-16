@@ -9,6 +9,7 @@ const outputDir = path.join(root, 'assets', 'avatar_layers');
 const outputJs = path.join(root, 'js', 'avatar_assets.js');
 const WIDTH = 96;
 const HEIGHT = 128;
+const ART_SCALE = 0.62;
 
 function loadCatalog() {
   const context = { console };
@@ -42,15 +43,15 @@ function escapeXml(value) {
     .replace(/>/g, '&gt;');
 }
 
-function directionOffset(direction) {
-  const offsets = {
-    N: { x: -1, y: -2, scale: 0.94 },
-    NE: { x: 3, y: -1, scale: 0.98 },
-    E: { x: 5, y: 0, scale: 1 },
-    SE: { x: 3, y: 2, scale: 1.02 },
-    S: { x: 0, y: 3, scale: 1 },
+function directionPose(direction) {
+  const poses = {
+    N: { x: -2, y: -5, scaleX: 0.82, scaleY: 0.92, skewY: -5 },
+    NE: { x: 2, y: -3, scaleX: 0.9, scaleY: 0.96, skewY: -2 },
+    E: { x: 7, y: -1, scaleX: 0.72, scaleY: 1, skewY: 0 },
+    SE: { x: 4, y: 2, scaleX: 0.88, scaleY: 1.02, skewY: 3 },
+    S: { x: 0, y: 3, scaleX: 1, scaleY: 1, skewY: 0 },
   };
-  return offsets[direction] || offsets.S;
+  return poses[direction] || poses.S;
 }
 
 function paletteFor(item) {
@@ -134,9 +135,15 @@ function layerShape(item) {
 }
 
 function renderSvg(item, direction) {
-  const offset = directionOffset(direction);
+  const pose = directionPose(direction);
   const shape = layerShape(item);
-  const transform = `translate(${offset.x} ${offset.y}) scale(${offset.scale})`;
+  const transform = [
+    `translate(${pose.x} ${pose.y})`,
+    'translate(48 116)',
+    `skewY(${pose.skewY})`,
+    `scale(${(pose.scaleX * ART_SCALE).toFixed(3)} ${(pose.scaleY * ART_SCALE).toFixed(3)})`,
+    'translate(-48 -116)',
+  ].join(' ');
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}" aria-label="${escapeXml(item.id)}">
   <rect width="${WIDTH}" height="${HEIGHT}" fill="none"/>
   <g transform="${transform}">${shape}</g>

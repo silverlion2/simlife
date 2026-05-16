@@ -2,6 +2,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+const zlib = require('zlib');
 const { _electron: electron } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
@@ -601,13 +602,122 @@ function checkResources() {
   const extraAvatar = avatarAssetKeys.filter(key => !expectedAvatarKeySet.has(key));
   if (extraAvatar.length) fail(`Unexpected avatar texture keys: ${extraAvatar.join(', ')}`);
 
+  const avatarQuality = checkAvatarLayerQuality(context.Game.AvatarCatalog);
+
   return {
     assetKeys: assetKeys.length,
     avatarAssetKeys: avatarAssetKeys.length,
     avatarLayerPngs: avatarLayerPngNames.length,
+    avatarDirectionalItems: avatarQuality.directionalItems,
+    avatarMaxLayerHeight: avatarQuality.maxLayerHeight,
     furnitureTypes: furnitureKeys.length,
     pngResources: pngCount,
   };
+}
+
+function parsePngRgba(filePath) {
+  const buffer = fs.readFileSync(filePath);
+  if (buffer.readUInt32BE(0) !== 0x89504e47) fail(`Expected PNG signature for ${filePath}`);
+  const width = buffer.readUInt32BE(16);
+  const height = buffer.readUInt32BE(20);
+  const chunks = [];
+  let pos = 8;
+  while (pos < buffer.length) {
+    const length = buffer.readUInt32BE(pos);
+    const type = buffer.toString('ascii', pos + 4, pos + 8);
+    if (type === 'IDAT') chunks.push(buffer.slice(pos + 8, pos + 8 + length));
+    if (type === 'IEND') break;
+    pos += length + 12;
+  }
+
+  const raw = zlib.inflateSync(Buffer.concat(chunks));
+  const stride = width * 4;
+  const pixels = Buffer.alloc(stride * height);
+  let previous = Buffer.alloc(stride);
+  let offset = 0;
+
+  function paeth(a, b, c) {
+    const p = a + b - c;
+    const pa = Math.abs(p - a);
+    const pb = Math.abs(p - b);
+    const pc = Math.abs(p - c);
+    if (pa <= pb && pa <= pc) return a;
+    return pb <= pc ? b : c;
+  }
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[offset++];
+    const row = Buffer.from(raw.slice(offset, offset + stride));
+    offset += stride;
+    for (let i = 0; i < stride; i += 1) {
+      const left = i >= 4 ? row[i - 4] : 0;
+      const up = previous[i];
+      const upLeft = i >= 4 ? previous[i - 4] : 0;
+      if (filter === 1) row[i] = (row[i] + left) & 255;
+      else if (filter === 2) row[i] = (row[i] + up) & 255;
+      else if (filter === 3) row[i] = (row[i] + Math.floor((left + up) / 2)) & 255;
+      else if (filter === 4) row[i] = (row[i] + paeth(left, up, upLeft)) & 255;
+    }
+    row.copy(pixels, y * stride);
+    previous = row;
+  }
+
+  return { width, height, pixels };
+}
+
+function avatarPngMetrics(textureKey) {
+  const png = parsePngRgba(path.join(root, 'assets', 'avatar_layers', `${textureKey}.png`));
+  let minX = png.width;
+  let minY = png.height;
+  let maxX = -1;
+  let maxY = -1;
+  let hash = 2166136261;
+  for (let y = 0; y < png.height; y += 1) {
+    for (let x = 0; x < png.width; x += 1) {
+      const idx = (y * png.width + x) * 4;
+      const alpha = png.pixels[idx + 3];
+      if (alpha <= 8) continue;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+      hash ^= x + 31 * y + 131 * alpha + 8191 * png.pixels[idx] + 131071 * png.pixels[idx + 1] + 524287 * png.pixels[idx + 2];
+      hash = Math.imul(hash, 16777619);
+    }
+  }
+  return {
+    width: png.width,
+    height: png.height,
+    bboxWidth: maxX >= minX ? maxX - minX + 1 : 0,
+    bboxHeight: maxY >= minY ? maxY - minY + 1 : 0,
+    hash: hash >>> 0,
+  };
+}
+
+function checkAvatarLayerQuality(catalog) {
+  const directions = catalog.DIRECTIONS;
+  let maxLayerHeight = 0;
+  let directionalItems = 0;
+  for (const item of Object.values(catalog.ITEMS)) {
+    const metrics = directions.map(direction => avatarPngMetrics(item.textures[direction]));
+    for (const metric of metrics) {
+      if (metric.width !== 96 || metric.height !== 128) {
+        fail(`Expected avatar layer ${item.id} to be 96x128, found ${metric.width}x${metric.height}`);
+      }
+      maxLayerHeight = Math.max(maxLayerHeight, metric.bboxHeight);
+    }
+    if (item.value === 'none') continue;
+    directionalItems += 1;
+    const uniqueHashes = new Set(metrics.map(metric => metric.hash));
+    const uniqueBounds = new Set(metrics.map(metric => `${metric.bboxWidth}x${metric.bboxHeight}`));
+    if (uniqueHashes.size < 3 || uniqueBounds.size < 2) {
+      fail(`Expected distinct directional avatar assets for ${item.id}, found hashes=${uniqueHashes.size}, bounds=${uniqueBounds.size}`);
+    }
+  }
+  if (maxLayerHeight > 76) {
+    fail(`Expected avatar layer art to stay within scale-safe bounds, max opaque height ${maxLayerHeight}`);
+  }
+  return { directionalItems, maxLayerHeight };
 }
 
 function countFiles(dir, ext) {
