@@ -54,19 +54,8 @@
       </div>
       
       <div class="cc-field">
-        <label>Skin / Shirt Color:</label>
-        <input type="color" id="cc-sim-color" value="#88CCFF">
-      </div>
-
-      <div class="cc-field">
-        <label>Avatar Form:</label>
-        <select id="cc-sim-form">
-          <option value="human">Person</option>
-          <option value="robot">Robot</option>
-          <option value="cat">Pet Cat</option>
-          <option value="banana">Banana</option>
-          <option value="online_witch" selected>Witch (Online Asset)</option>
-        </select>
+        <label>Appearance:</label>
+        <div id="cc-avatar-editor"></div>
       </div>
 
       <div class="cc-field">
@@ -100,18 +89,8 @@
       <input type="text" id="ec-sim-name" maxlength="15">
     </div>
     <div class="cc-field">
-      <label>Color Tint:</label>
-      <input type="color" id="ec-sim-color">
-    </div>
-    <div class="cc-field">
-      <label>Avatar Form:</label>
-      <select id="ec-sim-form">
-        <option value="human">Person</option>
-        <option value="robot">Robot</option>
-        <option value="cat">Pet Cat</option>
-        <option value="banana">Banana</option>
-        <option value="online_witch" selected>Witch (Online Asset)</option>
-      </select>
+      <label>Appearance:</label>
+      <div id="ec-avatar-editor"></div>
     </div>
     <div class="cc-field">
       <label>Change Trait (Free!):</label>
@@ -223,6 +202,7 @@
 <script src="js/renderer.js?v=5"></script>
 <script src="js/autonomy.js?v=2"></script>
 <script src="js/interaction.js?v=2"></script>
+<script src="js/avatar_editor.js?v=1"></script>
 <script src="js/ui.js?v=2"></script>
 <script src="js/main.js?v=2"></script>
 

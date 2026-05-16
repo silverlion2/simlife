@@ -6,6 +6,8 @@ window.Game = window.Game || {};
 Game.UI = (function() {
   let notifications = [];
   const MAX_NOTIFICATIONS = 3;
+  let createAvatarEditor = null;
+  let editAvatarEditor = null;
 
   function init() {
     buildStatusPanel();
@@ -13,6 +15,13 @@ Game.UI = (function() {
     buildQueueBar();
     setupPanelButtons();
     setupGraphicsToggle();
+  }
+
+  function getAppearancePrimaryColor(appearance) {
+    const state = Game.Appearance.getActiveFormState(appearance);
+    const value = state.colors.primary || Object.values(state.colors)[0] || '#88CCFF';
+    const resolved = Game.AvatarCatalog.COLOR_VALUES[value] || value;
+    return parseInt(String(resolved).replace('#', '0x'), 16);
   }
 
   function setupGraphicsToggle() {
@@ -56,6 +65,7 @@ Game.UI = (function() {
     // Populate trait grids
     populateTraitGrid('cc-trait-grid');
     populateTraitGrid('ec-trait-grid');
+    createAvatarEditor = Game.AvatarEditor.mount('cc-avatar-editor', Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF }));
 
     // Make sure we are at Main Menu
     mm.classList.remove('hidden');
@@ -121,12 +131,13 @@ Game.UI = (function() {
     document.getElementById('btn-cc-start').addEventListener('click', () => {
       const worldName = document.getElementById('cc-world-name').value || 'My World';
       const simName = document.getElementById('cc-sim-name').value || 'Player';
-      const color = document.getElementById('cc-sim-color').value || '#88CCFF';
-      const form = document.getElementById('cc-sim-form').value || 'human';
+      const appearance = createAvatarEditor ? createAvatarEditor.getAppearance() : Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF });
+      const form = appearance.form;
+      const color = getAppearancePrimaryColor(appearance);
       const selectedTraitCard = document.querySelector('#cc-trait-grid .trait-card.selected');
       const traitKey = selectedTraitCard ? selectedTraitCard.dataset.key : 'neat';
 
-      Game.State.createSave(worldName, { name: simName, trait: traitKey, color: color, form: form });
+      Game.State.createSave(worldName, { name: simName, trait: traitKey, color: color, form: form, appearance: appearance });
       startGameLoop(cc);
     });
 
@@ -149,16 +160,16 @@ Game.UI = (function() {
     
     document.getElementById('btn-ec-save').addEventListener('click', () => {
       const simName = document.getElementById('ec-sim-name').value;
-      const color = document.getElementById('ec-sim-color').value;
-      const form = document.getElementById('ec-sim-form').value;
+      const appearance = editAvatarEditor ? editAvatarEditor.getAppearance() : null;
       const selectedTraitCard = document.querySelector('#ec-trait-grid .trait-card.selected');
       
       const char = Game.State.get().character;
       if(simName) char.name = simName;
-      if(color) {
-        char.color = parseInt(color.replace('#', '0x'), 16);
+      if(appearance) {
+        char.appearance = appearance;
+        char.form = appearance.form;
+        char.color = getAppearancePrimaryColor(appearance);
       }
-      if(form) char.form = form;
       if(selectedTraitCard) {
         char.trait = selectedTraitCard.dataset.key;
       }
@@ -252,12 +263,15 @@ Game.UI = (function() {
     if(!modal) return;
     const char = Game.State.get().character;
     document.getElementById('ec-sim-name').value = char.name;
-    document.getElementById('ec-sim-form').value = char.form || 'human';
-    
-    // Hex parse
-    let hex = char.color.toString(16);
-    while(hex.length < 6) hex = '0' + hex;
-    document.getElementById('ec-sim-color').value = '#' + hex;
+    const startingAppearance = char.appearance || Game.Appearance.fromLegacy(char);
+    editAvatarEditor = Game.AvatarEditor.mount('ec-avatar-editor', startingAppearance, {
+      onChange: (appearance) => {
+        char.appearance = appearance;
+        char.form = appearance.form;
+        char.color = getAppearancePrimaryColor(appearance);
+        if (Game.Renderer && Game.Renderer.setBgDirty) Game.Renderer.setBgDirty();
+      }
+    });
     
     const grid = document.getElementById('ec-trait-grid');
     if (grid) {
