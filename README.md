@@ -19,6 +19,7 @@ A deep browser-based life simulation game inspired by The Sims. Build your home,
 - **🎲 Random Events** — Pipe leaks, party invitations, freelance gigs, stray cats, and more
 - **🌟 Prestige / Legacy** — Reset for Legacy Points, buy permanent upgrades, start a new generation
 - **🌅 Day/Night Cycle** — Dynamic sky, sunset colors, and nighttime overlays
+- **Character Customization** - Edit avatar form, body parts, clothing, accessories, and color sets during creation or any time in-game.
 - **💾 Auto-Save** — Progress saved to localStorage every 30 seconds
 
 ## 🎮 Controls

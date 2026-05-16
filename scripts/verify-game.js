@@ -591,6 +591,88 @@ function listPngFiles(dir) {
     .map(entry => entry.name);
 }
 
+async function waitForCanvasNonBlank(page) {
+  const handle = await page.waitForFunction(() => {
+    const canvas = document.getElementById('game-canvas');
+    if (!canvas || canvas.width <= 0 || canvas.height <= 0) return false;
+
+    const gl = canvas.getContext('webgl2') ||
+      canvas.getContext('webgl') ||
+      canvas.getContext('experimental-webgl');
+    if (!gl || (gl.isContextLost && gl.isContextLost())) return false;
+
+    const width = gl.drawingBufferWidth || canvas.width;
+    const height = gl.drawingBufferHeight || canvas.height;
+    if (width <= 0 || height <= 0) return false;
+
+    const pixels = new Uint8Array(width * height * 4);
+    gl.finish();
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+
+    const maxSamples = 20000;
+    const stride = Math.max(1, Math.floor(Math.sqrt((width * height) / maxSamples)));
+    let sampledPixels = 0;
+    let alphaPixels = 0;
+    let coloredPixels = 0;
+
+    for (let y = 0; y < height; y += stride) {
+      for (let x = 0; x < width; x += stride) {
+        const i = ((y * width) + x) * 4;
+        const r = pixels[i];
+        const g = pixels[i + 1];
+        const b = pixels[i + 2];
+        const a = pixels[i + 3];
+        sampledPixels += 1;
+        if (a > 0) alphaPixels += 1;
+        if (a > 0 && (r + g + b) > 12) coloredPixels += 1;
+      }
+    }
+
+    if (coloredPixels < 20) return false;
+    return { width, height, stride, sampledPixels, alphaPixels, coloredPixels };
+  }, null, { timeout: 10000 });
+
+  return handle.jsonValue();
+}
+
+async function openEditAvatarEditor(page) {
+  await page.evaluate(() => Game.UI.openEditModal());
+  await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
+}
+
+function legacyFormForAvatarForm(form) {
+  return form === 'witch' ? 'online_witch' : form;
+}
+
+async function saveInGameAvatarForm(page, form, options = {}) {
+  await openEditAvatarEditor(page);
+  await page.click(`#ec-avatar-editor [data-avatar-form="${form}"]`);
+
+  if (options.primaryColorClick) {
+    await page.click('#ec-avatar-editor [data-avatar-tab="colors"]');
+    await page.click('#ec-avatar-editor [data-color-channel="primary"]');
+  }
+
+  await page.click('#btn-ec-save');
+  await page.waitForFunction((expected) => {
+    const character = window.Game.State.get().character;
+    const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
+    if (!debug || debug.layerCount <= 0) return false;
+    if (character.appearance.form !== expected.form) return false;
+    if (character.form !== expected.legacyForm) return false;
+    if (!debug.layers.some(layer => layer.textureKey && layer.textureKey.startsWith(expected.texturePrefix))) return false;
+    if (expected.primaryColor && character.appearance.forms[expected.form].colors.primary !== expected.primaryColor) return false;
+    if (expected.topTint !== undefined && !debug.layers.some(layer => layer.slot === 'top' && layer.tint === expected.topTint)) return false;
+    return true;
+  }, {
+    form,
+    legacyForm: legacyFormForAvatarForm(form),
+    texturePrefix: `avatar_${form}_`,
+    primaryColor: options.primaryColor,
+    topTint: options.topTint,
+  }, { timeout: 10000 });
+}
+
 async function checkElectronRuntime() {
   const app = await electron.launch({ args: [root] });
   const page = await app.firstWindow({ timeout: 60000 });
@@ -622,6 +704,7 @@ async function checkElectronRuntime() {
         canvas.clientHeight > 0;
     }, null, { timeout: 60000 });
 
+    const canvasNonBlank = await waitForCanvasNonBlank(page);
     const result = await page.evaluate(() => {
       const canvas = document.getElementById('game-canvas');
       const canvases = [...document.querySelectorAll('canvas')].map(item => ({
@@ -642,46 +725,29 @@ async function checkElectronRuntime() {
         menuHidden: document.getElementById('main-menu-screen').classList.contains('hidden'),
       };
     });
+    result.canvasNonBlank = canvasNonBlank;
 
-    await page.evaluate(() => Game.UI.openEditModal());
-    await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
-    await page.click('#ec-avatar-editor [data-avatar-form="cat"]');
-    await page.click('#btn-ec-save');
-    await page.waitForFunction(() => {
-      const character = window.Game.State.get().character;
-      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
-      return character.appearance.form === 'cat' &&
-        debug &&
-        debug.layerCount > 0 &&
-        debug.layers.some(layer => layer.textureKey && layer.textureKey.startsWith('avatar_cat_'));
-    }, null, { timeout: 10000 });
-    await page.evaluate(() => Game.UI.openEditModal());
-    await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
+    await saveInGameAvatarForm(page, 'cat');
+    await openEditAvatarEditor(page);
     await page.click('#ec-avatar-editor [data-avatar-form="robot"]');
     await page.click('#btn-ec-close');
     await page.waitForFunction(() => window.Game.State.get().character.appearance.form === 'cat', null, { timeout: 10000 });
-    await page.evaluate(() => Game.UI.openEditModal());
-    await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
-    await page.click('#ec-avatar-editor [data-avatar-form="witch"]');
-    await page.click('#ec-avatar-editor [data-avatar-tab="colors"]');
-    await page.click('#ec-avatar-editor [data-color-channel="primary"]');
-    await page.click('#btn-ec-save');
-    await page.waitForFunction(() => {
-      const character = window.Game.State.get().character;
-      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
-      return character.appearance.form === 'witch' &&
-        character.form === 'online_witch' &&
-        character.appearance.forms.witch.colors.primary === 'sky_denim' &&
-        debug &&
-        debug.layerCount > 0 &&
-        debug.layers.some(layer => layer.textureKey && layer.textureKey.startsWith('avatar_witch_')) &&
-        debug.layers.some(layer => layer.slot === 'top' && layer.tint === 0x3f7fb8);
-    }, null, { timeout: 10000 });
+    await saveInGameAvatarForm(page, 'human');
+    await saveInGameAvatarForm(page, 'robot');
+    await saveInGameAvatarForm(page, 'banana');
+    await saveInGameAvatarForm(page, 'witch', {
+      primaryColorClick: true,
+      primaryColor: 'sky_denim',
+      topTint: 0x3f7fb8,
+    });
 
     if (pageErrors.length) fail(`Page errors:\n${pageErrors.join('\n')}`);
     if (consoleErrors.length) fail(`Console errors:\n${consoleErrors.join('\n')}`);
     if (result.canvases.length !== 1) fail(`Expected Phaser to use one canvas, found ${result.canvases.length}`);
     if (!result.gameCanvasVisible) fail('Expected #game-canvas to be visible and sized');
+    if (!result.canvasNonBlank || result.canvasNonBlank.coloredPixels < 20) {
+      fail(`Expected #game-canvas to contain rendered pixels: ${JSON.stringify(result.canvasNonBlank)}`);
+    }
     if (result.preloadedKeys !== result.assetKeys) {
       fail(`Expected all embedded assets to preload (${result.assetKeys}), loaded ${result.preloadedKeys}`);
     }
