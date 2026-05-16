@@ -434,6 +434,7 @@ async function checkElectronRuntime() {
         canvases,
         assetKeys: Object.keys(window.SIM_ASSETS || {}).length,
         preloadedKeys: Object.keys(window.SIM_PRELOADED_IMAGES || {}).length,
+        avatarDebug: window.Game.Renderer.getAvatarDebug ? window.Game.Renderer.getAvatarDebug() : null,
         activeFurniture: window.Game.State.getActiveMap().furniture.length,
         activeRooms: window.Game.State.getActiveMap().rooms.length,
         gameCanvasVisible: canvas.clientWidth > 0 && canvas.clientHeight > 0,
@@ -466,6 +467,9 @@ async function checkElectronRuntime() {
     if (!result.gameCanvasVisible) fail('Expected #game-canvas to be visible and sized');
     if (result.preloadedKeys !== result.assetKeys) {
       fail(`Expected all embedded assets to preload (${result.assetKeys}), loaded ${result.preloadedKeys}`);
+    }
+    if (!result.avatarDebug || result.avatarDebug.layerCount < 1) {
+      fail(`Expected rendered avatar layers, found ${JSON.stringify(result.avatarDebug)}`);
     }
     if (result.activeFurniture < 30) fail(`Expected starter world furniture, found ${result.activeFurniture}`);
     if (result.activeRooms < 3) fail(`Expected starter rooms, found ${result.activeRooms}`);

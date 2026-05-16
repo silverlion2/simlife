@@ -24,6 +24,9 @@ Game.Renderer = (function() {
   let shadowMap = new Map();
   let characterSprite = null;
   let charShadowSprite = null;
+  let avatarRenderer = null;
+  let avatarContainer = null;
+  let avatarDirection = 'S';
   let buildGhostSprite = null;
   let npcSpriteMap = new Map();
   let debugGraphics = null;
@@ -37,6 +40,9 @@ Game.Renderer = (function() {
     preload() {
       for (const key in window.SIM_PRELOADED_IMAGES) {
           this.textures.addImage(key, window.SIM_PRELOADED_IMAGES[key]);
+      }
+      for (const key in window.SIM_PRELOADED_AVATAR_IMAGES || {}) {
+          this.textures.addImage(key, window.SIM_PRELOADED_AVATAR_IMAGES[key]);
       }
 
     }
@@ -840,6 +846,23 @@ Game.Renderer = (function() {
       buildGhostSprite.setFlipX(!!ghost.rotated);
     }
 
+    resolveAvatarDirection(charObj) {
+      if (!charObj || !charObj.position || !charObj.targetPosition) return avatarDirection || 'S';
+
+      const dx = charObj.targetPosition.x - charObj.position.x;
+      const dy = charObj.targetPosition.y - charObj.position.y;
+
+      if (dx > 0.1 && Math.abs(dy) < 0.1) return 'SE';
+      if (dx < -0.1 && Math.abs(dy) < 0.1) return 'NE';
+      if (Math.abs(dx) < 0.1 && dy > 0.1) return 'SE';
+      if (Math.abs(dx) < 0.1 && dy < -0.1) return 'NE';
+      if (dx > 0.1 && dy > 0.1) return 'S';
+      if (dx < -0.1 && dy < -0.1) return 'N';
+      if (dx > 0.1 && dy < -0.1) return 'E';
+      if (dx < -0.1 && dy > 0.1) return 'E';
+      return avatarDirection || 'S';
+    }
+
     syncCharacter(charObj) {
       if(!charObj || !charObj.position) return;
       
@@ -851,7 +874,47 @@ Game.Renderer = (function() {
       
       let formKey = (charObj.form || 'online_witch') + '_iso';
       if (formKey === 'human_iso' || formKey === 'nano_hero_iso') formKey = 'online_witch_iso'; // Map legacy forms to the Witch
+      const ptActual = isoProject(charObj.position.x, charObj.position.y, charObj.position.z || 0);
+      const pt = ptActual; // Legacy support bridging
+      const useAvatar = !!(Game.AvatarRenderer && Game.Appearance && charObj.appearance);
       
+      if (useAvatar) {
+        avatarDirection = this.resolveAvatarDirection(charObj);
+        if (!avatarRenderer) avatarRenderer = Game.AvatarRenderer.create(this);
+        avatarContainer = Game.AvatarRenderer.sync(avatarRenderer, charObj, ptActual.x, ptActual.y, avatarDirection);
+
+        if (characterSprite && characterSprite !== avatarContainer && characterSprite.destroy) {
+          characterSprite.destroy();
+        }
+        characterSprite = avatarContainer;
+
+        if (!this.charMarker) {
+          this.charMarker = this.add.circle(0, 0, 12, 0x4488FF, 0.8);
+          this.charMarker.setStrokeStyle(2, 0xFFFFFF, 1);
+        }
+        if (!charShadowSprite) {
+          const shadowKey = avatarRenderer.layers[0] ? avatarRenderer.layers[0].textureKey : 'online_witch_iso';
+          charShadowSprite = this.add.image(0, 0, shadowKey);
+          charShadowSprite.setOrigin(0.5, 0.9);
+          charShadowSprite.setTint(0x000000).setTintMode(Phaser.TintModes.FILL);
+          charShadowSprite.setAlpha(0.25);
+        }
+        if (!this.charLabel) {
+          this.charLabel = this.add.text(0, 0, charObj.name || '馃 You', {
+            fontSize: '12px',
+            fontFamily: 'Nunito, sans-serif',
+            color: '#ffffff',
+            stroke: '#000000',
+            strokeThickness: 3,
+            align: 'center'
+          }).setOrigin(0.5, 1);
+        }
+        if (!this._followingCharacter) {
+          this.cameras.main.startFollow(characterSprite, true, 0.05, 0.05);
+          this.cameras.main.setDeadzone(40, 40);
+          this._followingCharacter = true;
+        }
+      } else {
       if(!characterSprite) {
         // Draw a bright circle as the character base marker
         this.charMarker = this.add.circle(0, 0, 12, 0x4488FF, 0.8);
@@ -891,10 +954,6 @@ Game.Renderer = (function() {
            ease: 'Sine.easeInOut'
         });
       }
-      const ptGround = isoProject(charObj.position.x, charObj.position.y, 0);
-      const ptActual = isoProject(charObj.position.x, charObj.position.y, charObj.position.z || 0);
-      const pt = ptActual; // Legacy support bridging
-
       characterSprite.setPosition(ptActual.x, ptActual.y);
       characterSprite.setTexture(formKey);
       
@@ -954,6 +1013,17 @@ Game.Renderer = (function() {
       // But Since SVGs are colored we might want to just set a light tint or no tint at all.
       // Let's remove the global tint for the new SVG characters so they retain their colors!
       characterSprite.clearTint();
+      }
+
+      if (useAvatar && charShadowSprite) {
+          const sp = this.getShadowParams();
+          const shadowKey = avatarRenderer && avatarRenderer.layers[0] ? avatarRenderer.layers[0].textureKey : null;
+          charShadowSprite.setPosition(ptActual.x + 8, ptActual.y - 2);
+          if (shadowKey) charShadowSprite.setTexture(shadowKey);
+          charShadowSprite.setScale(characterSprite.scaleX * 1.0, characterSprite.scaleY * -sp.stretch);
+          charShadowSprite.setAngle(sp.angle);
+          charShadowSprite.setAlpha(sp.alpha);
+      }
       
       // Let updateDepthSorting handle the strict depth index. Pre-initialize here to prevent null depths.
       const depthBase = (charObj.position.x + charObj.position.y) * 10 + 5;
@@ -1028,7 +1098,7 @@ Game.Renderer = (function() {
        }
        
        // Activity Indicator: gentle glow pulse when performing a task
-       if (characterSprite && this.game.renderer.type === Phaser.WEBGL) {
+       if (characterSprite && characterSprite.preFX && this.game.renderer.type === Phaser.WEBGL) {
            if (charObj.currentActivity) {
                if (!characterSprite._activityGlow) {
                    characterSprite._activityGlow = characterSprite.preFX.addGlow(0x88CCFF, 3, 0, false, 0.15, 12);
@@ -1323,30 +1393,37 @@ Game.Renderer = (function() {
   }
 
   function init(canvasEl) {
-    let keys = Object.keys(window.SIM_ASSETS || {});
-    if (keys.length === 0) {
+    window.SIM_PRELOADED_IMAGES = window.SIM_PRELOADED_IMAGES || {};
+    window.SIM_PRELOADED_AVATAR_IMAGES = window.SIM_PRELOADED_AVATAR_IMAGES || {};
+
+    const entries = [
+      ...Object.entries(window.SIM_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_IMAGES })),
+      ...Object.entries(window.SIM_AVATAR_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_AVATAR_IMAGES })),
+    ];
+
+    if (entries.length === 0) {
         startPhaser(canvasEl);
         return;
     }
     let loadedCount = 0;
-    for (let key of keys) {
+    for (const entry of entries) {
         let img = new Image();
         img.onload = () => {
-            window.SIM_PRELOADED_IMAGES[key] = img;
+            entry.target[entry.key] = img;
             loadedCount++;
-            if (loadedCount === keys.length) {
+            if (loadedCount === entries.length) {
                 startPhaser(canvasEl);
             }
         };
         img.onerror = () => {
-            console.error('Failed to load image for key:', key);
-            window.SIM_PRELOADED_IMAGES[key] = new Image();
+            console.error('Failed to load image for key:', entry.key);
+            entry.target[entry.key] = new Image();
             loadedCount++;
-            if (loadedCount === keys.length) {
+            if (loadedCount === entries.length) {
                 startPhaser(canvasEl);
             }
         };
-        img.src = window.SIM_ASSETS[key];
+        img.src = entry.src;
     }
 }
 
@@ -1607,6 +1684,13 @@ function startPhaser(canvasEl) {
     showPieMenu,
     closePieMenu,
     spawnFloatingBubble,
-    findPath
+    findPath,
+    getAvatarDebug: function() {
+      return {
+        layerCount: avatarRenderer ? avatarRenderer.layerCount : 0,
+        hasContainer: !!avatarContainer,
+        direction: avatarDirection,
+      };
+    }
   };
 })();
