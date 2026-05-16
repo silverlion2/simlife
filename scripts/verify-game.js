@@ -263,6 +263,56 @@ function checkStateAppearanceMigration() {
   if (blackLoaded.appearance.forms.robot.colors.primary !== '#000000') {
     fail(`Expected loaded black appearance #000000, found ${blackLoaded.appearance.forms.robot.colors.primary}`);
   }
+
+  const appearanceOnly = context.Game.Appearance.setColor(
+    context.Game.Appearance.normalizeAppearance({ form: 'robot' }),
+    'primary',
+    '#000000'
+  );
+  const appearanceOnlySlotId = context.Game.State.createSave('Appearance Only', {
+    name: 'Appearance Only',
+    trait: 'neat',
+    appearance: appearanceOnly,
+  });
+  const appearanceOnlyPayload = JSON.parse(context.localStorage.getItem(appearanceOnlySlotId));
+  if (appearanceOnlyPayload.character.appearance.form !== 'robot') {
+    fail(`Expected persisted appearance form robot, found ${appearanceOnlyPayload.character.appearance.form}`);
+  }
+  if (appearanceOnlyPayload.character.form !== 'robot') {
+    fail(`Expected persisted legacy form robot, found ${appearanceOnlyPayload.character.form}`);
+  }
+  if (appearanceOnlyPayload.character.color !== 0x000000) {
+    fail(`Expected persisted legacy color 0, found ${appearanceOnlyPayload.character.color}`);
+  }
+  if (appearanceOnlyPayload.character.appearance.forms.robot.colors.primary !== '#000000') {
+    fail(`Expected persisted appearance primary #000000, found ${appearanceOnlyPayload.character.appearance.forms.robot.colors.primary}`);
+  }
+
+  const witchSlotId = context.Game.State.createSave('Witch Appearance', {
+    name: 'Witch Appearance',
+    trait: 'neat',
+    appearance: context.Game.Appearance.normalizeAppearance({ form: 'witch' }),
+  });
+  const witchPayload = JSON.parse(context.localStorage.getItem(witchSlotId));
+  if (witchPayload.character.form !== 'online_witch') {
+    fail(`Expected persisted witch legacy form online_witch, found ${witchPayload.character.form}`);
+  }
+
+  context.localStorage.setItem('transitional_black', JSON.stringify({
+    character: {
+      name: 'Transitional Black',
+      trait: 'neat',
+      form: 'robot',
+      color: 0x000000,
+      appearance: { form: 'robot' },
+    },
+  }));
+  if (!context.Game.State.loadSlot('transitional_black')) fail('Expected transitional black slot to load');
+  const transitionalLoaded = context.Game.State.get().character;
+  if (transitionalLoaded.color !== 0x000000) fail(`Expected transitional black color 0, found ${transitionalLoaded.color}`);
+  if (transitionalLoaded.appearance.forms.robot.colors.primary !== '#000000') {
+    fail(`Expected transitional black appearance #000000, found ${transitionalLoaded.appearance.forms.robot.colors.primary}`);
+  }
 }
 
 function checkResources() {

@@ -7,6 +7,64 @@ Game.State = (function() {
   const SAVE_INDEX_KEY = 'simlife_saves_index';
   let activeSlotId = null;
 
+  function isMissingColor(color) {
+    return color === undefined || color === null;
+  }
+
+  function legacyFormFromAppearance(form) {
+    return form === 'witch' ? 'online_witch' : (form || 'online_witch');
+  }
+
+  function colorToNumber(color) {
+    if (typeof color === 'number') return color;
+    let value = color;
+    if (typeof value === 'string' && Game.AvatarCatalog && Game.AvatarCatalog.COLOR_VALUES[value]) {
+      value = Game.AvatarCatalog.COLOR_VALUES[value];
+    }
+    if (typeof value === 'string' && value.startsWith('#')) {
+      return parseInt(value.replace('#', '0x'), 16);
+    }
+    return 0x88CCFF;
+  }
+
+  function colorToHex(color) {
+    if (typeof color === 'string') return color;
+    return '#' + colorToNumber(color).toString(16).padStart(6, '0').slice(-6);
+  }
+
+  function syncLegacyAppearanceFields(character) {
+    if (!character) return;
+    if (isMissingColor(character.color)) character.color = 0x88CCFF;
+    if (!Game.Appearance) return;
+
+    if (!character.appearance) {
+      character.appearance = Game.Appearance.fromLegacy(character);
+    } else {
+      const legacyForm = Game.Appearance.legacyFormToCatalog(character.form);
+      const rawAppearance = character.appearance;
+      const rawForm = rawAppearance.form || legacyForm;
+      const rawFormState = rawAppearance.forms && rawAppearance.forms[rawForm];
+      const rawColors = rawFormState && rawFormState.colors;
+      const hasPrimary = rawColors && !isMissingColor(rawColors.primary);
+      const hasAccent = rawColors && !isMissingColor(rawColors.accent);
+      const appearanceInput = rawAppearance.form ? rawAppearance : { ...rawAppearance, form: rawForm };
+      const normalized = Game.Appearance.normalizeAppearance(appearanceInput);
+
+      if (!hasPrimary && !isMissingColor(character.color)) {
+        normalized.forms[normalized.form].colors.primary = colorToHex(character.color);
+      }
+      if (normalized.form === 'robot' && !hasAccent && !isMissingColor(character.color)) {
+        normalized.forms.robot.colors.accent = colorToHex(character.color);
+      }
+      character.appearance = Game.Appearance.normalizeAppearance(normalized);
+    }
+
+    const activeForm = character.appearance.form;
+    const activeColors = character.appearance.forms[activeForm].colors;
+    character.form = legacyFormFromAppearance(activeForm);
+    character.color = colorToNumber(activeColors.primary);
+  }
+
   function createNewState() {
     const cfg = Game.Config;
     const lotW = cfg.STARTING_STATE.lotWidth;
@@ -280,6 +338,7 @@ Game.State = (function() {
       try {
         // Create a deep clone for saving so we don't modify the live state
         const saveData = JSON.parse(JSON.stringify(state));
+        syncLegacyAppearanceFields(saveData.character);
         
         // Strip transient/runtime-only properties from the saved data
         delete saveData.ui;
@@ -331,12 +390,8 @@ Game.State = (function() {
         if (saved.character && !saved.character.mapId) {
           saved.character.mapId = 'house';
         }
-        if (Game.Appearance) {
-          if (!saved.character) saved.character = {};
-          saved.character.appearance = saved.character.appearance
-            ? Game.Appearance.normalizeAppearance(saved.character.appearance)
-            : Game.Appearance.fromLegacy(saved.character);
-        }
+        if (!saved.character) saved.character = {};
+        syncLegacyAppearanceFields(saved.character);
 
         state = deepMerge(fresh, saved);
         state.ui = fresh.ui;
@@ -348,8 +403,7 @@ Game.State = (function() {
         if (!state.maps.university) state.maps.university = fresh.maps.university;
         
         // Ensure legacy saves get a color if missing
-        if (state.character.color === undefined || state.character.color === null) state.character.color = 0x88CCFF;
-        if (Game.Appearance) state.character.appearance = Game.Appearance.normalizeAppearance(state.character.appearance);
+        syncLegacyAppearanceFields(state.character);
         
         activeSlotId = slotId;
         return true;
@@ -366,19 +420,14 @@ Game.State = (function() {
         fresh.character.name = characterData.name || fresh.character.name;
         fresh.character.trait = characterData.trait || fresh.character.trait;
 
-        // Parse hex color (e.g. "#FF0000" to 0xFF0000)
-        let c = characterData.color === undefined || characterData.color === null ? '#88CCFF' : characterData.color;
-        if (typeof c === 'string' && c.startsWith('#')) {
-          c = parseInt(c.replace('#', '0x'), 16);
-        }
-        fresh.character.color = c;
         fresh.character.form = characterData.form || fresh.character.form || 'online_witch';
-
-        if (Game.Appearance) {
-          fresh.character.appearance = characterData.appearance
-            ? Game.Appearance.normalizeAppearance(characterData.appearance)
-            : Game.Appearance.fromLegacy({ form: fresh.character.form, color: fresh.character.color });
+        fresh.character.color = isMissingColor(characterData.color) ? fresh.character.color : characterData.color;
+        if (characterData.appearance) {
+          fresh.character.appearance = characterData.appearance;
+        } else if (Game.Appearance) {
+          fresh.character.appearance = Game.Appearance.fromLegacy({ form: fresh.character.form, color: fresh.character.color });
         }
+        syncLegacyAppearanceFields(fresh.character);
       }
       state = fresh;
       activeSlotId = 'save_' + Date.now();
