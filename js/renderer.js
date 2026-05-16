@@ -27,6 +27,7 @@ Game.Renderer = (function() {
   let avatarRenderer = null;
   let avatarContainer = null;
   let avatarDirection = 'S';
+  let avatarFlipX = false;
   let buildGhostSprite = null;
   let npcSpriteMap = new Map();
   let debugGraphics = null;
@@ -846,21 +847,27 @@ Game.Renderer = (function() {
       buildGhostSprite.setFlipX(!!ghost.rotated);
     }
 
-    resolveAvatarDirection(charObj) {
-      if (!charObj || !charObj.position || !charObj.targetPosition) return avatarDirection || 'S';
+    resolveAvatarFacing(charObj) {
+      if (!charObj || !charObj.position || !charObj.targetPosition) {
+        return { direction: avatarDirection || 'S', flipX: avatarFlipX || false };
+      }
 
       const dx = charObj.targetPosition.x - charObj.position.x;
       const dy = charObj.targetPosition.y - charObj.position.y;
 
-      if (dx > 0.1 && Math.abs(dy) < 0.1) return 'SE';
-      if (dx < -0.1 && Math.abs(dy) < 0.1) return 'NE';
-      if (Math.abs(dx) < 0.1 && dy > 0.1) return 'SE';
-      if (Math.abs(dx) < 0.1 && dy < -0.1) return 'NE';
-      if (dx > 0.1 && dy > 0.1) return 'S';
-      if (dx < -0.1 && dy < -0.1) return 'N';
-      if (dx > 0.1 && dy < -0.1) return 'E';
-      if (dx < -0.1 && dy > 0.1) return 'E';
-      return avatarDirection || 'S';
+      if (dx > 0.1 && Math.abs(dy) < 0.1) return { direction: 'SE', flipX: false };
+      if (dx < -0.1 && Math.abs(dy) < 0.1) return { direction: 'NE', flipX: true };
+      if (Math.abs(dx) < 0.1 && dy > 0.1) return { direction: 'SE', flipX: true };
+      if (Math.abs(dx) < 0.1 && dy < -0.1) return { direction: 'NE', flipX: false };
+      if (dx > 0.1 && dy > 0.1) return { direction: 'S', flipX: false };
+      if (dx < -0.1 && dy < -0.1) return { direction: 'N', flipX: false };
+      if (dx > 0.1 && dy < -0.1) return { direction: 'E', flipX: false };
+      if (dx < -0.1 && dy > 0.1) return { direction: 'E', flipX: true };
+      return { direction: avatarDirection || 'S', flipX: avatarFlipX || false };
+    }
+
+    resolveAvatarDirection(charObj) {
+      return this.resolveAvatarFacing(charObj).direction;
     }
 
     syncCharacter(charObj) {
@@ -876,18 +883,37 @@ Game.Renderer = (function() {
       if (formKey === 'human_iso' || formKey === 'nano_hero_iso') formKey = 'online_witch_iso'; // Map legacy forms to the Witch
       const ptActual = isoProject(charObj.position.x, charObj.position.y, charObj.position.z || 0);
       const pt = ptActual; // Legacy support bridging
-      const useAvatar = !!(Game.AvatarRenderer && Game.Appearance && charObj.appearance);
+      const wantsAvatar = !!(Game.AvatarRenderer && Game.Appearance && charObj.appearance);
+      let useAvatar = false;
       
-      if (useAvatar) {
-        avatarDirection = this.resolveAvatarDirection(charObj);
+      if (wantsAvatar) {
+        const avatarFacing = this.resolveAvatarFacing(charObj);
+        const previousAvatarContainer = avatarContainer;
+        avatarDirection = avatarFacing.direction;
+        avatarFlipX = avatarFacing.flipX;
         if (!avatarRenderer) avatarRenderer = Game.AvatarRenderer.create(this);
         avatarContainer = Game.AvatarRenderer.sync(avatarRenderer, charObj, ptActual.x, ptActual.y, avatarDirection);
+        useAvatar = !!avatarContainer;
 
-        if (characterSprite && characterSprite !== avatarContainer && characterSprite.destroy) {
-          characterSprite.destroy();
+        if (useAvatar) {
+          if (avatarContainer.setScale) avatarContainer.setScale(avatarFlipX ? -1 : 1, 1);
+
+          if (characterSprite && characterSprite !== avatarContainer && characterSprite.destroy) {
+            characterSprite.destroy();
+          }
+          characterSprite = avatarContainer;
+        } else if (characterSprite && characterSprite === previousAvatarContainer) {
+          characterSprite = null;
+          this._followingCharacter = false;
         }
-        characterSprite = avatarContainer;
+      } else if (avatarContainer && characterSprite === avatarContainer) {
+        if (avatarRenderer) Game.AvatarRenderer.destroy(avatarRenderer);
+        avatarContainer = null;
+        characterSprite = null;
+        this._followingCharacter = false;
+      }
 
+      if (useAvatar) {
         if (!this.charMarker) {
           this.charMarker = this.add.circle(0, 0, 12, 0x4488FF, 0.8);
           this.charMarker.setStrokeStyle(2, 0xFFFFFF, 1);
@@ -916,11 +942,13 @@ Game.Renderer = (function() {
         }
       } else {
       if(!characterSprite) {
-        // Draw a bright circle as the character base marker
-        this.charMarker = this.add.circle(0, 0, 12, 0x4488FF, 0.8);
-        this.charMarker.setStrokeStyle(2, 0xFFFFFF, 1);
+        if (!this.charMarker) {
+          this.charMarker = this.add.circle(0, 0, 12, 0x4488FF, 0.8);
+          this.charMarker.setStrokeStyle(2, 0xFFFFFF, 1);
+        }
         
-        charShadowSprite = this.add.image(0, 0, formKey);
+        if (!charShadowSprite) charShadowSprite = this.add.image(0, 0, formKey);
+        else charShadowSprite.setTexture(formKey);
         charShadowSprite.setOrigin(0.5, 0.9);
         charShadowSprite.setTint(0x000000).setTintMode(Phaser.TintModes.FILL);
         charShadowSprite.setAlpha(0.25);
@@ -1020,7 +1048,8 @@ Game.Renderer = (function() {
           const shadowKey = avatarRenderer && avatarRenderer.layers[0] ? avatarRenderer.layers[0].textureKey : null;
           charShadowSprite.setPosition(ptActual.x + 8, ptActual.y - 2);
           if (shadowKey) charShadowSprite.setTexture(shadowKey);
-          charShadowSprite.setScale(characterSprite.scaleX * 1.0, characterSprite.scaleY * -sp.stretch);
+          charShadowSprite.setFlipX(avatarFlipX);
+          charShadowSprite.setScale(Math.abs(characterSprite.scaleX || 1) * 1.0, Math.abs(characterSprite.scaleY || 1) * -sp.stretch);
           charShadowSprite.setAngle(sp.angle);
           charShadowSprite.setAlpha(sp.alpha);
       }
@@ -1097,27 +1126,67 @@ Game.Renderer = (function() {
           }
        }
        
-       // Activity Indicator: gentle glow pulse when performing a task
-       if (characterSprite && characterSprite.preFX && this.game.renderer.type === Phaser.WEBGL) {
-           if (charObj.currentActivity) {
-               if (!characterSprite._activityGlow) {
-                   characterSprite._activityGlow = characterSprite.preFX.addGlow(0x88CCFF, 3, 0, false, 0.15, 12);
-                   this.tweens.add({
-                       targets: characterSprite._activityGlow,
-                       outerStrength: 6,
-                       yoyo: true,
-                       repeat: -1,
-                       duration: 1500,
-                       ease: 'Sine.easeInOut'
-                   });
-               }
-           } else {
-               if (characterSprite._activityGlow) {
-                   characterSprite.preFX.remove(characterSprite._activityGlow);
-                   characterSprite._activityGlow = null;
-               }
-           }
-       }
+       this.syncActivityGlow(charObj, depthBase);
+    }
+
+    syncActivityGlow(charObj, depthBase) {
+      const active = !!(charObj && charObj.currentActivity);
+      const canUsePreFx = !!(characterSprite && characterSprite.preFX && this.game.renderer.type === Phaser.WEBGL);
+
+      if (canUsePreFx) {
+        if (this._avatarActivityGlow) this._avatarActivityGlow.setVisible(false);
+        this._avatarActivityGlowActive = false;
+        if (active) {
+          if (!characterSprite._activityGlow) {
+            characterSprite._activityGlow = characterSprite.preFX.addGlow(0x88CCFF, 3, 0, false, 0.15, 12);
+            this.tweens.add({
+              targets: characterSprite._activityGlow,
+              outerStrength: 6,
+              yoyo: true,
+              repeat: -1,
+              duration: 1500,
+              ease: 'Sine.easeInOut'
+            });
+          }
+        } else if (characterSprite._activityGlow) {
+          characterSprite.preFX.remove(characterSprite._activityGlow);
+          characterSprite._activityGlow = null;
+        }
+        this._legacyActivityGlowActive = active;
+        return;
+      }
+
+      if (characterSprite && characterSprite._activityGlow && characterSprite.preFX) {
+        characterSprite.preFX.remove(characterSprite._activityGlow);
+        characterSprite._activityGlow = null;
+      }
+      this._legacyActivityGlowActive = false;
+
+      if (!active) {
+        if (this._avatarActivityGlow) this._avatarActivityGlow.setVisible(false);
+        this._avatarActivityGlowActive = false;
+        return;
+      }
+
+      if (!this._avatarActivityGlow) {
+        this._avatarActivityGlow = this.add.circle(0, 0, 24, 0x88CCFF, 0.22);
+        this._avatarActivityGlow.setStrokeStyle(2, 0xFFFFFF, 0.18);
+        if (this._avatarActivityGlow.setBlendMode) this._avatarActivityGlow.setBlendMode('ADD');
+        this.tweens.add({
+          targets: this._avatarActivityGlow,
+          scale: 1.25,
+          alpha: 0.1,
+          yoyo: true,
+          repeat: -1,
+          duration: 1500,
+          ease: 'Sine.easeInOut'
+        });
+      }
+
+      this._avatarActivityGlow.setVisible(true);
+      this._avatarActivityGlow.setPosition(characterSprite.x, characterSprite.y - 26);
+      this._avatarActivityGlow.setDepth(depthBase + 0.25);
+      this._avatarActivityGlowActive = true;
     }
 
     getShadowParams() {
@@ -1690,6 +1759,9 @@ function startPhaser(canvasEl) {
         layerCount: avatarRenderer ? avatarRenderer.layerCount : 0,
         hasContainer: !!avatarContainer,
         direction: avatarDirection,
+        flipX: avatarFlipX,
+        activityGlowActive: !!(mainScene && (mainScene._avatarActivityGlowActive || mainScene._legacyActivityGlowActive)),
+        missingTextureKeys: avatarRenderer ? (avatarRenderer.missingTextureKeys || []) : [],
       };
     }
   };

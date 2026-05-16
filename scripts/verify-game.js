@@ -212,6 +212,148 @@ function checkAppearanceHelpers() {
   }
 }
 
+class MockImage {
+  constructor(x, y, textureKey) {
+    this.x = x;
+    this.y = y;
+    this.texture = { key: textureKey };
+    this.tintTopLeft = null;
+    this.destroyed = false;
+  }
+
+  setOrigin(x, y) {
+    this.originX = x;
+    this.originY = y;
+    return this;
+  }
+
+  setScale(x, y) {
+    this.scaleX = x;
+    this.scaleY = y === undefined ? x : y;
+    return this;
+  }
+
+  setTint(value) {
+    this.tintTopLeft = value;
+    return this;
+  }
+
+  clearTint() {
+    this.tintTopLeft = null;
+    return this;
+  }
+
+  destroy() {
+    this.destroyed = true;
+  }
+}
+
+class MockContainer {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.list = [];
+    this.destroyed = false;
+  }
+
+  setPosition(x, y) {
+    this.x = x;
+    this.y = y;
+    return this;
+  }
+
+  add(item) {
+    this.list.push(item);
+    return this;
+  }
+
+  removeAll(destroyChildren) {
+    if (destroyChildren) this.list.forEach(item => item.destroy && item.destroy());
+    this.list = [];
+    return this;
+  }
+
+  sort(prop) {
+    this.list.sort((a, b) => (a[prop] || 0) - (b[prop] || 0));
+    return this;
+  }
+
+  destroy() {
+    this.destroyed = true;
+    this.removeAll(true);
+  }
+}
+
+function createMockAvatarScene(textureKeys) {
+  const textureKeySet = new Set(textureKeys);
+  return {
+    textures: {
+      exists: key => textureKeySet.has(key),
+    },
+    add: {
+      image: (x, y, key) => new MockImage(x, y, key),
+      container: (x, y) => new MockContainer(x, y),
+    },
+  };
+}
+
+function resolveColorValue(catalog, value) {
+  const resolved = catalog.COLOR_VALUES[value] || value;
+  return Number.parseInt(String(resolved).replace('#', ''), 16);
+}
+
+function checkAvatarRendererBehavior() {
+  const context = loadBrowserGlobals(['js/avatar_catalog.js', 'js/appearance.js', 'js/avatar_renderer.js']);
+  const catalog = context.Game.AvatarCatalog;
+  const appearance = context.Game.Appearance;
+  const renderer = context.Game.AvatarRenderer;
+
+  if (!renderer) fail('Expected Game.AvatarRenderer to be defined');
+
+  const customHuman = appearance.setColor(
+    appearance.setColor(
+      appearance.normalizeAppearance({ form: 'human' }),
+      'skin',
+      'cool_deep'
+    ),
+    'primary',
+    '#112233'
+  );
+  const layers = appearance.getRenderLayers(customHuman, 'S');
+  const textureKeys = layers.map(layer => layer.textureKey);
+
+  const missingScene = createMockAvatarScene(textureKeys.slice(1));
+  const missingInstance = renderer.create(missingScene);
+  const missingResult = renderer.sync(missingInstance, { appearance: customHuman }, 10, 20, 'S');
+  if (missingResult !== null) {
+    fail('Expected avatar renderer to return null when any requested layer texture is missing');
+  }
+  if (missingInstance.layerCount !== 0 || missingInstance.container) {
+    fail(`Expected missing avatar render to clear container state, found layerCount=${missingInstance.layerCount}`);
+  }
+
+  const scene = createMockAvatarScene(textureKeys);
+  const instance = renderer.create(scene);
+  const result = renderer.sync(instance, { appearance: customHuman }, 10, 20, 'S');
+  if (!result || instance.layerCount !== layers.length) {
+    fail(`Expected all avatar layers to render, found layerCount=${instance.layerCount}`);
+  }
+
+  const bodyLayer = instance.layerMap.get('body');
+  const topLayer = instance.layerMap.get('top');
+  if (!bodyLayer) fail('Expected rendered avatar body layer');
+  if (!topLayer) fail('Expected rendered avatar top layer');
+
+  const expectedSkinTint = resolveColorValue(catalog, 'cool_deep');
+  const expectedPrimaryTint = resolveColorValue(catalog, '#112233');
+  if (bodyLayer.tintTopLeft !== expectedSkinTint) {
+    fail(`Expected body layer skin tint ${expectedSkinTint}, found ${bodyLayer.tintTopLeft}`);
+  }
+  if (topLayer.tintTopLeft !== expectedPrimaryTint) {
+    fail(`Expected top layer primary tint ${expectedPrimaryTint}, found ${topLayer.tintTopLeft}`);
+  }
+}
+
 function checkStateAppearanceMigration() {
   const context = loadBrowserGlobals([
     'js/config.js',
@@ -471,6 +613,36 @@ async function checkElectronRuntime() {
     if (!result.avatarDebug || result.avatarDebug.layerCount < 1) {
       fail(`Expected rendered avatar layers, found ${JSON.stringify(result.avatarDebug)}`);
     }
+
+    await page.evaluate(() => {
+      const character = window.Game.State.get().character;
+      character.targetPosition = {
+        x: character.position.x - 1,
+        y: character.position.y,
+      };
+    });
+    await page.waitForFunction(() => {
+      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
+      return debug && debug.direction === 'NE' && debug.flipX === true;
+    }, null, { timeout: 10000 });
+
+    await page.evaluate(() => {
+      const character = window.Game.State.get().character;
+      character.currentActivity = { type: 'verify_glow' };
+    });
+    await page.waitForFunction(() => {
+      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
+      return debug && debug.activityGlowActive === true;
+    }, null, { timeout: 10000 });
+
+    await page.evaluate(() => {
+      window.Game.State.get().character.currentActivity = null;
+    });
+    await page.waitForFunction(() => {
+      const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
+      return debug && debug.activityGlowActive === false;
+    }, null, { timeout: 10000 });
+
     if (result.activeFurniture < 30) fail(`Expected starter world furniture, found ${result.activeFurniture}`);
     if (result.activeRooms < 3) fail(`Expected starter rooms, found ${result.activeRooms}`);
     if (!result.menuHidden) fail('Expected main menu to hide after starting the game');
@@ -486,6 +658,7 @@ async function checkElectronRuntime() {
   checkRendererMathHelpers();
   checkRendererDataHelpers();
   checkAppearanceHelpers();
+  checkAvatarRendererBehavior();
   checkStateAppearanceMigration();
   const resources = checkResources();
   const runtime = await checkElectronRuntime();
