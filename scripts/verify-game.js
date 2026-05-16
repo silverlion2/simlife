@@ -5,9 +5,45 @@ const vm = require('vm');
 const { _electron: electron } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
+const UI_TIMEOUT = 20000;
+const RENDER_TIMEOUT = 30000;
+const STARTUP_TIMEOUT = 90000;
 
 function fail(message) {
   throw new Error(message);
+}
+
+async function step(label, action) {
+  try {
+    return await action();
+  } catch (err) {
+    const original = err && (err.stack || err.message) ? err : new Error(String(err));
+    const wrapped = new Error(`${label} failed: ${original.message || original}`);
+    wrapped.cause = err;
+    wrapped.stack = `${wrapped.stack}\nCaused by: ${original.stack || original.message || original}`;
+    throw wrapped;
+  }
+}
+
+function waitForSelector(page, label, selector, options = {}) {
+  return step(label, () => page.waitForSelector(selector, {
+    timeout: UI_TIMEOUT,
+    ...options,
+  }));
+}
+
+function waitForGameFunction(page, label, predicate, arg = null, options = {}) {
+  return step(label, () => page.waitForFunction(predicate, arg, {
+    timeout: UI_TIMEOUT,
+    ...options,
+  }));
+}
+
+function click(page, label, selector, options = {}) {
+  return step(label, () => page.click(selector, {
+    timeout: UI_TIMEOUT,
+    ...options,
+  }));
 }
 
 function checkSyntax() {
@@ -592,7 +628,7 @@ function listPngFiles(dir) {
 }
 
 async function waitForCanvasNonBlank(page) {
-  const handle = await page.waitForFunction(() => {
+  const handle = await waitForGameFunction(page, 'wait for varied WebGL canvas pixels', () => {
     const canvas = document.getElementById('game-canvas');
     if (!canvas || canvas.width <= 0 || canvas.height <= 0) return false;
 
@@ -614,6 +650,9 @@ async function waitForCanvasNonBlank(page) {
     let sampledPixels = 0;
     let alphaPixels = 0;
     let coloredPixels = 0;
+    let minLuma = Infinity;
+    let maxLuma = -Infinity;
+    const colorBuckets = new Set();
 
     for (let y = 0; y < height; y += stride) {
       for (let x = 0; x < width; x += stride) {
@@ -624,20 +663,53 @@ async function waitForCanvasNonBlank(page) {
         const a = pixels[i + 3];
         sampledPixels += 1;
         if (a > 0) alphaPixels += 1;
-        if (a > 0 && (r + g + b) > 12) coloredPixels += 1;
+        if (a > 0 && (r + g + b) > 12) {
+          coloredPixels += 1;
+          const luma = (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+          minLuma = Math.min(minLuma, luma);
+          maxLuma = Math.max(maxLuma, luma);
+          if (colorBuckets.size < 64) {
+            colorBuckets.add(`${r >> 4},${g >> 4},${b >> 4},${a >> 6}`);
+          }
+        }
       }
     }
 
     if (coloredPixels < 20) return false;
-    return { width, height, stride, sampledPixels, alphaPixels, coloredPixels };
-  }, null, { timeout: 10000 });
+    if (colorBuckets.size < 4) return false;
+    if (maxLuma - minLuma < 10) return false;
+    return {
+      width,
+      height,
+      stride,
+      sampledPixels,
+      alphaPixels,
+      coloredPixels,
+      colorBuckets: colorBuckets.size,
+      lumaRange: Math.round((maxLuma - minLuma) * 100) / 100,
+    };
+  }, null, { timeout: RENDER_TIMEOUT });
 
   return handle.jsonValue();
 }
 
 async function openEditAvatarEditor(page) {
-  await page.evaluate(() => Game.UI.openEditModal());
-  await page.waitForSelector('#ec-avatar-editor .avatar-editor', { timeout: 10000 });
+  await step('open Skills panel', async () => {
+    const skillsPanelOpen = await page.evaluate(() => {
+      const panel = document.getElementById('side-panel');
+      return Boolean(panel && panel.dataset.active === 'skills' && !panel.classList.contains('hidden'));
+    });
+    if (!skillsPanelOpen) {
+      await page.click('[data-panel="skills"]', { timeout: UI_TIMEOUT });
+    }
+  });
+  await waitForSelector(page, 'wait for Skills panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+  await step('click Customise Sim button', async () => {
+    const button = page.locator('#side-panel button').filter({ hasText: 'Customise Sim' }).first();
+    await button.waitFor({ state: 'visible', timeout: UI_TIMEOUT });
+    await button.click({ timeout: UI_TIMEOUT });
+  });
+  await waitForSelector(page, 'wait for edit avatar editor', '#ec-avatar-editor .avatar-editor', { timeout: UI_TIMEOUT });
 }
 
 function legacyFormForAvatarForm(form) {
@@ -646,15 +718,15 @@ function legacyFormForAvatarForm(form) {
 
 async function saveInGameAvatarForm(page, form, options = {}) {
   await openEditAvatarEditor(page);
-  await page.click(`#ec-avatar-editor [data-avatar-form="${form}"]`);
+  await click(page, `select ${form} avatar form in editor`, `#ec-avatar-editor [data-avatar-form="${form}"]`);
 
   if (options.primaryColorClick) {
-    await page.click('#ec-avatar-editor [data-avatar-tab="colors"]');
-    await page.click('#ec-avatar-editor [data-color-channel="primary"]');
+    await click(page, 'open edit avatar color tab', '#ec-avatar-editor [data-avatar-tab="colors"]');
+    await click(page, 'select edit avatar primary color', '#ec-avatar-editor [data-color-channel="primary"]');
   }
 
-  await page.click('#btn-ec-save');
-  await page.waitForFunction((expected) => {
+  await click(page, `save ${form} avatar editor changes`, '#btn-ec-save');
+  await waitForGameFunction(page, `wait for saved ${form} avatar render`, (expected) => {
     const character = window.Game.State.get().character;
     const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
     if (!debug || debug.layerCount <= 0) return false;
@@ -670,7 +742,7 @@ async function saveInGameAvatarForm(page, form, options = {}) {
     texturePrefix: `avatar_${form}_`,
     primaryColor: options.primaryColor,
     topTint: options.topTint,
-  }, { timeout: 10000 });
+  }, { timeout: RENDER_TIMEOUT });
 }
 
 async function checkElectronRuntime() {
@@ -685,16 +757,16 @@ async function checkElectronRuntime() {
   });
 
   try {
-    await page.waitForLoadState('domcontentloaded', { timeout: 60000 });
+    await step('wait for Electron DOMContentLoaded', () => page.waitForLoadState('domcontentloaded', { timeout: STARTUP_TIMEOUT }));
 
-    await page.click('#btn-mm-new');
-    await page.waitForSelector('#char-creation-screen:not(.hidden)', { timeout: 10000 });
-    await page.waitForSelector('#cc-avatar-editor .avatar-editor', { timeout: 10000 });
-    await page.click('#cc-avatar-editor [data-avatar-form="robot"]');
-    await page.click('#cc-avatar-editor [data-avatar-tab="colors"]');
-    await page.click('#cc-avatar-editor [data-color-channel="primary"]');
-    await page.click('#btn-cc-start');
-    await page.waitForFunction(() => {
+    await click(page, 'start new game from main menu', '#btn-mm-new');
+    await waitForSelector(page, 'wait for character creation screen', '#char-creation-screen:not(.hidden)', { timeout: UI_TIMEOUT });
+    await waitForSelector(page, 'wait for character creation avatar editor', '#cc-avatar-editor .avatar-editor', { timeout: UI_TIMEOUT });
+    await click(page, 'select initial robot avatar form', '#cc-avatar-editor [data-avatar-form="robot"]');
+    await click(page, 'open character creation color tab', '#cc-avatar-editor [data-avatar-tab="colors"]');
+    await click(page, 'select character creation primary color', '#cc-avatar-editor [data-color-channel="primary"]');
+    await click(page, 'start gameplay from character creation', '#btn-cc-start');
+    await waitForGameFunction(page, 'wait for gameplay state, assets, and canvas', () => {
       const state = window.Game?.State?.get?.();
       const canvas = document.getElementById('game-canvas');
       return state &&
@@ -702,7 +774,7 @@ async function checkElectronRuntime() {
         canvas &&
         canvas.clientWidth > 0 &&
         canvas.clientHeight > 0;
-    }, null, { timeout: 60000 });
+    }, null, { timeout: STARTUP_TIMEOUT });
 
     const canvasNonBlank = await waitForCanvasNonBlank(page);
     const result = await page.evaluate(() => {
@@ -729,9 +801,9 @@ async function checkElectronRuntime() {
 
     await saveInGameAvatarForm(page, 'cat');
     await openEditAvatarEditor(page);
-    await page.click('#ec-avatar-editor [data-avatar-form="robot"]');
-    await page.click('#btn-ec-close');
-    await page.waitForFunction(() => window.Game.State.get().character.appearance.form === 'cat', null, { timeout: 10000 });
+    await click(page, 'select unsaved robot avatar form in editor', '#ec-avatar-editor [data-avatar-form="robot"]');
+    await click(page, 'close edit avatar editor without saving', '#btn-ec-close');
+    await waitForGameFunction(page, 'wait for unsaved edit close to preserve cat form', () => window.Game.State.get().character.appearance.form === 'cat', null, { timeout: UI_TIMEOUT });
     await saveInGameAvatarForm(page, 'human');
     await saveInGameAvatarForm(page, 'robot');
     await saveInGameAvatarForm(page, 'banana');
@@ -745,8 +817,11 @@ async function checkElectronRuntime() {
     if (consoleErrors.length) fail(`Console errors:\n${consoleErrors.join('\n')}`);
     if (result.canvases.length !== 1) fail(`Expected Phaser to use one canvas, found ${result.canvases.length}`);
     if (!result.gameCanvasVisible) fail('Expected #game-canvas to be visible and sized');
-    if (!result.canvasNonBlank || result.canvasNonBlank.coloredPixels < 20) {
-      fail(`Expected #game-canvas to contain rendered pixels: ${JSON.stringify(result.canvasNonBlank)}`);
+    if (!result.canvasNonBlank ||
+      result.canvasNonBlank.coloredPixels < 20 ||
+      result.canvasNonBlank.colorBuckets < 4 ||
+      result.canvasNonBlank.lumaRange < 10) {
+      fail(`Expected #game-canvas to contain varied rendered pixels: ${JSON.stringify(result.canvasNonBlank)}`);
     }
     if (result.preloadedKeys !== result.assetKeys) {
       fail(`Expected all embedded assets to preload (${result.assetKeys}), loaded ${result.preloadedKeys}`);
@@ -775,27 +850,27 @@ async function checkElectronRuntime() {
         y: character.position.y,
       };
     });
-    await page.waitForFunction(() => {
+    await waitForGameFunction(page, 'wait for avatar facing NE with flipX', () => {
       const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
       return debug && debug.direction === 'NE' && debug.flipX === true;
-    }, null, { timeout: 10000 });
+    }, null, { timeout: RENDER_TIMEOUT });
 
     await page.evaluate(() => {
       const character = window.Game.State.get().character;
       character.currentActivity = { type: 'verify_glow' };
     });
-    await page.waitForFunction(() => {
+    await waitForGameFunction(page, 'wait for avatar activity glow to activate', () => {
       const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
       return debug && debug.activityGlowActive === true;
-    }, null, { timeout: 10000 });
+    }, null, { timeout: RENDER_TIMEOUT });
 
     await page.evaluate(() => {
       window.Game.State.get().character.currentActivity = null;
     });
-    await page.waitForFunction(() => {
+    await waitForGameFunction(page, 'wait for avatar activity glow to clear', () => {
       const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
       return debug && debug.activityGlowActive === false;
-    }, null, { timeout: 10000 });
+    }, null, { timeout: RENDER_TIMEOUT });
 
     if (result.activeFurniture < 30) fail(`Expected starter world furniture, found ${result.activeFurniture}`);
     if (result.activeRooms < 3) fail(`Expected starter rooms, found ${result.activeRooms}`);
@@ -819,6 +894,6 @@ async function checkElectronRuntime() {
   const runtime = await checkElectronRuntime();
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));
 })().catch(err => {
-  console.error(err.message || err);
+  console.error(err && err.stack ? err.stack : err);
   process.exit(1);
 });
