@@ -74,3 +74,12 @@ simlife/
 ## 📜 License
 
 MIT
+
+<!-- discoverability:start -->
+## Discoverability
+
+- **Project:** SimLife
+- **Summary:** A browser-based life simulation game where players build a home, grow a career, manage relationships, queue actions, and guide autonomous Sims-style characters.
+- **Primary keywords:** browser-game, life-simulation, simulation-game, ai-agents, moodlets, build-mode, javascript, html5, css3, game-dev
+- **Use cases:** Browser life simulation gameplay, Autonomous character AI experiments, 2.5D build and career simulation
+<!-- discoverability:end -->
