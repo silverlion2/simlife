@@ -43,24 +43,26 @@
     <h2>Create Your Sim</h2>
     
     <div class="cc-form">
-      <div class="cc-field">
-        <label>World Name:</label>
-        <input type="text" id="cc-world-name" value="My New Life" maxlength="20">
-      </div>
-      
-      <div class="cc-field">
-        <label>Sim Name:</label>
-        <input type="text" id="cc-sim-name" value="Alex" maxlength="15">
-      </div>
-      
-      <div class="cc-field">
-        <label>Appearance:</label>
-        <div id="cc-avatar-editor"></div>
-      </div>
+      <div class="cc-scroll-fields">
+        <div class="cc-field">
+          <label>World Name:</label>
+          <input type="text" id="cc-world-name" value="My New Life" maxlength="20">
+        </div>
 
-      <div class="cc-field">
-        <label>Primary Trait:</label>
-        <div id="cc-trait-grid" class="trait-grid"></div>
+        <div class="cc-field">
+          <label>Sim Name:</label>
+          <input type="text" id="cc-sim-name" value="Alex" maxlength="15">
+        </div>
+
+        <div class="cc-field">
+          <label>Appearance:</label>
+          <div id="cc-avatar-editor"></div>
+        </div>
+
+        <div class="cc-field">
+          <label>Primary Trait:</label>
+          <div id="cc-trait-grid" class="trait-grid"></div>
+        </div>
       </div>
       
       <button id="btn-cc-start" class="primary-btn">▶ Start Your Life</button>
@@ -96,7 +98,10 @@
       <label>Change Trait (Free!):</label>
       <div id="ec-trait-grid" class="trait-grid"></div>
     </div>
-    <button id="btn-ec-save" class="primary-btn" style="margin-top:15px; width:100%;">💾 Apply Changes</button>
+    <div class="dialog-actions">
+      <button id="btn-ec-cancel" class="secondary-btn" type="button">Cancel</button>
+      <button id="btn-ec-save" class="primary-btn" type="button">💾 Apply Changes</button>
+    </div>
   </div>
 </div>
 
@@ -160,6 +165,10 @@
     
     <div class="action-panel">
       <div id="activity-display">💤 Idle</div>
+      <button id="daily-focus" class="daily-focus" type="button" data-focus-panel="goals">
+        <span class="daily-focus-kicker">Today</span>
+        <span class="daily-focus-text">Choose a goal to start building momentum.</span>
+      </button>
       <div id="moodlet-bar" class="moodlet-bar"></div>
       <div id="queue-bar" class="queue-bar"></div>
     </div>
@@ -183,6 +192,11 @@
   
   <!-- Hover Tooltip -->
   <div id="hover-tooltip" class="hidden" style="position: absolute; pointer-events: none; z-index: 9999; background: rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; border-radius: 6px; font-family: 'Nunito', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transform: translate(-50%, -120%); white-space: nowrap;"></div>
+  <div id="interaction-hint" class="interaction-hint hidden"></div>
+  <div id="placement-actions" class="placement-actions hidden" aria-label="Placement controls">
+    <button id="btn-placement-rotate" type="button">Rotate</button>
+    <button id="btn-placement-cancel" type="button">Cancel</button>
+  </div>
 </div>
 
 <!-- Scripts in dependency order -->

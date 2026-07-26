@@ -89,7 +89,7 @@ Game.Interaction = (function() {
         locked: false,
         lockReason: '',
         callback: () => {
-          Game.House.sellFurniture(furn.id);
+          Game.House.sellFurniture(furn.id, 0.5);
           if (Game.Renderer && Game.Renderer.setBgDirty) Game.Renderer.setBgDirty();
           if (Game.Character.invalidateComfortCache) Game.Character.invalidateComfortCache();
         }
@@ -161,7 +161,7 @@ Game.Interaction = (function() {
       locked: false,
       lockReason: '',
       callback: () => {
-        Game.House.sellFurniture(furn.id);
+        Game.House.sellFurniture(furn.id, 0.25);
       }
     });
 

@@ -198,11 +198,11 @@ Game.Config = {
     china_cabinet: { label: 'China Cabinet',  icon: '🏺', room: 'dining', cost: 400,  quality: 2, needBonus: { comfort: 8 },            comfort: 3, w: 1, h: 1 },
 
     // Multi-room decorations
-    plant:         { label: 'House Plant',    icon: '🪴', room: '*', cost: 30,  quality: 1, needBonus: { comfort: 3 }, comfort: 2, w: 1, h: 1 },
+    plant:         { label: 'House Plant',    icon: '🌿', room: '*', cost: 30,  quality: 1, needBonus: { comfort: 3 }, comfort: 2, w: 1, h: 1 },
     rug:           { label: 'Area Rug',       icon: '🟫', room: '*', cost: 80,  quality: 1, needBonus: { comfort: 5 }, comfort: 3, w: 2, h: 2 },
     painting:      { label: 'Wall Painting',  icon: '🖼️', room: '*', cost: 120, quality: 1, needBonus: { comfort: 4, fun: 2 }, comfort: 2, w: 1, h: 1 },
     aquarium:      { label: 'Aquarium',       icon: '🐠', room: '*', cost: 600, quality: 2, needBonus: { fun: 10, comfort: 5 },comfort: 0, w: 2, h: 1 },
-    mirror:        { label: 'Standing Mirror',icon: '🪞', room: '*', cost: 150, quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1, skill: 'charisma' },
+    mirror:        { label: 'Standing Mirror',icon: '💠', room: '*', cost: 150, quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1, skill: 'charisma' },
     indoor_tree:   { label: 'Indoor Tree',    icon: '🌲', room: '*', cost: 100, quality: 1, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2 },
     staircase:     { label: 'Staircase',      icon: 'ST', room: '*', cost: 800, quality: 2, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2, unlockLevel: 2 },
     map_portal:    { label: 'Door / Portal',  icon: '🚪', room: '*', cost: 0,   quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1 },
@@ -505,7 +505,7 @@ Game.Config = {
     grill_food:   { label: 'Grill Food',     duration: 40,  needs: { hunger: 30 },          room: 'patio',  furniture: 'bbq_grill',    icon: '🥓', skill: 'cooking', xp: 20, moodlet: { name: 'BBQ Master', value: 6, duration: 180, icon: '🍔' } },
     tinker:       { label: 'Tinker',         duration: 60,  needs: { fun: 15 },             room: 'workshop',furniture: 'workbench',   icon: '🧰', skill: 'handiness', xp: 25, moodlet: { name: 'Productive', value: 5, duration: 180, icon: '🔧' } },
     use_hottub:   { label: 'Relax in Tub',   duration: 45,  needs: { hygiene: 20, fun: 15, comfort: 20 }, room: 'patio', furniture: 'hot_tub', icon: '🛁', moodlet: { name: 'Steamy', value: 8, duration: 240, icon: '🫧' } },
-    practice_speech:{ label:'Practice Speech',duration: 30, needs: { fun: 5 },              room: 'bedroom', furniture: 'mirror',      icon: '🪞', skill: 'charisma', xp: 15, moodlet: { name: 'Confident', value: 5, duration: 180, icon: '😎' } },
+    practice_speech:{ label:'Practice Speech',duration: 30, needs: { fun: 5 },              room: 'bedroom', furniture: 'mirror',      icon: '💠', skill: 'charisma', xp: 15, moodlet: { name: 'Confident', value: 5, duration: 180, icon: '😎' } },
     repair:        { label: 'Repair',         duration: 30, needs: {},                       room: null,      furniture: null,           icon: '🔧', skill: 'handiness', xp: 25, moodlet: { name: 'Handy', value: 4, duration: 120, icon: '🔧' } },
     invite_over:   { label: 'Invite Friend',  duration: 60, needs: { social: 30, fun: 15 },  room: 'living',  furniture: null,           icon: '🏠', moodlet: { name: 'Good Company', value: 7, duration: 240, icon: '👥' } },
     travel:        { label: 'Travel',         duration: 1,  needs: {},                       room: '*',       furniture: 'map_portal',   icon: '🚶' },

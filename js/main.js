@@ -97,6 +97,7 @@ Game.Main = (function() {
       uiThrottleAccum = 0;
       Game.UI.updateStatusBars();
       Game.UI.updateMoodletDisplay();
+      Game.UI.updateQueueDisplay();
     }
 
     // ---- Auto-save (every 30 seconds of wall time) ----
@@ -429,11 +430,15 @@ Game.Main = (function() {
         case '3': gameSpeed = 10; updateSpeedDisplay(); break;
         case 'Escape':
           if (Game.State.get().ui.mode === 'build') {
-            if (Game.State.get().ui.buildGhost) {
-              Game.State.get().ui.buildGhost = null; // Drop item
-            } else {
-              Game.State.get().ui.mode = 'live'; // Exit build mode
-            }
+            if (Game.UI && Game.UI.cancelBuild) Game.UI.cancelBuild();
+            break;
+          }
+          if (Game.State.get().ui.mode === 'sell') {
+            if (Game.UI && Game.UI.toggleSellMode) Game.UI.toggleSellMode();
+            break;
+          }
+          if (Game.State.get().ui.mode === 'store') {
+            if (Game.UI && Game.UI.toggleStoreMode) Game.UI.toggleStoreMode();
             break;
           }
           if (Game.Interaction) Game.Interaction.closePieMenu();
@@ -443,12 +448,8 @@ Game.Main = (function() {
           break;
         case 'r':
         case 'R':
-          if (Game.State.get().ui.mode === 'build' && Game.State.get().ui.buildGhost && Game.State.get().ui.buildGhost.type === 'furniture') {
-            const ghost = Game.State.get().ui.buildGhost;
-            ghost.rotated = !ghost.rotated;
-            const temp = ghost.w;
-            ghost.w = ghost.h;
-            ghost.h = temp;
+          if (Game.State.get().ui.mode === 'build' && Game.UI && Game.UI.rotateBuildGhost) {
+            Game.UI.rotateBuildGhost();
           }
           break;
         case 'q':

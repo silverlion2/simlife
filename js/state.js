@@ -141,7 +141,7 @@ Game.State = (function() {
             { id: 'furn_16', type: 'garden_plot', roomId: null, x: 2, y: 10 },
             { id: 'furn_17', type: 'garden_plot', roomId: null, x: 3, y: 10 },
             { id: 'furn_18', type: 'garden_plot', roomId: null, x: 4, y: 10 },
-            { id: 'furn_37', type: 'grand_piano', roomId: null, x: 8, y: 10 },
+            { id: 'furn_37', type: 'garden_bench', roomId: null, x: 8, y: 10 },
             { id: 'furn_38', type: 'bonsai_shrine', roomId: null, x: 11, y: 10 },
             
             { id: 'furn_19', type: 'map_portal', roomId: null, x: 4, y: 9, config: { targetMap: 'mail_room', targetX: 2, targetY: 2 } },

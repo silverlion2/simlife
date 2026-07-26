@@ -29,6 +29,7 @@ Game.Renderer = (function() {
   let avatarDirection = 'S';
   let avatarFlipX = false;
   let buildGhostSprite = null;
+  let buildGhostFootprint = null;
   let npcSpriteMap = new Map();
   let familySpriteMap = new Map();
   let debugGraphics = null;
@@ -63,20 +64,27 @@ Game.Renderer = (function() {
       this.cameras.main.setBackgroundColor('#25451f');
 
       const backdropGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-      backdropGraphics.fillStyle(0x2f5525, 1);
+      backdropGraphics.fillStyle(0x3b6232, 1);
       backdropGraphics.fillRect(0, 0, 128, 128);
-      for (let i = 0; i < 130; i++) {
+      for (let i = 0; i < 92; i++) {
         const x = (i * 37) % 128;
         const y = (i * 61) % 128;
-        const tint = i % 3 === 0 ? 0x3f6c31 : (i % 3 === 1 ? 0x25481f : 0x5d7e3e);
-        backdropGraphics.fillStyle(tint, 0.26);
-        backdropGraphics.fillRect(x, y, 2 + (i % 3), 1);
+        const tint = i % 4 === 0 ? 0x517c3f : (i % 4 === 1 ? 0x2f4f2a : (i % 4 === 2 ? 0x7f9650 : 0x2f6f61));
+        backdropGraphics.fillStyle(tint, 0.16);
+        backdropGraphics.fillRect(x, y, 2 + (i % 4), 1);
+      }
+      for (let i = 0; i < 16; i++) {
+        const x = (i * 53 + 11) % 128;
+        const y = (i * 29 + 17) % 128;
+        backdropGraphics.fillStyle(i % 2 === 0 ? 0xf3d778 : 0xd66b6b, 0.28);
+        backdropGraphics.fillCircle(x, y, 1);
       }
       backdropGraphics.generateTexture('grass_backdrop', 128, 128);
       this.terrainBackdrop = this.add.tileSprite(0, 0, this.scale.width, this.scale.height, 'grass_backdrop');
       this.terrainBackdrop.setOrigin(0, 0);
       this.terrainBackdrop.setScrollFactor(0);
       this.terrainBackdrop.setDepth(-1000000);
+      this.terrainBackdrop.setAlpha(0.94);
       
       if (this.game.renderer.type === Phaser.WEBGL) {
           // Phaser 4: Pipelines and old postFX removed.
@@ -136,6 +144,7 @@ Game.Renderer = (function() {
         // Click on empty space — move character
         const char = Game.State.get().character;
         char.targetPosition = { x: gx, y: gy };
+        this.showMoveMarker(gx, gy);
       });
       
       this.input.keyboard.on('keydown-SPACE', () => {
@@ -267,6 +276,15 @@ Game.Renderer = (function() {
       this.stopNativeCameraFollow();
     }
 
+    getRoomColor(room, field, fallback) {
+      const roomCfg = room && Game.Config.ROOMS[room.type];
+      const raw = roomCfg && roomCfg[field];
+      if (typeof raw === 'string' && raw.startsWith('#')) {
+        return parseInt(raw.slice(1), 16);
+      }
+      return fallback;
+    }
+
     drawHouseGrid() {
       const activeMap = Game.State.getActiveMap();
       if(!activeMap) return;
@@ -297,6 +315,7 @@ Game.Renderer = (function() {
 
           // Check if this tile is inside a room
           let inRoom = false;
+          let currentRoom = null;
           let isTopEdge = false;
           let isLeftEdge = false;
           let isRightEdge = false;
@@ -306,6 +325,7 @@ Game.Renderer = (function() {
           for (const r of roomsList) {
             if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) {
               inRoom = true;
+              currentRoom = r;
               if (y === r.y) isTopEdge = true;
               if (x === r.x) isLeftEdge = true;
               if (x === r.x + r.w - 1) isRightEdge = true;
@@ -316,8 +336,10 @@ Game.Renderer = (function() {
 
           if (inRoom) {
             tile.setTexture('planks');
-            // Remove tint entirely for interior floors to let original texture shine
-            tile.clearTint();
+            tile.setTint(this.getRoomColor(currentRoom, 'floorColor', 0xd6bc8e));
+            tile.setAlpha(0.96);
+            const wallTint = this.getRoomColor(currentRoom, 'wallColor', 0x8b7355);
+            this.drawRoomTileWash(x, y, this.getRoomColor(currentRoom, 'floorColor', 0xd6bc8e), wallTint);
             
             // Draw isometric walls explicitly on the tile edges
             // Lift walls up by 24 pixels so they sit on the top surface of the floor tile rather than sinking into it
@@ -327,6 +349,8 @@ Game.Renderer = (function() {
                this.gridSprites.push(wall);
                wall.setScale(0.25);
                wall.setOrigin(0.5, 0.75); 
+               wall.setTint(wallTint);
+               wall.setAlpha(0.88);
                wall.depth = (x + y) * 10 - 1; 
             }
             if (isLeftEdge) {
@@ -335,6 +359,8 @@ Game.Renderer = (function() {
                this.gridSprites.push(wall);
                wall.setScale(0.25);
                wall.setOrigin(0.5, 0.75); 
+               wall.setTint(wallTint);
+               wall.setAlpha(0.88);
                wall.depth = (x + y) * 10 - 1; 
             }
             
@@ -345,8 +371,10 @@ Game.Renderer = (function() {
                this.gridSprites.push(wall);
                wall.setScale(0.25);
                wall.setOrigin(0.5, 0.75); 
+               wall.setTint(wallTint);
+               wall.setAlpha(0.78);
                wall.depth = (x + y + 1) * 10 - 1; 
-               this.frontWalls.push({ sprite: wall, room: roomsList.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) });
+               this.frontWalls.push({ sprite: wall, room: currentRoom });
             }
             if (isRightEdge) {
                const ptF = isoProject(x + 1, y + 0.5); // Push to edge midpoint
@@ -354,16 +382,62 @@ Game.Renderer = (function() {
                this.gridSprites.push(wall);
                wall.setScale(0.25);
                wall.setOrigin(0.5, 0.75); 
+               wall.setTint(wallTint);
+               wall.setAlpha(0.78);
                wall.depth = (x + 1 + y) * 10 - 1; 
-               this.frontWalls.push({ sprite: wall, room: roomsList.find(r => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) });
+               this.frontWalls.push({ sprite: wall, room: currentRoom });
             }
           } else {
             tile.setTexture('floor');
             tile.setTint(pickGroundTint(x, y, false));
+            tile.setAlpha(1);
           }
       }
 
+      this.drawRoomNameplates(visibleRooms);
       this.drawAmbientScenery(activeMap, w, h);
+    }
+
+    drawRoomNameplates(rooms) {
+      for (const room of rooms || []) {
+        const cfg = Game.Config.ROOMS[room.type] || { label: room.type, icon: '' };
+        const pt = isoProject(room.x + room.w * 0.5, room.y + 0.08);
+        const label = `${cfg.icon || ''} ${cfg.label}`.trim();
+        const text = this.add.text(pt.x, pt.y - 12, label, {
+          fontFamily: 'Nunito, sans-serif',
+          fontSize: '10px',
+          fontStyle: '700',
+          color: '#fff8e6',
+          backgroundColor: 'rgba(32, 25, 21, 0.5)',
+          padding: { x: 5, y: 2 },
+          stroke: '#201915',
+          strokeThickness: 2,
+          shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 2, fill: true }
+        }).setOrigin(0.5, 0.5);
+        text.setAlpha(0.56);
+        text.setDepth((room.x + room.y) * 10 - 2.2);
+        this.gridSprites.push(text);
+      }
+    }
+
+    drawRoomTileWash(x, y, fillColor, strokeColor) {
+      const p1 = isoProject(x, y);
+      const p2 = isoProject(x + 1, y);
+      const p3 = isoProject(x + 1, y + 1);
+      const p4 = isoProject(x, y + 1);
+      const wash = this.add.graphics();
+      this.gridSprites.push(wash);
+      wash.fillStyle(fillColor, 0.18);
+      wash.lineStyle(1, strokeColor, 0.16);
+      wash.beginPath();
+      wash.moveTo(p1.x, p1.y);
+      wash.lineTo(p2.x, p2.y);
+      wash.lineTo(p3.x, p3.y);
+      wash.lineTo(p4.x, p4.y);
+      wash.closePath();
+      wash.fillPath();
+      wash.strokePath();
+      wash.depth = (x + y) * 10 - 4.4;
     }
 
     getRenderedGroundTileKeys(activeMap, w, h) {
@@ -453,11 +527,14 @@ Game.Renderer = (function() {
 
       const furn = hitTestFurniture(gx, gy);
       const npcHit = Game.Main.hitTestNPCWalker ? Game.Main.hitTestNPCWalker(gx, gy) : null;
+      const room = hitTestRoom(gx, gy);
       
       if (furn) {
         this.setHoverEffect('furniture', furn, pointer.event.clientX, pointer.event.clientY);
       } else if (npcHit) {
         this.setHoverEffect('npc', npcHit, pointer.event.clientX, pointer.event.clientY);
+      } else if (room) {
+        this.setHoverEffect('room', room, pointer.event.clientX, pointer.event.clientY);
       } else {
         this.clearHover();
       }
@@ -477,11 +554,13 @@ Game.Renderer = (function() {
        if (!this.hoverTooltipEl) this.hoverTooltipEl = document.getElementById('hover-tooltip');
        
        if (type === 'furniture') {
+           const fc = Game.Config.FURNITURE[obj.type];
            const sprite = spriteMap.get(obj.id);
            if (sprite) {
                if (!sprite.glowFx && sprite.preFX && sprite.preFX.addGlow) {
                    sprite.glowFx = sprite.preFX.addGlow(0xffffff, 2, 0, false, 0.1, 10);
                }
+               this.showHoverBadge(sprite.x, sprite.y, fc ? fc.icon : '');
            }
            
            if (this.hoverTooltipEl) {
@@ -492,9 +571,9 @@ Game.Renderer = (function() {
                } else if (obj.type === 'pet_bowl') {
                    text = `🥣 Food: ${Math.floor(obj.foodLevel || 0)}%`;
                } else {
-                   const fc = Game.Config.FURNITURE[obj.type];
                    text = fc ? fc.label : 'Object';
                }
+               text += ' - click actions, Shift+click queues';
                
                this.hoverTooltipEl.textContent = text;
                this.hoverTooltipEl.classList.remove('hidden');
@@ -503,12 +582,63 @@ Game.Renderer = (function() {
            }
        } else if (type === 'npc') {
            if (this.hoverTooltipEl) {
-               this.hoverTooltipEl.textContent = `👤 ${obj.name || 'Stranger'}`;
+               this.hoverTooltipEl.textContent = `👤 ${obj.name || 'Stranger'} - click to socialize`;
+               this.hoverTooltipEl.classList.remove('hidden');
+               this.hoverTooltipEl.style.left = clientX + 'px';
+               this.hoverTooltipEl.style.top = clientY + 'px';
+           }
+       } else if (type === 'room') {
+           if (this.hoverTooltipEl) {
+               const rc = Game.Config.ROOMS[obj.type];
+               this.hoverTooltipEl.textContent = `${rc ? `${rc.icon} ${rc.label}` : 'Room'} - click room actions`;
                this.hoverTooltipEl.classList.remove('hidden');
                this.hoverTooltipEl.style.left = clientX + 'px';
                this.hoverTooltipEl.style.top = clientY + 'px';
            }
        }
+    }
+
+    showHoverBadge(x, y, icon) {
+       if (!icon) return;
+       if (!this.hoverBadge) {
+          this.hoverBadge = this.add.text(0, 0, icon, {
+             fontSize: '24px',
+             fontFamily: 'Nunito, sans-serif',
+             color: '#ffffff',
+             stroke: '#201915',
+             strokeThickness: 4,
+             shadow: { offsetX: 0, offsetY: 3, color: '#000000', blur: 5, fill: true }
+          }).setOrigin(0.5, 1);
+       }
+       this.hoverBadge.setText(icon);
+       this.hoverBadge.setPosition(x, y - 50);
+       this.hoverBadge.setDepth(999998);
+       this.hoverBadge.setVisible(true);
+    }
+
+    showMoveMarker(gx, gy) {
+       const pt = isoProject(gx + 0.5, gy + 0.5);
+       const marker = this.add.graphics({ x: pt.x, y: pt.y });
+       marker.lineStyle(3, 0x45c0b3, 0.95);
+       marker.fillStyle(0x45c0b3, 0.18);
+       marker.beginPath();
+       marker.moveTo(0, -14);
+       marker.lineTo(28, 0);
+       marker.lineTo(0, 14);
+       marker.lineTo(-28, 0);
+       marker.closePath();
+       marker.fillPath();
+       marker.strokePath();
+       marker.setDepth(89998);
+       marker.setScale(0.55);
+       this.tweens.add({
+          targets: marker,
+          scale: 1.08,
+          alpha: 0,
+          duration: 650,
+          ease: 'Sine.easeOut',
+          onComplete: () => marker.destroy()
+       });
     }
 
     clearHover() {
@@ -522,6 +652,7 @@ Game.Renderer = (function() {
            }
            this.hoveredObj = null;
        }
+       if (this.hoverBadge) this.hoverBadge.setVisible(false);
        if (!this.hoverTooltipEl) this.hoverTooltipEl = document.getElementById('hover-tooltip');
        if (this.hoverTooltipEl) this.hoverTooltipEl.classList.add('hidden');
     }
@@ -852,25 +983,60 @@ Game.Renderer = (function() {
     // ---- WebGL Pie Menu ----
     showPieMenu(x, y, centerTitle, items) {
        this.closePieMenu();
+       this.clearHover();
        if (!this.uiContainer) {
           this.uiContainer = this.add.container(0, 0);
           this.uiContainer.setScrollFactor(0);
           this.uiContainer.setDepth(900000); // Sit above shadow map
        }
        
+       const isCompactWheel = this.scale.width < 640 || this.scale.height < 640;
+       const radius = Math.min(isCompactWheel ? 88 : 108, 78 + Math.max(0, items.length - 4) * 6);
+       const buttonRadius = isCompactWheel ? 34 : 38;
+       const menuReach = radius + buttonRadius;
+       const clampSafe = (value, min, max, fallback) => max >= min ? Phaser.Math.Clamp(value, min, max) : fallback;
+
+       if (isCompactWheel && typeof document !== 'undefined') {
+          const topHudBottom = ['.hud-left', '.hud-center', '.hud-right']
+             .map(sel => document.querySelector(sel)?.getBoundingClientRect().bottom || 0)
+             .filter(Number.isFinite)
+             .reduce((max, value) => Math.max(max, value), 0);
+          const bottomHudTop = ['.needs-section-rpg', '.action-panel']
+             .map(sel => document.querySelector(sel)?.getBoundingClientRect().top || this.scale.height)
+             .filter(value => Number.isFinite(value) && value > 0)
+             .reduce((min, value) => Math.min(min, value), this.scale.height);
+          const minY = topHudBottom + menuReach + 8;
+          const maxY = Math.max(minY, bottomHudTop - menuReach - 18);
+          x = clampSafe(x, menuReach + 12, this.scale.width - menuReach - 12, this.scale.width / 2);
+          y = clampSafe(y, minY, maxY, Math.min(this.scale.height * 0.38, maxY));
+       } else {
+          const inset = menuReach + 18;
+          x = clampSafe(x, inset, this.scale.width - inset, this.scale.width / 2);
+          y = clampSafe(y, inset, this.scale.height - inset, this.scale.height / 2);
+       }
+
        this.pieMenu = this.add.container(x, y);
        this.uiContainer.add(this.pieMenu);
        
        const blocker = this.add.rectangle(0, 0, 8000, 8000, 0x000000, 0).setInteractive();
        blocker.on('pointerdown', () => this.closePieMenu());
        
-       const bg = this.add.circle(0, 0, 20, 0x000000, 0.7).setInteractive();
-       const cancel = this.add.text(0, 0, '✕', { fontSize: '18px', color: '#ffffff' }).setOrigin(0.5);
-       this.pieMenu.add([blocker, bg, cancel]);
+       const halo = this.add.circle(0, 0, radius + buttonRadius + 16, 0x120d0a, 0.24);
+       halo.setStrokeStyle(2, 0xffd77a, 0.18);
+       const ring = this.add.circle(0, 0, radius, 0x000000, 0);
+       ring.setStrokeStyle(2, 0x45c0b3, 0.28);
+       const bg = this.add.circle(0, 0, 28, 0x201915, 0.94).setInteractive();
+       bg.setStrokeStyle(2, 0xffd77a, 0.75);
+       const cancel = this.add.text(0, 0, centerTitle || '✕', {
+          fontSize: '20px',
+          color: '#ffffff',
+          stroke: '#000000',
+          strokeThickness: 3
+       }).setOrigin(0.5);
+       this.pieMenu.add([blocker, halo, ring, bg, cancel]);
        
        bg.on('pointerdown', () => this.closePieMenu());
        
-       const radius = 65;
        const angleStep = (2 * Math.PI) / Math.max(items.length, 1);
        const startAngle = -Math.PI / 2;
        
@@ -879,9 +1045,37 @@ Game.Renderer = (function() {
           const ix = Math.cos(angle) * radius;
           const iy = Math.sin(angle) * radius;
           
-          const btnBg = this.add.circle(ix, iy, 25, item.locked ? 0x888888 : 0x222222, 0.9).setInteractive();
-          const btnIcon = this.add.text(ix, iy - 6, item.locked ? '🔒' : item.icon, { fontSize: '18px' }).setOrigin(0.5);
-          const btnText = this.add.text(ix, iy + 10, item.label, { fontSize: '10px', color: '#ffffff', backgroundColor: '#00000088', padding: {x:2, y:1} }).setOrigin(0.5);
+          const btnBg = this.add.circle(ix, iy, buttonRadius, item.locked ? 0x5f5a55 : 0x2e241f, 0.96).setInteractive({ useHandCursor: true });
+          btnBg.setStrokeStyle(2, item.locked ? 0x777777 : 0xffd77a, item.locked ? 0.55 : 0.9);
+          const btnIcon = this.add.text(ix, iy - 10, item.locked ? '🔒' : item.icon, {
+             fontSize: isCompactWheel ? '22px' : '24px',
+             stroke: '#000000',
+             strokeThickness: 3
+          }).setOrigin(0.5);
+          const btnText = this.add.text(ix, iy + 20, item.label, {
+             fontFamily: 'Nunito, sans-serif',
+             fontSize: isCompactWheel ? '10px' : '12px',
+             color: '#ffffff',
+             backgroundColor: '#201915dd',
+             padding: { x: 5, y: 3 },
+             align: 'center',
+             wordWrap: { width: isCompactWheel ? 76 : 96 },
+             stroke: '#000000',
+             strokeThickness: 2
+          }).setOrigin(0.5);
+
+          btnBg.on('pointerover', () => {
+             btnBg.setFillStyle(0x3f2f27, 1);
+             btnBg.setStrokeStyle(3, 0x45c0b3, 1);
+             btnIcon.setScale(1.08);
+             btnText.setScale(1.04);
+          });
+          btnBg.on('pointerout', () => {
+             btnBg.setFillStyle(item.locked ? 0x777777 : 0x2e241f, 0.94);
+             btnBg.setStrokeStyle(2, item.locked ? 0x777777 : 0xffd77a, item.locked ? 0.55 : 0.9);
+             btnIcon.setScale(1);
+             btnText.setScale(1);
+          });
           
           btnBg.on('pointerdown', (p) => {
              if (item.locked) {
@@ -909,6 +1103,7 @@ Game.Renderer = (function() {
     syncBuildGhost(ghost) {
       if (!ghost) {
         if (buildGhostSprite) buildGhostSprite.setVisible(false);
+        if (buildGhostFootprint) buildGhostFootprint.clear();
         return;
       }
       
@@ -917,16 +1112,27 @@ Game.Renderer = (function() {
         buildGhostSprite.setScale(0.25);
         buildGhostSprite.setOrigin(0.5, 0.75);
       }
+      if (!buildGhostFootprint) {
+        buildGhostFootprint = this.add.graphics();
+      }
       
       buildGhostSprite.setVisible(true);
 
       if (ghost.type === 'furniture' || ghost.type === 'stored') {
-         buildGhostSprite.setTexture(this.getTextureForFurn(ghost.key));
+         const textureKey = this.getTextureForFurn(ghost.key);
+         const visual = this.getFurnitureVisual(ghost.key, textureKey);
+         buildGhostSprite.setTexture(textureKey);
+         buildGhostSprite.setScale(visual.scale);
+         buildGhostSprite.setOrigin(0.5, visual.originY);
       } else {
          buildGhostSprite.setTexture('planks'); // Minimal indicator for rooms
+         buildGhostSprite.setScale(0.25);
+         buildGhostSprite.setOrigin(0.5, 0.75);
       }
       
-      const pt = isoProject(ghost.x + (ghost.w > 1 ? ghost.w/2 - 0.5 : 0), ghost.y + (ghost.h > 1 ? ghost.h/2 - 0.5 : 0));
+      const footprintW = ghost.rotated ? ghost.h : ghost.w;
+      const footprintH = ghost.rotated ? ghost.w : ghost.h;
+      const pt = isoProject(ghost.x + (footprintW > 1 ? footprintW/2 - 0.5 : 0), ghost.y + (footprintH > 1 ? footprintH/2 - 0.5 : 0));
       buildGhostSprite.setPosition(pt.x, pt.y);
       buildGhostSprite.depth = 90000; // Float high
       
@@ -959,8 +1165,27 @@ Game.Renderer = (function() {
          }
       }
       
-      buildGhostSprite.setAlpha(0.6);
-      buildGhostSprite.setTint(isValid ? 0x88FF88 : 0xFF4444);
+      const ghostColor = isValid ? 0x7ee081 : 0xff5d5d;
+      const p1 = isoProject(ghost.x, ghost.y);
+      const p2 = isoProject(ghost.x + footprintW, ghost.y);
+      const p3 = isoProject(ghost.x + footprintW, ghost.y + footprintH);
+      const p4 = isoProject(ghost.x, ghost.y + footprintH);
+
+      buildGhostFootprint.clear();
+      buildGhostFootprint.fillStyle(ghostColor, isValid ? 0.16 : 0.2);
+      buildGhostFootprint.lineStyle(3, ghostColor, 0.9);
+      buildGhostFootprint.beginPath();
+      buildGhostFootprint.moveTo(p1.x, p1.y);
+      buildGhostFootprint.lineTo(p2.x, p2.y);
+      buildGhostFootprint.lineTo(p3.x, p3.y);
+      buildGhostFootprint.lineTo(p4.x, p4.y);
+      buildGhostFootprint.closePath();
+      buildGhostFootprint.fillPath();
+      buildGhostFootprint.strokePath();
+      buildGhostFootprint.depth = 89999;
+
+      buildGhostSprite.setAlpha(isValid ? 0.72 : 0.58);
+      buildGhostSprite.setTint(ghostColor);
       buildGhostSprite.setFlipX(!!ghost.rotated);
     }
 
@@ -1043,7 +1268,7 @@ Game.Renderer = (function() {
           charShadowSprite.setAlpha(0.25);
         }
         if (!this.charLabel) {
-          this.charLabel = this.add.text(0, 0, charObj.name || '馃 You', {
+          this.charLabel = this.add.text(0, 0, charObj.name || '🧑 You', {
             fontSize: '12px',
             fontFamily: 'Nunito, sans-serif',
             color: '#ffffff',
@@ -1330,12 +1555,84 @@ Game.Renderer = (function() {
         return { angle, stretch, alpha };
     }
 
+    textureExists(key) {
+      if (!key) return false;
+      if (mainScene && mainScene.textures && mainScene.textures.exists && mainScene.textures.exists(key)) return true;
+      return !!(window.SIM_ASSETS && window.SIM_ASSETS[key]);
+    }
+
+    firstExisting(keys, fallback) {
+      return keys.find((key) => this.textureExists(key)) || fallback;
+    }
+
+    orientedTexture(furnState, eastKey, northKey, fallback) {
+      const preferred = furnState && furnState.rotated ? northKey : eastKey;
+      return this.firstExisting([preferred, eastKey, northKey], fallback);
+    }
+
+    getFurnitureVisual(type, textureKey) {
+      let scale = 0.21;
+      let originY = 0.76;
+
+      if (textureKey === 'grandPiano_se') return { scale: 0.115, originY: 0.76 };
+      if (textureKey === 'bonsaiShrine_se') return { scale: 0.105, originY: 0.78 };
+      if (textureKey === 'map_portal' || textureKey === 'subway_turnstile') return { scale: 0.25, originY: 0.82 };
+
+      if (type.includes('bed') || type === 'hammock' || type === 'crib') scale = 0.18;
+      if (type.includes('tv') || type.includes('bookcase') || type.includes('shelf') || type === 'wardrobe' || type === 'display_case' || type === 'arcade_machine') scale = 0.17;
+      if (type.includes('sofa') || type.includes('chair') || type === 'recliner' || type === 'toilet' || type === 'vanity') scale = 0.18;
+      if (type.includes('table') || type.includes('desk') || type.includes('counter') || type === 'garden_bench' || type === 'workbench') scale = 0.18;
+      if (type.includes('stove') || type.includes('sink') || type.includes('fridge') || type.includes('microwave') || type.includes('espresso') || type.includes('dishwasher') || type === 'bbq_grill') scale = 0.18;
+      if (type === 'lamp' || type === 'candle_stand' || type === 'fireplace') scale = 0.17;
+      if (type === 'garden_plot' || type === 'rug' || type === 'yoga_mat' || type === 'cushion') {
+        scale = 0.16;
+        originY = 0.72;
+      }
+      if (type === 'indoor_tree' || type === 'plant' || type === 'potted_flower') scale = 0.16;
+      if (type === 'fountain' || type === 'weights') scale = 0.16;
+      if (textureKey === 'crate' || textureKey === 'barrel' || textureKey === 'chestClosed') scale = Math.min(scale, 0.18);
+      if (textureKey === 'floorCarpet') {
+        scale = 0.18;
+        originY = 0.72;
+      }
+
+      return { scale, originY };
+    }
+
     getTextureForFurn(type, furnState) {
+      const config = Game.Config.FURNITURE[type] || {};
+      if (config.texture && this.textureExists(config.texture)) return config.texture;
+
       if(type === 'display_case') return 'displayCase';
       if(type === 'candle_stand') return 'candleStand';
       if(type === 'decorated_table') return 'decoratedTable';
       if(type === 'wide_bookcase') return 'wideBookcase';
       if(type === 'cushion') return 'floorCarpet';
+      if(type === 'grand_piano') return this.firstExisting(['grandPiano_se'], 'longTable');
+      if(type === 'bonsai_shrine') return this.firstExisting(['bonsaiShrine_se'], 'hayStack');
+      if(type === 'lamp' || type === 'fireplace') return 'candleStand';
+      if(type === 'rustic_armchair' || type === 'recliner' || type === 'dining_chairs') {
+          return this.orientedTexture(furnState, 'rustic_armchair_e', 'rustic_armchair_n', 'libraryChair');
+      }
+      if(type === 'vintage_tv' || type === 'basic_tv' || type === 'big_tv') {
+          return this.orientedTexture(furnState, 'vintage_tv_e', 'vintage_tv_n', 'displayCase');
+      }
+      if(type === 'vintage_stereo' || type === 'stereo') {
+          return this.orientedTexture(furnState, 'vintage_stereo_e', 'vintage_stereo_n', 'displayCase');
+      }
+      if(type === 'bookshelf' || type === 'study_shelf' || type === 'display_shelf') {
+          return this.orientedTexture(furnState, 'bookcase_e', 'bookcase_n', 'bookcaseWideBooks');
+      }
+      if(type === 'bookcase') return this.orientedTexture(furnState, 'bookcase_e', 'bookcase_n', 'bookcaseWideBooks');
+      if(type === 'toy_chest' || type === 'dresser' || type === 'wardrobe') return 'chestClosed';
+      if(type === 'china_cabinet' || type === 'globe' || type === 'dartboard' || type === 'painting' || type === 'arcade_machine' || type === 'printer_3d') return 'displayCase';
+      if(type === 'crib' || type === 'hammock') return 'hayStack';
+      if(type === 'treadmill' || type === 'workbench') return 'longTable';
+      if(type === 'weights' || type === 'fountain') return 'barrel';
+      if(type === 'yoga_mat') return 'floorCarpet';
+      if(type === 'telescope') return 'displayCase';
+      if(type === 'language_book') return 'bookcaseWideBooks';
+      if(type === 'staircase') return 'planks';
 
       if(type === 'subway_gate') return 'subway_turnstile';
       if(type === 'map_portal') return 'map_portal';
@@ -1343,9 +1640,10 @@ Game.Renderer = (function() {
       if(type === 'pet_bowl') return furnState && furnState.isFull ? 'chestClosed' : 'crate';
       if(type === 'potted_flower') return 'hayStack'; 
       if(type === 'garden_plot') {
-          if (furnState && furnState.cropState === 'ready') return 'hayStack';
-          if (furnState && furnState.cropState === 'growing') return 'hay';
-          return 'crate';
+          if (furnState && (furnState.cropState === 'ready' || furnState.cropState === 'growing')) {
+              return this.firstExisting(['crop_corn'], 'hay');
+          }
+          return 'floorCarpet';
       }
 
       if(type.includes('bed')) return 'hayStack';
@@ -1387,16 +1685,17 @@ Game.Renderer = (function() {
         let sprite = spriteMap.get(furn.id);
         const fc = Game.Config.FURNITURE[furn.type];
         const textureKey = this.getTextureForFurn(furn.type, furn);
+        const visual = this.getFurnitureVisual(furn.type, textureKey);
         
         if(!sprite) {
            sprite = this.add.image(0, 0, textureKey);
-           sprite.setScale(0.25);
-           sprite.setOrigin(0.5, 0.75); 
+           sprite.setScale(visual.scale);
+           sprite.setOrigin(0.5, visual.originY);
            spriteMap.set(furn.id, sprite);
 
            let shadow = this.add.image(0, 0, textureKey);
-           shadow.setScale(0.25);
-           shadow.setOrigin(0.5, 0.75);
+           shadow.setScale(visual.scale);
+           shadow.setOrigin(0.5, visual.originY);
            shadow.setTint(0x000000).setTintMode(Phaser.TintModes.FILL);
            shadow.setAlpha(0.25);
            shadowMap.set(furn.id, shadow);
@@ -1406,6 +1705,12 @@ Game.Renderer = (function() {
                if (shadowMap.has(furn.id)) {
                    shadowMap.get(furn.id).setTexture(textureKey);
                }
+           }
+           sprite.setScale(visual.scale);
+           sprite.setOrigin(0.5, visual.originY);
+           if (shadowMap.has(furn.id)) {
+               const shadow = shadowMap.get(furn.id);
+               shadow.setOrigin(0.5, visual.originY);
            }
         }
         
@@ -1425,7 +1730,7 @@ Game.Renderer = (function() {
            shadow.setFlipX(!!furn.rotated);
            const sp = this.getShadowParams();
 
-           shadow.setScale(0.25 * 1.0, 0.25 * -sp.stretch);
+           shadow.setScale(visual.scale * 1.0, visual.scale * -sp.stretch);
 
            shadow.setAngle(sp.angle);
 
