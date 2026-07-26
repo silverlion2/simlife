@@ -1291,6 +1291,7 @@ async function checkBuildRenovationPanel(page) {
   }));
   await click(page, 'open Build panel for renovation controls', '[data-panel="build"]');
   await waitForSelector(page, 'wait for Build panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
+  await click(page, 'open Build Renovate tab', '#side-panel [data-build-tab="renovate"]');
   const result = await step('read Build renovation controls', async () => page.evaluate(() => {
     const panel = document.getElementById('side-panel');
     return {

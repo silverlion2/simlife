@@ -9,6 +9,7 @@ Game.UI = (function() {
   let createAvatarEditor = null;
   let editAvatarEditor = null;
   let editDraftAppearance = null;
+  let buildPanelTab = 'rooms';
 
   function init() {
     buildStatusPanel();
@@ -394,16 +395,16 @@ Game.UI = (function() {
         const pct = Math.max(0, Math.min(100, Math.round((char.activityProgress || 0) * 100)));
         let prefix = '';
         if (char.targetPosition || char.path || char.isPathfinding) {
-           prefix = '🚶 Walking to ';
+           prefix = 'Walking to ';
         }
         actEl.textContent = actCfg ? `${prefix}${actCfg.icon} ${actCfg.label} (${pct}%)` : '...';
         actEl.dataset.state = 'active';
       } else if (char.autonomy && char.autonomy.thought) {
         const actCfg = Game.Config.ACTIVITIES[char.autonomy.thought];
-        actEl.textContent = actCfg ? `💭 Thinking about ${actCfg.label.toLowerCase()}...` : '💤 Idle';
+        actEl.textContent = actCfg ? `Thinking about ${actCfg.label.toLowerCase()}...` : 'Idle';
         actEl.dataset.state = 'thinking';
       } else {
-        actEl.textContent = '💤 Idle';
+        actEl.textContent = 'Idle';
         actEl.dataset.state = 'idle';
       }
     }
@@ -441,10 +442,29 @@ Game.UI = (function() {
     const readyCollection = Game.HomeCollections && Game.HomeCollections.getCollections
       ? Game.HomeCollections.getCollections().find(collection => collection.claimable)
       : null;
+    const firstDayFocus = (() => {
+      if ((state.time?.day || 1) !== 1) return null;
+      const queueLength = Array.isArray(char.actionQueue) ? char.actionQueue.length : 0;
+      if (!char.currentActivity && queueLength === 0 && (state.time?.totalMinutes || 0) < 180) {
+        return makeFocus('First Move', 'Open Do and start one quick activity.', 'activities', 'ready');
+      }
+      if (char.currentActivity || queueLength > 0) {
+        return makeFocus('Good Start', 'Activity is running. Pick a career next.', 'career', 'ready');
+      }
+      if (Game.Economy && Game.Economy.getCareerInfo && !Game.Economy.getCareerInfo()) {
+        return makeFocus('First Income', 'Choose a career path for daily cash.', 'career', 'ready');
+      }
+      if (openGoal) {
+        return makeFocus('First Reward', openGoal.desc || openGoal.title, 'goals');
+      }
+      return makeFocus('Explore', 'Open Market or Social for the next loop.', 'market');
+    })();
 
     let next = makeFocus('Today', 'Choose a goal to start building momentum.', 'goals');
     if (criticalNeed) {
       next = makeFocus('Need Care', `${criticalNeed.label} is low. Open Do and fix it now.`, 'activities', 'urgent');
+    } else if (firstDayFocus) {
+      next = firstDayFocus;
     } else if (readyGoal) {
       next = makeFocus('Reward Ready', `Claim ${readyGoal.title}.`, 'goals', 'ready');
     } else if (readyCollection) {
@@ -712,12 +732,34 @@ Game.UI = (function() {
       btn.addEventListener('click', () => {
         const panel = btn.dataset.panel;
         togglePanel(panel);
+        setMobilePanelMenu(false);
       });
     });
+
+    const mobileMenuToggle = document.getElementById('btn-mobile-panels');
+    if (mobileMenuToggle) {
+      mobileMenuToggle.addEventListener('click', () => {
+        setMobilePanelMenu(!document.body.classList.contains('mobile-panel-menu-open'));
+      });
+      setMobilePanelMenu(false);
+      window.addEventListener('resize', () => {
+        if (window.innerWidth > 620) setMobilePanelMenu(false);
+      });
+    }
   }
 
   function setSidePanelOpen(isOpen) {
     document.body.classList.toggle('side-panel-open', Boolean(isOpen));
+  }
+
+  function setMobilePanelMenu(isOpen) {
+    const open = Boolean(isOpen);
+    document.body.classList.toggle('mobile-panel-menu-open', open);
+    const toggle = document.getElementById('btn-mobile-panels');
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.textContent = open ? '- Less' : '+ More';
+    }
   }
 
   function togglePanel(panelName) {
@@ -825,19 +867,45 @@ Game.UI = (function() {
       }
       renovationHtml += '</div>';
     }
-    html += '<h4 class="build-category">Rooms</h4><div class="build-grid">';
-    for (const [key, room] of Object.entries(Game.Config.ROOMS)) {
-      const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isRoomUnlocked(key));
-      const lockReason = locked && Game.HomeGrowth.getRoomLockReason ? Game.HomeGrowth.getRoomLockReason(key) : '';
-      html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('room','${key}')"`}>
-        <div class="build-item-icon">${room.icon}</div>
-        <div class="build-item-name">${room.label}</div>
-        <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + room.baseCost)}</div>
-      </div>`;
+    const storedObjects = Game.HomeGrowth && Game.HomeGrowth.getInventoryObjects ? Game.HomeGrowth.getInventoryObjects() : [];
+    const buildTabs = [
+      { key: 'rooms', label: 'Rooms', count: Object.keys(Game.Config.ROOMS).length },
+      { key: 'furniture', label: 'Furniture', count: Object.keys(Game.Config.FURNITURE).length },
+      { key: 'storage', label: 'Storage', count: storedObjects.length, disabled: storedObjects.length === 0 },
+      { key: 'renovate', label: 'Renovate', count: renovationRooms.length, disabled: !growthHtml && renovationRooms.length === 0 },
+    ];
+    if (!buildTabs.some(tab => tab.key === buildPanelTab && !tab.disabled)) buildPanelTab = 'rooms';
+    html += '<div class="build-tabs" role="tablist" aria-label="Build categories">';
+    for (const tab of buildTabs) {
+      html += `<button class="build-tab ${buildPanelTab === tab.key ? 'active' : ''}" role="tab" data-build-tab="${tab.key}" aria-selected="${buildPanelTab === tab.key}" ${tab.disabled ? 'disabled' : ''} onclick="Game.UI.setBuildPanelTab('${tab.key}')">${tab.label}<span>${tab.count}</span></button>`;
     }
     html += '</div>';
-    const storedObjects = Game.HomeGrowth && Game.HomeGrowth.getInventoryObjects ? Game.HomeGrowth.getInventoryObjects() : [];
-    if (storedObjects.length) {
+
+    if (buildPanelTab === 'rooms') {
+      html += '<h4 class="build-category">Rooms</h4><div class="build-grid">';
+      for (const [key, room] of Object.entries(Game.Config.ROOMS)) {
+        const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isRoomUnlocked(key));
+        const lockReason = locked && Game.HomeGrowth.getRoomLockReason ? Game.HomeGrowth.getRoomLockReason(key) : '';
+        html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('room','${key}')"`}>
+          <div class="build-item-icon">${room.icon}</div>
+          <div class="build-item-name">${room.label}</div>
+          <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + room.baseCost)}</div>
+        </div>`;
+      }
+      html += '</div>';
+    } else if (buildPanelTab === 'furniture') {
+      html += '<h4 class="build-category">Furniture</h4><div class="build-grid">';
+      for (const [key, furn] of Object.entries(Game.Config.FURNITURE)) {
+        const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isFurnitureUnlocked(key));
+        const lockReason = locked && Game.HomeGrowth.getFurnitureLockReason ? Game.HomeGrowth.getFurnitureLockReason(key) : '';
+        html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('furniture','${key}')"`}>
+          <div class="build-item-icon">${furn.icon}</div>
+          <div class="build-item-name">${furn.label}</div>
+          <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + furn.cost)}</div>
+        </div>`;
+      }
+      html += '</div>';
+    } else if (buildPanelTab === 'storage') {
       html += '<h4 class="build-category">Stored Objects</h4><div class="build-grid">';
       for (const object of storedObjects) {
         const furn = Game.Config.FURNITURE[object.type];
@@ -848,27 +916,25 @@ Game.UI = (function() {
           <div class="build-item-cost">Owned</div>
         </div>`;
       }
-      html += '</div>';
+      html += storedObjects.length ? '</div>' : '</div><p class="empty-msg">Store or earn objects to place them later.</p>';
+    } else if (buildPanelTab === 'renovate') {
+      if (growthHtml) {
+        html += '<h4 class="build-category">Home Layout</h4><div class="build-home-tools">';
+        html += growthHtml;
+        html += '</div>';
+      }
+      html += renovationHtml || '<h4 class="build-category">Renovation</h4><p class="empty-msg">Build a room on this floor to unlock resize and furnish controls.</p>';
     }
-    if (growthHtml) {
-      html += '<h4 class="build-category">Home Layout</h4><div class="build-home-tools">';
-      html += growthHtml;
-      html += '</div>';
-    }
-    html += '<h4 class="build-category">Furniture</h4><div class="build-grid">';
-    for (const [key, furn] of Object.entries(Game.Config.FURNITURE)) {
-      const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isFurnitureUnlocked(key));
-      const lockReason = locked && Game.HomeGrowth.getFurnitureLockReason ? Game.HomeGrowth.getFurnitureLockReason(key) : '';
-      html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('furniture','${key}')"`}>
-        <div class="build-item-icon">${furn.icon}</div>
-        <div class="build-item-name">${furn.label}</div>
-        <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + furn.cost)}</div>
-      </div>`;
-    }
-    html += '</div>';
-    html += renovationHtml;
     html += '</div>';
     panel.innerHTML = html;
+  }
+
+  function setBuildPanelTab(tab) {
+    buildPanelTab = tab;
+    const panel = document.getElementById('side-panel');
+    if (panel && panel.dataset.active === 'build') {
+      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+    }
   }
 
   function buildMarketPanel(panel, closeHtml) {
@@ -1251,11 +1317,54 @@ Game.UI = (function() {
     return `${icon} ${sign}${number}`;
   }
 
+  function setActivityDisplayPreview(text, state) {
+    const actEl = document.getElementById('activity-display');
+    if (!actEl) return;
+    actEl.textContent = text;
+    actEl.dataset.state = state || 'active';
+  }
+
+  function startActivityFromPanel(activityKey) {
+    const actCfg = Game.Config.ACTIVITIES[activityKey];
+    const label = actCfg ? `${actCfg.icon} ${actCfg.label}` : activityKey;
+    const char = Game.State.get().character;
+    const isBusy = !!(char.currentActivity);
+    const success = isBusy
+      ? Game.Character.queueActivity(activityKey)
+      : Game.Character.startActivity(activityKey);
+
+    if (!success) {
+      showNotification(`Can't start ${actCfg ? actCfg.label : activityKey} yet.`);
+      return false;
+    }
+
+    if (isBusy) {
+      setActivityDisplayPreview(`Queued ${label}`, 'queued');
+      showNotification(`${actCfg ? actCfg.label : activityKey} added to queue.`);
+    } else {
+      updateStatusBars();
+      const moving = !!(char.targetPosition || char.path || char.isPathfinding);
+      setActivityDisplayPreview(`${moving ? 'Walking to' : 'Started'} ${label}`, 'active');
+      showNotification(`Started ${actCfg ? actCfg.label : activityKey}.`);
+    }
+    updateQueueDisplay();
+
+    if (window.matchMedia && window.matchMedia('(max-width: 620px)').matches) {
+      const panel = document.getElementById('side-panel');
+      if (panel && panel.dataset.active === 'activities') {
+        panel.classList.add('hidden');
+        panel.dataset.active = '';
+        setSidePanelOpen(false);
+      }
+    }
+    return true;
+  }
+
   function buildActivitiesPanel(panel, closeHtml) {
     const available = Game.Character.getAvailableActivities();
     let html = (closeHtml || '') + '<h3>🎯 Activities</h3><div class="activity-list">';
     for (const act of available) {
-      html += `<button class="activity-item" onclick="Game.Character.startActivity('${act.key}')">
+      html += `<button class="activity-item" onclick="Game.UI.startActivityFromPanel('${act.key}')">
         <span class="activity-title">${act.icon} ${act.label}</span>
         <small>${Object.entries(act.needs).map(([k,v]) => formatNeedDelta(k, v)).join(' ')}</small>
         ${act.moodlet ? `<span class="act-moodlet">${act.moodlet.icon} ${act.moodlet.name}</span>` : ''}
@@ -1539,7 +1648,9 @@ Game.UI = (function() {
     showEvent,
     hideEvent,
     togglePanel,
+    setBuildPanelTab,
     startBuild,
+    startActivityFromPanel,
     cancelBuild,
     buyMarketOffer,
     craftObject,

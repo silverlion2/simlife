@@ -174,9 +174,9 @@ Game.Config = {
     dartboard:     { label: 'Dartboard',      icon: '🎯', room: 'gameroom', cost: 80,   quality: 1, needBonus: { fun: 12 },            comfort: 0, w: 1, h: 1 },
 
     // Nursery / Family
-    crib:          { label: 'Crib',            icon: 'CR', room: 'nursery', cost: 350,  quality: 2, needBonus: { comfort: 10, social: 8 }, comfort: 2, w: 1, h: 2, unlockLevel: 2 },
-    changing_table:{ label: 'Changing Table',  icon: 'CT', room: 'nursery', cost: 220,  quality: 2, needBonus: { hygiene: 10 },          comfort: 1, w: 1, h: 1, unlockLevel: 2 },
-    toy_chest:     { label: 'Toy Chest',       icon: 'TC', room: 'nursery', cost: 180,  quality: 2, needBonus: { fun: 12 },              comfort: 1, w: 1, h: 1, unlockLevel: 2 },
+    crib:          { label: 'Crib',            icon: '\u{1F37C}', room: 'nursery', cost: 350,  quality: 2, needBonus: { comfort: 10, social: 8 }, comfort: 2, w: 1, h: 2, unlockLevel: 2 },
+    changing_table:{ label: 'Changing Table',  icon: '\u{1F9F4}', room: 'nursery', cost: 220,  quality: 2, needBonus: { hygiene: 10 },          comfort: 1, w: 1, h: 1, unlockLevel: 2 },
+    toy_chest:     { label: 'Toy Chest',       icon: '\u{1F9F8}', room: 'nursery', cost: 180,  quality: 2, needBonus: { fun: 12 },              comfort: 1, w: 1, h: 1, unlockLevel: 2 },
 
     // Garden
     garden_plot:   { label: 'Garden Plot',    icon: '🌱', room: 'garden', cost: 50,  quality: 1, needBonus: {},          comfort: 0, w: 1, h: 1, skill: 'gardening' },
@@ -204,7 +204,7 @@ Game.Config = {
     aquarium:      { label: 'Aquarium',       icon: '🐠', room: '*', cost: 600, quality: 2, needBonus: { fun: 10, comfort: 5 },comfort: 0, w: 2, h: 1 },
     mirror:        { label: 'Standing Mirror',icon: '💠', room: '*', cost: 150, quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1, skill: 'charisma' },
     indoor_tree:   { label: 'Indoor Tree',    icon: '🌲', room: '*', cost: 100, quality: 1, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2 },
-    staircase:     { label: 'Staircase',      icon: 'ST', room: '*', cost: 800, quality: 2, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2, unlockLevel: 2 },
+    staircase:     { label: 'Staircase',      icon: '\u{1FA9C}', room: '*', cost: 800, quality: 2, needBonus: { comfort: 4 },           comfort: 1, w: 1, h: 2, unlockLevel: 2 },
     map_portal:    { label: 'Door / Portal',  icon: '🚪', room: '*', cost: 0,   quality: 1, needBonus: {},                     comfort: 0, w: 1, h: 1 },
 
     // City & Specialized

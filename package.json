@@ -13,7 +13,10 @@
     "test": "node scripts/verify-game.js",
     "generate:avatars": "node scripts/generate-avatar-assets.js",
     "start:desktop": "electron .",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "sop:doctor": "web-sop doctor",
+    "sop:check": "web-sop check --mode fast",
+    "sop:release": "web-sop check --mode release"
   },
   "repository": {
     "type": "git",

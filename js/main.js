@@ -516,14 +516,8 @@ Game.Main = (function() {
     if (tutorialShown || Game.State.get().time.day > 1) return;
     tutorialShown = true;
     setTimeout(() => {
-      Game.UI.showNotification('🏠 Welcome! Click furniture to interact via pie menu.');
+      Game.UI.showNotification('Welcome! Start with Daily Focus or Do.');
     }, 1000);
-    setTimeout(() => {
-      Game.UI.showNotification('⌨️ Press 1/2/3 for speed, Space to pause, Q for autonomy toggle.');
-    }, 3000);
-    setTimeout(() => {
-      Game.UI.showNotification('💡 Shift+Click to queue actions. Your Sim will auto-act when idle!');
-    }, 5000);
   }
 
   return { init, getSpeed: () => gameSpeed, hitTestNPCWalker, spawnNPCWalker, tick };

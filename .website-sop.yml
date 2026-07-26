@@ -1,0 +1,50 @@
+# Managed by web-sop. Project-specific values may be edited.
+version: 1.0.0
+project:
+  name: the-game
+  profile: static
+  packageManager: npm
+  workspaceKind: single
+  sourceRoots: []
+commands:
+  install: npm ci
+  dev: null
+  lint: null
+  typecheck: null
+  test: npm run test
+  build: npm run test
+  e2e: null
+  audit: npm audit --audit-level=high
+  verify: null
+quality:
+  enforcement: warn
+  requiredDocs:
+    - docs/product-spec.md
+    - docs/architecture.md
+    - docs/design-system.md
+    - docs/test-matrix.md
+    - docs/release-checklist.md
+    - docs/workspace-layout.md
+  requiredStates:
+    - loading
+    - empty
+    - error
+    - success
+    - partial
+  budgets:
+    lighthousePerformance: 85
+    lighthouseAccessibility: 95
+    lighthouseBestPractices: 95
+    lighthouseSeo: 90
+    lcpMs: 2500
+    cls: 0.1
+    inpMs: 200
+release:
+  requireRollbackPlan: true
+  requireProductionSmokeTest: true
+plugins:
+  preferred:
+    - build-web-apps:frontend-app-builder
+    - build-web-apps:frontend-testing-debugging
+    - build-web-apps:react-best-practices
+    - codex-security:security-diff-scan

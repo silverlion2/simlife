@@ -1,0 +1,18 @@
+{
+  "sopVersion": "1.0.0",
+  "adoptedAt": "2026-07-26T10:48:18.605Z",
+  "project": "the-game",
+  "profile": "static",
+  "workspaceKind": "single",
+  "packageScriptsUpdated": true,
+  "generatedFiles": [
+    ".website-sop.yml",
+    "docs/product-spec.md",
+    "docs/architecture.md",
+    "docs/design-system.md",
+    "docs/test-matrix.md",
+    "docs/release-checklist.md",
+    "docs/workspace-layout.md",
+    ".github/workflows/website-quality.yml"
+  ]
+}

@@ -766,6 +766,28 @@ body.low-graphics #tilt-shift-overlay {
   box-shadow: 0 0 10px rgba(212, 175, 55, 0.3), var(--shadow-drop);
 }
 
+.mobile-menu-toggle {
+  display: none;
+  background: var(--panel-bg);
+  border: 2px solid var(--gold-trim);
+  border-bottom: 3px solid var(--gold-dim);
+  color: var(--text-main);
+  min-width: 0;
+  width: 100%;
+  padding: 6px 10px;
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 8px;
+  box-shadow: var(--shadow-drop);
+  transition: all 0.1s;
+  letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---- Dialogs & Modals ---- */
 .rpg-dialog {
   position: absolute;
@@ -3049,6 +3071,11 @@ select:focus-visible,
   border-color: rgba(112, 183, 255, 0.58);
 }
 
+#activity-display[data-state="queued"] {
+  border-color: rgba(255, 215, 122, 0.64);
+  box-shadow: var(--shadow-drop), 0 0 24px rgba(255, 215, 122, 0.15);
+}
+
 .daily-focus {
   min-width: 260px;
   max-width: 430px;
@@ -3172,6 +3199,23 @@ select:focus-visible,
   box-shadow: var(--shadow-drop), 0 0 0 2px rgba(255, 215, 122, 0.16), 0 0 20px rgba(255, 215, 122, 0.18);
 }
 
+.mobile-menu-toggle {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(69, 192, 179, 0.54);
+  border-bottom: 2px solid rgba(44, 122, 118, 0.8);
+  background:
+    linear-gradient(180deg, rgba(69, 192, 179, 0.24), rgba(255, 247, 224, 0.03)),
+    rgba(37, 51, 48, 0.88);
+  box-shadow: var(--shadow-drop), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  color: var(--text-main);
+}
+
+.mobile-menu-toggle:hover {
+  border-color: rgba(113, 224, 212, 0.78);
+  transform: translateY(-1px);
+}
+
 #btn-ingame-menu {
   color: #ffc5bd !important;
   border-color: rgba(239, 106, 104, 0.62) !important;
@@ -3253,6 +3297,62 @@ select:focus-visible,
   background:
     linear-gradient(180deg, rgba(128, 211, 127, 0.24), rgba(69, 192, 179, 0.09)),
     rgba(38, 62, 42, 0.9) !important;
+}
+
+.build-tabs {
+  position: sticky;
+  top: 40px;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 10px;
+  padding: 6px;
+  border: 1px solid rgba(255, 215, 122, 0.22);
+  border-radius: 8px;
+  background: rgba(24, 18, 15, 0.78);
+  backdrop-filter: blur(8px);
+}
+
+.build-tab {
+  min-height: 36px;
+  border: 1px solid rgba(255, 215, 122, 0.24);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 247, 224, 0.1), rgba(255, 247, 224, 0.025)),
+    rgba(51, 38, 31, 0.82);
+  color: rgba(255, 248, 230, 0.78);
+  cursor: pointer;
+  font-family: var(--font-serif);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.build-tab span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 248, 230, 0.66);
+  font-family: var(--font-sans);
+  font-size: 10px;
+}
+
+.build-tab.active {
+  border-color: rgba(69, 192, 179, 0.74);
+  background:
+    linear-gradient(180deg, rgba(69, 192, 179, 0.28), rgba(255, 215, 122, 0.08)),
+    rgba(31, 48, 45, 0.92);
+  color: var(--text-main);
+  box-shadow: 0 0 0 2px rgba(69, 192, 179, 0.15);
+}
+
+.build-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.46;
 }
 
 .panel-close,
@@ -3847,15 +3947,42 @@ body.side-panel-open .daily-focus {
   }
 
   .menu-bar {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     width: 100%;
-    gap: 6px;
+    gap: 5px;
   }
 
-  .panel-btn {
+  .mobile-menu-toggle {
+    display: block;
+  }
+
+  .menu-bar .panel-btn[data-panel="market"],
+  .menu-bar .panel-btn[data-panel="collections"],
+  .menu-bar .panel-btn[data-panel="career"],
+  .menu-bar .panel-btn[data-panel="social"],
+  .menu-bar .panel-btn[data-panel="skills"],
+  .menu-bar .panel-btn[data-panel="legacy"] {
+    display: none;
+  }
+
+  body.mobile-panel-menu-open .menu-bar {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  body.mobile-panel-menu-open .menu-bar .panel-btn[data-panel="market"],
+  body.mobile-panel-menu-open .menu-bar .panel-btn[data-panel="collections"],
+  body.mobile-panel-menu-open .menu-bar .panel-btn[data-panel="career"],
+  body.mobile-panel-menu-open .menu-bar .panel-btn[data-panel="social"],
+  body.mobile-panel-menu-open .menu-bar .panel-btn[data-panel="skills"],
+  body.mobile-panel-menu-open .menu-bar .panel-btn[data-panel="legacy"] {
+    display: block;
+  }
+
+  .panel-btn,
+  .mobile-menu-toggle {
     min-height: 30px;
-    padding: 4px 6px;
-    font-size: 11px;
+    padding: 4px 5px;
+    font-size: 10px;
   }
 
   .social-summary {
@@ -3986,6 +4113,19 @@ body.side-panel-open .daily-focus {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
     padding-bottom: 8px;
+  }
+
+  .build-tabs {
+    top: 82px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+    margin-bottom: 8px;
+    padding: 5px;
+  }
+
+  .build-tab {
+    min-height: 32px;
+    font-size: 11px;
   }
 
   .build-mode-actions .sell-mode-btn {
