@@ -39,6 +39,7 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 | Electron boot smoke | Passing | Passing on every PR | `npm test` |
 | Rendered canvas | Nonblank | Colored pixels, 4+ buckets, no missing avatar textures | `scripts/verify-game.js` |
 | Mobile menu weight | 10 persistent buttons | 5 persistent buttons, rest in More drawer | Visual check |
+| Mobile HUD height | 315px at 390×844 | 270px or less with all seven needs visible | Automated layout check and screenshot |
 | First activity feedback | Delayed/implicit | HUD updates immediately after click | Visual and DOM check |
 
 ## Decisions

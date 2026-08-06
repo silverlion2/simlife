@@ -21,7 +21,7 @@
 
 - Desktop: persistent 3-column menu; full needs labels; side/dialog panel can occupy the center.
 - Tablet: bottom HUD becomes two columns with action panel spanning the row.
-- Mobile: menu shows Build, Goals, Do, Menu, More in one row; secondary menu buttons appear only when More is open.
+- Mobile: needs use a compact four-column/two-row grid; menu shows Build, Goals, Do, Menu, More in one row; secondary menu buttons appear only when More is open.
 - Mobile panels: full-height dialog with sticky controls and two-column Build tabs.
 
 ## Interaction states

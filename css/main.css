@@ -3930,16 +3930,26 @@ body.side-panel-open .daily-focus {
 
   .needs-section-rpg {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     width: 100%;
-    padding: 7px;
-    gap: 6px;
+    padding: 6px;
+    gap: 5px;
   }
 
   .need-bar {
-    grid-template-columns: 22px minmax(54px, 1fr) 26px;
-    gap: 5px;
-    min-height: 24px;
+    grid-template-columns: 20px minmax(14px, 1fr) 20px;
+    gap: 3px;
+    min-height: 22px;
+  }
+
+  .need-icon {
+    width: 20px;
+    height: 20px;
+    font-size: 13px;
+  }
+
+  .need-value {
+    font-size: 9px;
   }
 
   .need-name {

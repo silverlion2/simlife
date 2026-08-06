@@ -1383,6 +1383,50 @@ async function checkFamilyAssignmentsPanel(page) {
   return { ...initial, ...assigned };
 }
 
+async function checkMobileHudLayout(page) {
+  await step('resize Electron viewport for mobile HUD check', () => page.setViewportSize({
+    width: 390,
+    height: 844,
+  }));
+  await page.waitForTimeout(250);
+
+  const result = await step('read compact mobile HUD layout', () => page.evaluate(() => {
+    const hud = document.getElementById('status-panel');
+    const needs = document.getElementById('needs-bars');
+    const bars = [...document.querySelectorAll('#needs-bars .need-bar')];
+    const visibleButtons = [...document.querySelectorAll('.menu-bar button')]
+      .filter(button => getComputedStyle(button).display !== 'none');
+    const rowTops = [...new Set(bars.map(bar => Math.round(bar.getBoundingClientRect().top)))];
+    return {
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      hudHeight: Math.round(hud.getBoundingClientRect().height),
+      needsHeight: Math.round(needs.getBoundingClientRect().height),
+      needBars: bars.length,
+      configuredNeeds: Object.keys(window.Game.Config.NEEDS).length,
+      needRows: rowTops.length,
+      visibleMenuButtons: visibleButtons.map(button => button.textContent.trim()),
+      horizontalOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  }));
+
+  if (result.needBars !== result.configuredNeeds) {
+    fail(`Expected every need in the mobile HUD: ${JSON.stringify(result)}`);
+  }
+  if (result.needRows > 2 || result.needsHeight > 80) {
+    fail(`Expected compact two-row mobile needs layout: ${JSON.stringify(result)}`);
+  }
+  if (result.hudHeight > 270) {
+    fail(`Expected mobile HUD to stay at or below 270px: ${JSON.stringify(result)}`);
+  }
+  if (result.visibleMenuButtons.length !== 5) {
+    fail(`Expected five persistent mobile menu buttons: ${JSON.stringify(result)}`);
+  }
+  if (result.horizontalOverflow > 0) {
+    fail(`Expected no mobile horizontal overflow: ${JSON.stringify(result)}`);
+  }
+  return result;
+}
+
 async function openEditAvatarEditor(page) {
   await step('open Skills panel', async () => {
     const skillsPanelOpen = await page.evaluate(() => {
@@ -1603,6 +1647,7 @@ async function checkElectronRuntime() {
     if (result.activeFurniture < 30) fail(`Expected starter world furniture, found ${result.activeFurniture}`);
     if (result.activeRooms < 3) fail(`Expected starter rooms, found ${result.activeRooms}`);
     if (!result.menuHidden) fail('Expected main menu to hide after starting the game');
+    result.mobileHud = await checkMobileHudLayout(page);
 
     return result;
   } finally {

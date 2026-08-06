@@ -11,5 +11,5 @@
 | Home goals | Open Goals | Active goal cards and disabled incomplete claims render | E2E | Yes, `npm test` |
 | Build renovate tab | Open Build, switch Renovate | Layout, resize, furnish, floor, and lot controls render | E2E | Yes, `npm test` |
 | Family assignments | Seed household members | Routine buttons render and assignment state updates | E2E | Yes, `npm test` |
-| Mobile HUD | 390px viewport | Five persistent menu buttons, More reveals secondary buttons | Visual | Manual screenshot |
+| Mobile HUD | 390×844 viewport | Seven needs fit in at most two rows, HUD is at most 270px tall, and five persistent menu buttons remain visible | E2E + visual | Yes, `npm test`, plus manual screenshot |
 | Activity feedback | Start activity from mobile Activities panel | Panel closes and HUD immediately shows active movement | Visual | Manual screenshot |
