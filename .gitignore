@@ -1,4 +1,7 @@
 node_modules/
+dist/
+output/
+__pycache__/
 browser_*.txt
 *.py
 

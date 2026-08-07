@@ -8,16 +8,18 @@ Game.Audio = (function() {
   let masterGain = null;
   let ambientGain = null;
   let initialized = false;
+  let masterVolume = 0.3;
+  let muted = false;
 
   function init() {
     try {
       ctx = new (window.AudioContext || window.webkitAudioContext)();
       masterGain = ctx.createGain();
-      masterGain.gain.value = 0.3;
+      masterGain.gain.value = muted ? 0 : masterVolume;
       masterGain.connect(ctx.destination);
       ambientGain = ctx.createGain();
       ambientGain.gain.value = 0.15;
-      ambientGain.connect(ctx.destination);
+      ambientGain.connect(masterGain);
       initialized = true;
     } catch(e) { console.warn('Audio unavailable'); }
   }
@@ -25,6 +27,12 @@ Game.Audio = (function() {
   function ensureCtx() {
     if (!initialized) init();
     if (ctx && ctx.state === 'suspended') ctx.resume();
+  }
+
+  function setMasterVolume(value, shouldMute) {
+    masterVolume = Math.max(0, Math.min(1, Number(value) || 0));
+    muted = Boolean(shouldMute);
+    if (masterGain) masterGain.gain.value = muted ? 0 : masterVolume;
   }
 
   // Simple tone beep (for UI clicks, harvest, etc.)
@@ -114,5 +122,6 @@ Game.Audio = (function() {
     playNotification,
     startRain,
     stopRain,
+    setMasterVolume,
   };
 })();

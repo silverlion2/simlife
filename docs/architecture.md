@@ -33,3 +33,17 @@ SimLife is a static browser game that also runs inside Electron. The runtime loa
 - Verification: `npm test`, `web-sop doctor`, `web-sop check --mode fast`.
 - Release: Electron packaging uses `npm run build:win` when a Windows build is needed.
 - Rollback: revert the release commit or ship the previous known-good Electron package.
+
+## Hearthbyte Edition modules
+
+- `Game.Campaign` owns serializable chapter progress, XP, level, rewards, and campaign-panel rendering. It reads simulation state but never owns renderer objects.
+- `Game.Shell` owns the pause/settings/controls overlay, accessibility preferences, and menu input gating.
+- `Game.Main` remains the simulation clock and exposes explicit speed/pause functions used by the shell.
+- `Game.Renderer` owns camera zoom and presentation only. Its initial zoom is responsive and does not alter simulation coordinates.
+- `Game.Audio` owns the master mute and volume boundary. Settings persist in localStorage and are safe when Web Audio is unavailable.
+
+Campaign state is stored under `state.campaign`. Settings are stored under `simlife_settings_v2` because they apply across save slots. Existing saves call `Game.Campaign.ensureState()` during startup and receive defaults for missing fields.
+
+Phaser, EasyStar, NavMesh, and the rex state manager load from pinned files under `vendor/`. CDN and production `node_modules` execution are not part of the shipping boot path. Steamworks is disabled by default and only initializes when a real `SIMLIFE_STEAM_APP_ID` is supplied for a Steam-specific build.
+
+Production Electron builds use the branded `SimLife Hearthbyte Edition` user-data directory. On first launch, `main.js` copies only the legacy profile's `Local Storage` directory when the branded profile has no local storage yet. Volatile Chromium caches are intentionally not migrated.

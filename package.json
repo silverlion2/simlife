@@ -1,13 +1,9 @@
 {
-  "dependencies": {
-    "easystarjs": "^0.4.4",
-    "navmesh": "^2.3.1",
-    "phaser4-rex-plugins": "^4.0.1",
-    "playwright": "^1.59.1"
-  },
-  "name": "the-game",
-  "version": "1.0.0",
-  "description": "A deep browser-based life simulation game inspired by The Sims. Build your home, grow your career, make friends, and leave a lasting legacy — all from your browser.",
+  "dependencies": {},
+  "name": "simlife-hearthbyte-edition",
+  "productName": "SimLife: Hearthbyte Edition",
+  "version": "2.0.0",
+  "description": "A cozy retro 2D life simulation about building a home, growing a career, making friends, and leaving a legacy.",
   "main": "main.js",
   "scripts": {
     "test": "node scripts/verify-game.js",
@@ -22,17 +18,68 @@
     "type": "git",
     "url": "git+https://github.com/silverlion2/simlife.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "life-simulation",
+    "retro-game",
+    "pixel-art",
+    "electron"
+  ],
+  "author": "SimLife Team",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/silverlion2/simlife/issues"
   },
   "homepage": "https://github.com/silverlion2/simlife#readme",
+  "build": {
+    "appId": "com.simlife.hearthbyte",
+    "productName": "SimLife Hearthbyte Edition",
+    "asar": true,
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "preload.js",
+      "css/**/*",
+      "js/**/*",
+      "vendor/**/*",
+      "assets/**/*",
+      "!assets/**/*.zip",
+      "!assets/**/Samples/**/*",
+      "!assets/**/Sample.png",
+      "!assets/**/Preview.png",
+      "!assets/**/*.url",
+      "package.json"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "SimLife-Hearthbyte-${version}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  },
   "devDependencies": {
-    "electron": "^41.2.1",
-    "electron-builder": "^26.8.1",
+    "easystarjs": "^0.4.4",
+    "electron": "^41.10.4",
+    "electron-builder": "^26.15.3",
+    "navmesh": "^2.3.1",
+    "phaser": "^4.0.0",
+    "phaser4-rex-plugins": "^4.2.0",
+    "playwright": "^1.59.1",
     "steamworks.js": "^0.4.0"
   }
 }

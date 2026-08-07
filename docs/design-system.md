@@ -38,3 +38,21 @@
 - Keep mobile touch targets at least about 30px high for dense controls and larger where space allows.
 - Use `aria-selected` on Build tabs and `aria-expanded` on the mobile More toggle.
 - Avoid text overlap by using ellipsis inside fixed-format HUD/buttons.
+
+## Hearthbyte Edition art direction
+
+- Fantasy: a complete 16-bit "cozy cartridge" life-sim presented through warm CRT-era console chrome.
+- Materials: midnight navy shell, ink-black recesses, brass pixels, mint/teal success, coral danger, and parchment text.
+- Typography: chunky display face for titles and controls; highly legible rounded sans for descriptions and dense panels.
+- Shape language: clipped pixel corners and double-line highlights on hero controls; modest 4-8px rounding inside dense panels.
+- Texture: restrained scanlines, dithered gradients, star specks, and edge vignette. Effects never reduce text contrast.
+- Motion: short stepped transitions for rewards and menus; reduced-motion disables nonessential float, shimmer, and scanline movement.
+
+### HUD hierarchy
+
+1. Current objective and danger state.
+2. Time, speed, money, mood, and needs.
+3. Contextual activity/queue feedback.
+4. Deep systems behind the command dock or side panel.
+
+The center of the playfield stays clear. The campaign chip replaces the decorative title as the primary top-center control and opens the campaign journal.

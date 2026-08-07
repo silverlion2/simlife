@@ -74,9 +74,17 @@ Game.AvatarEditor = (function() {
       const colors = Object.values(state.colors).map(resolveColor);
       const primary = colors[0] || '#3f7fb8';
       const secondary = colors[1] || '#202935';
+      const layers = Game.Appearance.getRenderLayers(appearance, 'S');
+      const layerMarkup = layers.map(layer => {
+        const src = window.SIM_AVATAR_ASSETS && window.SIM_AVATAR_ASSETS[layer.textureKey];
+        if (!src) return '';
+        return `<img class="avatar-preview-layer" src="${src}" alt="" draggable="false">`;
+      }).join('');
       return `
         <div class="avatar-preview" aria-hidden="true">
-          <div class="avatar-preview-figure avatar-preview-${appearance.form}" style="--avatar-primary:${primary}; --avatar-secondary:${secondary};"></div>
+          <div class="avatar-preview-stage avatar-preview-${appearance.form}" style="--avatar-primary:${primary}; --avatar-secondary:${secondary};">
+            ${layerMarkup || '<div class="avatar-preview-fallback"></div>'}
+          </div>
           <div class="avatar-preview-name">${Game.AvatarCatalog.FORMS[appearance.form].label}</div>
         </div>
       `;

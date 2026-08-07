@@ -83,3 +83,22 @@ MIT
 - **Primary keywords:** browser-game, life-simulation, simulation-game, ai-agents, moodlets, build-mode, javascript, html5, css3, game-dev
 - **Use cases:** Browser life simulation gameplay, Autonomous character AI experiments, 2.5D build and career simulation
 <!-- discoverability:end -->
+
+## Hearthbyte Edition v2.0
+
+The v2.0 release turns SimLife into a complete retro-cozy campaign while preserving the original sandbox depth.
+
+- Eight-chapter **New Roots** story campaign with persistent XP, levels, one-time rewards, and clear next actions.
+- Proper pause menu with save, resume, controls, audio, CRT, reduced-motion, and high-contrast settings.
+- Responsive, world-first HUD and camera framing for desktop and mobile-sized windows.
+- Fully local Phaser and pathfinding runtime for offline Electron play.
+- Existing save slots migrate forward automatically.
+
+Additional controls:
+
+| Key | Action |
+|-----|--------|
+| **B** | Open Build |
+| **J** | Open campaign journal |
+| **F3** | Toggle developer bounds |
+| **Escape** | Close the current surface or open pause |

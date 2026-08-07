@@ -48,3 +48,20 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 - 2026-07-26: Use Daily Focus for first-day onboarding instead of modal tutorials so the playfield stays visible.
 - 2026-07-26: Mobile HUD keeps Build, Goals, Do, Menu, and More visible; secondary panels live in the More drawer.
 - 2026-07-26: Build panel uses tabs to reduce scrolling and accidental taps while preserving existing functionality.
+- 2026-08-07: Ship the polished game as **SimLife: Hearthbyte Edition**, a complete retro-cozy campaign layered over the existing simulation.
+- 2026-08-07: Preserve the static `window.Game` module architecture and current saves; add migration-safe campaign and settings state instead of a framework rewrite.
+- 2026-08-07: Make the first playable frame world-forward: a closer default camera, compact objective tracker, and no blocking tutorial.
+- 2026-08-07: Replace the reload-only in-game Menu action with a true pause surface containing resume, save, settings, controls, and main-menu actions.
+- 2026-08-07: Bundle Phaser locally so the Electron game remains playable without a network connection.
+
+## Hearthbyte Edition release loop
+
+The player creates a Sim, enters a furnished starter home, and advances through an eight-chapter "New Roots" campaign while freely using every sandbox system. Each chapter has one legible objective, an immediate reward, and an explicit next step. The campaign starts with basic self-care and careers, then introduces goals, furnishing, skills, relationships, home growth, and collections.
+
+The release is considered fully playable when:
+
+- A new player can start, understand the next action, complete activities, pause, save, and return to the main menu without external instructions.
+- The campaign persists across local saves and migrates old saves without data loss.
+- Keyboard, pointer, and mobile-width layouts preserve access to primary actions.
+- The Electron runtime boots and renders with network access disabled.
+- Desktop and mobile screenshots show a readable world, objective, needs, and controls without blocking the central playfield.

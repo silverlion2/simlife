@@ -37,6 +37,15 @@ Game.Renderer = (function() {
   const CAMERA_FOCUS_FALLBACK_OFFSET = 48;
   window.DEBUG_BOUNDS = false;
 
+  function getDefaultCameraZoom(width, height) {
+    const viewportWidth = Number(width) || window.innerWidth || 1280;
+    const viewportHeight = Number(height) || window.innerHeight || 720;
+    if (viewportWidth <= 620 || viewportHeight <= 560) return 1.12;
+    if (viewportWidth >= 1500) return 1.62;
+    if (viewportWidth >= 1100) return 1.5;
+    return 1.3;
+  }
+
   class MainScene extends Phaser.Scene {
     constructor() {
       super({ key: 'MainScene' });
@@ -61,6 +70,7 @@ Game.Renderer = (function() {
     create() {
       mainScene = this;
       this.cameraFollowsCharacter = true;
+      this.userAdjustedZoom = false;
       this.cameras.main.setBackgroundColor('#25451f');
 
       const backdropGraphics = this.make.graphics({ x: 0, y: 0, add: false });
@@ -147,13 +157,6 @@ Game.Renderer = (function() {
         this.showMoveMarker(gx, gy);
       });
       
-      this.input.keyboard.on('keydown-SPACE', () => {
-          const char = Game.State.get().character;
-          if (char && char.position && (!char.position.z || char.position.z <= 0)) {
-              char.vz = 4.0; // Trigger jump velocity (units per minute)
-          }
-      });
-
       // Global Shadow Overlay
       this.shadowOverlay = this.add.rectangle(0, 0, 8000, 6000, 0x040822);
       this.shadowOverlay.setScrollFactor(0);
@@ -194,7 +197,7 @@ Game.Renderer = (function() {
       });
       this.snowEmitter.setDepth(999990);
 
-      this.input.keyboard.on('keydown-B', () => {
+      this.input.keyboard.on('keydown-F3', () => {
           window.DEBUG_BOUNDS = !window.DEBUG_BOUNDS;
           document.dispatchEvent(new CustomEvent('notification', { detail: { message: window.DEBUG_BOUNDS ? '🔍 Debug Overlays: ON' : '🔍 Debug Overlays: OFF' }}));
       });
@@ -204,6 +207,7 @@ Game.Renderer = (function() {
 
       // Draw static grid representing the house rooms/lot
       this.drawHouseGrid();
+      this.cameras.main.setZoom(getDefaultCameraZoom(this.scale.width, this.scale.height));
       this.centerCameraOnCharacter();
     }
 
@@ -1904,6 +1908,21 @@ Game.Renderer = (function() {
   RendererMath.setOffset(window.innerWidth / 2, 200);
   window.addEventListener('resize', () => {
     RendererMath.setOffset(window.innerWidth / 2, RendererMath.getOffset().y);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!mainScene) return;
+        if (!mainScene.userAdjustedZoom) {
+          mainScene.cameras.main.setZoom(getDefaultCameraZoom(mainScene.scale.width, mainScene.scale.height));
+        }
+        if (mainScene.drawHouseGrid) mainScene.drawHouseGrid();
+        if (mainScene.terrainBackdrop) {
+          mainScene.terrainBackdrop.setSize(mainScene.scale.width, mainScene.scale.height);
+        }
+        if (mainScene.cameraFollowsCharacter && mainScene.centerCameraOnCharacter) {
+          mainScene.centerCameraOnCharacter(true);
+        }
+      });
+    });
   });
 
   // Pure Isometric Math: Cartesian (gridX, gridY, gridZ) to Screen (scX, scY)
@@ -2044,6 +2063,7 @@ function startPhaser(canvasEl) {
   
   function adjustZoom(step) {
     if(mainScene) {
+      mainScene.userAdjustedZoom = true;
       mainScene.cameras.main.zoom = Math.max(0.25, Math.min(4, mainScene.cameras.main.zoom + step));
       if (mainScene.cameraFollowsCharacter && mainScene.centerCameraOnCharacter) {
         mainScene.centerCameraOnCharacter(true);
@@ -2077,6 +2097,10 @@ function startPhaser(canvasEl) {
   }
   function closePieMenu() {
     if (mainScene) mainScene.closePieMenu();
+  }
+
+  function isPieMenuOpen() {
+    return Boolean(mainScene && mainScene.pieMenu);
   }
 
   function hitTestFurniture(gx, gy) {
@@ -2267,6 +2291,7 @@ function startPhaser(canvasEl) {
     getCameraDebug,
     showPieMenu,
     closePieMenu,
+    isPieMenuOpen,
     spawnFloatingBubble,
     findPath,
     getAvatarDebug: function() {

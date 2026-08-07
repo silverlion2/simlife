@@ -295,6 +295,16 @@ Game.State = (function() {
         generation: 1,
         upgrades: {},
       },
+      campaign: {
+        id: 'new_roots_v1',
+        completed: [],
+        awarded: {},
+        xp: 0,
+        level: 1,
+        flags: {},
+        startedDay: 1,
+        finishedDay: null,
+      },
       stats: {
         buildingsBuilt: 0,
         furnitureBought: 0,

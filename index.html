@@ -4,22 +4,28 @@
     <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SimLife — Build Your Dream Life</title>
-  <meta name="description" content="A deep life simulation game. Build your home, grow your career, make friends, and leave a legacy. Featuring autonomous AI, moodlets, and radial pie menus.">
+  <meta name="description" content="A complete retro-cozy life simulation. Build a home, grow a career, make friends, master skills, and finish the New Roots campaign.">
+  <meta name="theme-color" content="#111827">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>">
-  <link rel="stylesheet" href="css/main.css?v=3">
+  <link rel="stylesheet" href="css/main.css?v=5">
   
-  <!-- Phaser 4 Core Engine -->
-  <script src="https://cdn.jsdelivr.net/npm/phaser@4.0.0/dist/phaser.min.js"></script>
-  <!-- EasyStar.js for A* Pathfinding -->
-  <script src="https://cdn.jsdelivr.net/npm/easystarjs@0.4.4/bin/easystar-0.4.4.min.js"></script>
+  <!-- Local runtime dependencies keep the Electron game fully playable offline. -->
+  <script src="vendor/phaser.min.js"></script>
+  <script src="vendor/easystar.min.js"></script>
 </head>
 <body>
 
 <!-- Main Menu Screen (Starts visible) -->
 <div id="main-menu-screen" class="fs-screen">
   <div class="menu-content">
+    <div class="menu-kicker">HEARTHBYTE SYSTEM // DELUXE CARTRIDGE</div>
     <h1 class="bounce-title">🏡 SimLife</h1>
-    <p class="subtitle">Build your dream home, grow your career, make friends.</p>
+    <p class="subtitle">One tiny home. One big life. Your story starts at sunrise.</p>
+    <div class="menu-feature-strip" aria-label="Game features">
+      <span>1 PLAYER</span>
+      <span>8 CHAPTERS</span>
+      <span>LOCAL SAVE</span>
+    </div>
     
     <div class="menu-btn-group">
       <button id="btn-mm-new">✨ New Game</button>
@@ -32,6 +38,11 @@
       <input type="file" id="file-import" accept=".json" style="display:none">
 
       <button id="btn-mm-wipe" style="background:#cc3333; color:white; border-color:#990000; margin-top: 15px;">🗑️ Wipe All Data</button>
+    </div>
+    <div class="menu-footer">
+      <span>v2.0</span>
+      <span>POINTER + KEYBOARD</span>
+      <span>OFFLINE READY</span>
     </div>
   </div>
 </div>
@@ -110,6 +121,50 @@
   <h1 id="announcer-text">🌸 A New Day Begins!</h1>
 </div>
 
+<!-- Pause / settings shell -->
+<div id="pause-overlay" class="pause-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
+  <div class="pause-card">
+    <div class="pause-kicker">GAME SUSPENDED</div>
+    <h2 id="pause-title">SimLife</h2>
+    <p class="pause-subtitle">HEARTHBYTE EDITION</p>
+    <div class="pause-actions">
+      <button id="btn-pause-resume" class="pause-primary" type="button">RESUME</button>
+      <button id="btn-pause-save" type="button">SAVE WORLD</button>
+      <button id="btn-pause-controls" type="button" aria-expanded="false">CONTROLS</button>
+      <button id="btn-pause-settings" type="button" aria-expanded="false">SETTINGS</button>
+      <button id="btn-pause-menu" class="pause-danger" type="button">SAVE &amp; MAIN MENU</button>
+    </div>
+    <div id="pause-controls-panel" class="pause-drawer hidden">
+      <h3>FIELD MANUAL</h3>
+      <div class="control-grid">
+        <span><kbd>CLICK</kbd> Move / interact</span>
+        <span><kbd>SHIFT+CLICK</kbd> Queue action</span>
+        <span><kbd>WASD</kbd> Pan camera</span>
+        <span><kbd>C</kbd> Center camera</span>
+        <span><kbd>SPACE</kbd> Pause time</span>
+        <span><kbd>1 2 3</kbd> Game speed</span>
+        <span><kbd>B</kbd> Build mode</span>
+        <span><kbd>J</kbd> Campaign journal</span>
+        <span><kbd>Q</kbd> Toggle autonomy</span>
+        <span><kbd>ESC</kbd> Pause / back</span>
+      </div>
+    </div>
+    <div id="pause-settings-panel" class="pause-drawer hidden">
+      <h3>SYSTEM SETTINGS</h3>
+      <label class="setting-row" for="setting-volume">
+        <span>Master volume</span>
+        <input id="setting-volume" type="range" min="0" max="100" step="5" value="30">
+        <output id="setting-volume-value" for="setting-volume">30%</output>
+      </label>
+      <label class="setting-toggle"><input id="setting-muted" type="checkbox"><span>Mute audio</span></label>
+      <label class="setting-toggle"><input id="setting-scanlines" type="checkbox" checked><span>CRT scanlines</span></label>
+      <label class="setting-toggle"><input id="setting-reduced-motion" type="checkbox"><span>Reduced motion</span></label>
+      <label class="setting-toggle"><input id="setting-high-contrast" type="checkbox"><span>High contrast HUD</span></label>
+    </div>
+    <div class="pause-hint">ESC TO RESUME</div>
+  </div>
+</div>
+
 <div class="game-container">
   
   <!-- Content -->
@@ -144,6 +199,11 @@
     
     <div class="hud-center">
       <h1 class="game-title">SimLife</h1>
+      <button id="campaign-chip" class="campaign-chip" type="button" data-panel="campaign" aria-label="Open campaign journal">
+        <span class="campaign-chip-kicker">NEW ROOTS // CHAPTER 1</span>
+        <strong class="campaign-objective">Make your first move</strong>
+        <span class="campaign-progress"><i></i></span>
+      </button>
     </div>
 
     <div class="hud-right">
@@ -201,8 +261,8 @@
 </div>
 
 <!-- Scripts in dependency order -->
-<script src="node_modules/navmesh/dist/navmesh.js"></script>
-<script src="node_modules/phaser4-rex-plugins/dist/rexstatemanagerplugin.min.js"></script>
+<script src="vendor/navmesh.js"></script>
+<script src="vendor/rexstatemanagerplugin.min.js"></script>
 <script src="js/config.js?v=2"></script>
 <script src="js/avatar_catalog.js?v=1"></script>
 <script src="js/appearance.js?v=1"></script>
@@ -225,12 +285,14 @@
 <script src="js/renderer_math.js?v=1"></script>
 <script src="js/renderer_helpers.js?v=1"></script>
 <script src="js/avatar_renderer.js?v=3"></script>
-<script src="js/renderer.js?v=8"></script>
+<script src="js/renderer.js?v=9"></script>
 <script src="js/autonomy.js?v=2"></script>
 <script src="js/interaction.js?v=2"></script>
-<script src="js/avatar_editor.js?v=1"></script>
-<script src="js/ui.js?v=2"></script>
-<script src="js/main.js?v=2"></script>
+<script src="js/avatar_editor.js?v=2"></script>
+<script src="js/ui.js?v=3"></script>
+<script src="js/campaign.js?v=1"></script>
+<script src="js/shell.js?v=1"></script>
+<script src="js/main.js?v=3"></script>
 
 </body>
 </html>

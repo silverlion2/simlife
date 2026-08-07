@@ -1,6 +1,7 @@
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 const vm = require('vm');
 const zlib = require('zlib');
 const { _electron: electron } = require('playwright');
@@ -884,6 +885,7 @@ function checkHomeGrowthAndFamilySystems() {
 
 function checkResources() {
   const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_catalog.js', 'js/avatar_assets.js', 'js/config.js']);
+  const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
   const avatarAssetKeys = Object.keys(context.SIM_AVATAR_ASSETS || {});
   const expectedAvatarKeys = Object.values(context.Game.AvatarCatalog.ITEMS)
@@ -896,6 +898,24 @@ function checkResources() {
   const pngCount = countFiles(path.join(root, 'assets'), '.png');
   const avatarLayerPngNames = listPngFiles(path.join(root, 'assets', 'avatar_layers'));
   const avatarLayerPngNameSet = new Set(avatarLayerPngNames);
+
+  if (/https:\/\/cdn\.jsdelivr\.net/i.test(indexHtml)) {
+    fail('Expected production game dependencies to load locally, found a jsDelivr runtime script');
+  }
+  const vendorRuntimes = [
+    'phaser.min.js',
+    'easystar.min.js',
+    'navmesh.js',
+    'rexstatemanagerplugin.min.js'
+  ];
+  for (const runtime of vendorRuntimes) {
+    if (!fs.existsSync(path.join(root, 'vendor', runtime))) {
+      fail(`Expected the bundled runtime at vendor/${runtime}`);
+    }
+    if (!indexHtml.includes(`vendor/${runtime}`)) {
+      fail(`Expected index.html to load vendor/${runtime}`);
+    }
+  }
 
   if (assetKeys.length < 40) fail(`Expected at least 40 embedded render assets, found ${assetKeys.length}`);
   if (furnitureKeys.length < 70) fail(`Expected at least 70 furniture types, found ${furnitureKeys.length}`);
@@ -942,6 +962,69 @@ function checkResources() {
     furnitureTypes: furnitureKeys.length,
     pngResources: pngCount,
   };
+}
+
+function checkCampaignBehavior() {
+  const state = {
+    character: {
+      career: null,
+      currentActivity: null,
+      skills: { cooking: 0 },
+    },
+    economy: { money: 500 },
+    homeGoals: { completed: [] },
+    homeCollections: { completed: [] },
+    homeGrowth: { level: 1 },
+    stats: { furnitureBought: 0, friendsMade: 0 },
+    time: { day: 1 },
+  };
+  let saves = 0;
+  const context = loadBrowserGlobals(['js/campaign.js'], {
+    Game: {
+      State: {
+        get: () => state,
+        save: () => { saves += 1; return true; },
+      },
+      UI: {
+        showNotification: () => {},
+        playAnnouncer: () => {},
+      },
+      Audio: {
+        playChime: () => {},
+      },
+    },
+    document: {
+      getElementById: () => null,
+    },
+  });
+
+  const campaign = context.Game.Campaign.ensureState();
+  if (!campaign || campaign.id !== 'new_roots_v1' || campaign.completed.length !== 0) {
+    fail(`Expected missing campaign state to migrate safely: ${JSON.stringify(campaign)}`);
+  }
+
+  state.character.currentActivity = { type: 'verify_activity' };
+  const firstCompleted = context.Game.Campaign.evaluateCurrent();
+  if (!firstCompleted || campaign.completed[0] !== 'first_move') {
+    fail(`Expected first activity to complete chapter one: ${JSON.stringify(campaign)}`);
+  }
+  if (state.economy.money !== 575 || campaign.xp !== 100 || saves !== 1) {
+    fail(`Expected the first campaign reward exactly once: ${JSON.stringify({ campaign, money: state.economy.money, saves })}`);
+  }
+
+  context.Game.Campaign.evaluateCurrent();
+  if (state.economy.money !== 575 || saves !== 1) {
+    fail('Expected campaign rewards to remain idempotent');
+  }
+
+  state.character.career = 'tech';
+  const secondCompleted = context.Game.Campaign.evaluateCurrent();
+  if (!secondCompleted || !campaign.completed.includes('first_paycheck')) {
+    fail(`Expected career selection to complete chapter two: ${JSON.stringify(campaign)}`);
+  }
+  if (state.economy.money !== 675 || campaign.xp !== 200 || campaign.level !== 2) {
+    fail(`Unexpected second campaign reward or level: ${JSON.stringify({ campaign, money: state.economy.money })}`);
+  }
 }
 
 function parsePngRgba(filePath) {
@@ -1479,8 +1562,37 @@ async function saveInGameAvatarForm(page, form, options = {}) {
   }, { timeout: RENDER_TIMEOUT });
 }
 
+async function checkPauseShell(page) {
+  const before = await page.evaluate(() => window.Game.Main.getSpeed());
+  await page.keyboard.press('Escape');
+  await waitForSelector(page, 'wait for pause shell to open', '#pause-overlay:not(.hidden)', { timeout: UI_TIMEOUT });
+  const paused = await page.evaluate(() => ({
+    speed: window.Game.Main.getSpeed(),
+    open: window.Game.Shell.isOpen(),
+    title: document.getElementById('pause-title')?.textContent || '',
+  }));
+  await page.keyboard.press('Escape');
+  await waitForGameFunction(page, 'wait for pause shell to close', () => (
+    document.getElementById('pause-overlay')?.classList.contains('hidden') &&
+    !window.Game.Shell.isOpen()
+  ), null, { timeout: UI_TIMEOUT });
+  const after = await page.evaluate(() => window.Game.Main.getSpeed());
+
+  if (!paused.open || paused.speed !== 0) {
+    fail(`Expected Escape to pause the simulation: ${JSON.stringify(paused)}`);
+  }
+  if (after !== before) {
+    fail(`Expected resume to restore speed ${before}, found ${after}`);
+  }
+  return { before, paused, after };
+}
+
 async function checkElectronRuntime() {
-  const app = await electron.launch({ args: [root] });
+  const testUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'simlife-test-'));
+  const app = await electron.launch({
+    args: [root],
+    env: { ...process.env, SIMLIFE_TEST_USER_DATA: testUserData },
+  });
   const page = await app.firstWindow({ timeout: 60000 });
   const pageErrors = [];
   const consoleErrors = [];
@@ -1513,7 +1625,25 @@ async function checkElectronRuntime() {
     await click(page, 'select initial robot avatar form', '#cc-avatar-editor [data-avatar-form="robot"]');
     await click(page, 'open character creation color tab', '#cc-avatar-editor [data-avatar-tab="colors"]');
     await click(page, 'select character creation primary color', '#cc-avatar-editor [data-color-channel="primary"]');
-    await click(page, 'start gameplay from character creation', '#btn-cc-start');
+    const avatarPreview = await step('verify layered character creation preview', () => page.evaluate(async () => {
+      const images = [...document.querySelectorAll('#cc-avatar-editor .avatar-preview-layer')];
+      await Promise.all(images.map(image => image.complete
+        ? Promise.resolve()
+        : new Promise(resolve => {
+          image.addEventListener('load', resolve, { once: true });
+          image.addEventListener('error', resolve, { once: true });
+        })));
+      return {
+        layers: images.length,
+        loadedLayers: images.filter(image => image.naturalWidth > 0 && image.naturalHeight > 0).length,
+        stageWidth: Math.round(document.querySelector('#cc-avatar-editor .avatar-preview-stage')?.getBoundingClientRect().width || 0),
+        stageHeight: Math.round(document.querySelector('#cc-avatar-editor .avatar-preview-stage')?.getBoundingClientRect().height || 0),
+      };
+    }));
+    if (avatarPreview.layers < 2 || avatarPreview.loadedLayers !== avatarPreview.layers || avatarPreview.stageHeight < 70) {
+      fail(`Expected a loaded layered avatar preview: ${JSON.stringify(avatarPreview)}`);
+    }
+    await click(page, 'start gameplay from character creation', '#btn-cc-start', { timeout: STARTUP_TIMEOUT });
     await waitForGameFunction(page, 'wait for gameplay state, assets, and canvas', () => {
       const state = window.Game?.State?.get?.();
       const canvas = document.getElementById('game-canvas');
@@ -1535,6 +1665,7 @@ async function checkElectronRuntime() {
       }
     }));
     const cameraControls = await checkCameraControls(page);
+    await page.evaluate(() => window.Game.UI.updateStatusBars());
     const result = await page.evaluate(() => {
       const canvas = document.getElementById('game-canvas');
       const canvases = [...document.querySelectorAll('canvas')].map(item => ({
@@ -1550,6 +1681,12 @@ async function checkElectronRuntime() {
         preloadedKeys: Object.keys(window.SIM_PRELOADED_IMAGES || {}).length,
         sceneChildren: window.__SIM_PHASER_GAME?.scene?.scenes?.[0]?.children?.list?.length || 0,
         initialAvatarDebug: window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug(),
+        campaignShell: {
+          current: window.Game.Campaign?.getCurrentChapter?.()?.id || null,
+          objective: document.querySelector('.campaign-objective')?.textContent || '',
+          dailyKicker: document.querySelector('.daily-focus-kicker')?.textContent || '',
+          dailyText: document.querySelector('.daily-focus-text')?.textContent || '',
+        },
         activeFurniture: window.Game.State.getActiveMap().furniture.length,
         activeRooms: window.Game.State.getActiveMap().rooms.length,
         gameCanvasVisible: canvas.clientWidth > 0 && canvas.clientHeight > 0,
@@ -1557,8 +1694,10 @@ async function checkElectronRuntime() {
       };
     });
     result.canvasNonBlank = canvasNonBlank;
+    result.avatarPreview = avatarPreview;
     result.outOfBoundsPathResult = outOfBoundsPathResult;
     result.cameraControls = cameraControls;
+    result.pauseShell = await checkPauseShell(page);
     result.objectMarketPanel = await checkObjectMarketPanel(page);
     result.collectionsPanel = await checkCollectionsPanel(page);
     result.goalsPanel = await checkGoalsPanel(page);
@@ -1627,9 +1766,12 @@ async function checkElectronRuntime() {
       return debug && debug.direction === 'NE' && debug.flipX === true;
     }, null, { timeout: RENDER_TIMEOUT });
 
-    await page.evaluate(() => {
+    const glowCheckSpeed = await page.evaluate(() => {
       const character = window.Game.State.get().character;
+      const speed = window.Game.Main.getSpeed();
+      window.Game.Main.setSpeed(0);
       character.currentActivity = { type: 'verify_glow' };
+      return speed;
     });
     await waitForGameFunction(page, 'wait for avatar activity glow to activate', () => {
       const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
@@ -1643,15 +1785,27 @@ async function checkElectronRuntime() {
       const debug = window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug();
       return debug && debug.activityGlowActive === false;
     }, null, { timeout: RENDER_TIMEOUT });
+    await page.evaluate(speed => window.Game.Main.setSpeed(speed), glowCheckSpeed);
 
     if (result.activeFurniture < 30) fail(`Expected starter world furniture, found ${result.activeFurniture}`);
     if (result.activeRooms < 3) fail(`Expected starter rooms, found ${result.activeRooms}`);
     if (!result.menuHidden) fail('Expected main menu to hide after starting the game');
+    if (!result.campaignShell.current || !result.campaignShell.objective) {
+      fail(`Expected an active campaign objective in the HUD: ${JSON.stringify(result.campaignShell)}`);
+    }
+    if (!result.campaignShell.dailyKicker.startsWith('Chapter')) {
+      fail(`Expected Daily Focus to follow the active campaign chapter: ${JSON.stringify(result.campaignShell)}`);
+    }
     result.mobileHud = await checkMobileHudLayout(page);
 
     return result;
   } finally {
     await app.close();
+    const resolvedTemp = path.resolve(os.tmpdir());
+    const resolvedUserData = path.resolve(testUserData);
+    if (resolvedUserData.startsWith(resolvedTemp + path.sep) && path.basename(resolvedUserData).startsWith('simlife-test-')) {
+      fs.rmSync(resolvedUserData, { recursive: true, force: true });
+    }
   }
 }
 
@@ -1664,6 +1818,7 @@ async function checkElectronRuntime() {
   checkRendererAvatarPreloadFailures();
   checkStateAppearanceMigration();
   checkHomeGrowthAndFamilySystems();
+  checkCampaignBehavior();
   const resources = checkResources();
   const runtime = await checkElectronRuntime();
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));

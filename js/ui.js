@@ -70,6 +70,25 @@ Game.UI = (function() {
     const cc = document.getElementById('char-creation-screen');
     const ls = document.getElementById('load-game-screen');
     const ui = document.getElementById('ui-layer');
+    const localSaves = Game.State.getSaves();
+
+    document.title = 'SimLife: Hearthbyte Edition';
+    const menuTitle = mm.querySelector('.bounce-title');
+    if (menuTitle) menuTitle.textContent = 'SimLife';
+    const newButton = document.getElementById('btn-mm-new');
+    const loadButton = document.getElementById('btn-mm-load');
+    const exportButton = document.getElementById('btn-mm-export');
+    const importButton = document.getElementById('btn-mm-import');
+    const wipeButton = document.getElementById('btn-mm-wipe');
+    if (newButton) newButton.innerHTML = 'NEW STORY <small>Create a fresh Sim</small>';
+    if (loadButton) {
+      loadButton.innerHTML = localSaves.length
+        ? `CONTINUE <small>${localSaves.length} saved ${localSaves.length === 1 ? 'world' : 'worlds'}</small>`
+        : 'LOAD WORLD <small>No saved worlds yet</small>';
+    }
+    if (exportButton) exportButton.textContent = 'EXPORT';
+    if (importButton) importButton.textContent = 'IMPORT';
+    if (wipeButton) wipeButton.textContent = 'RESET SAVE DATA';
 
     // Populate trait grids
     populateTraitGrid('cc-trait-grid');
@@ -196,6 +215,8 @@ Game.UI = (function() {
       if (e.key !== 'Escape') return;
       const editModal = document.getElementById('edit-char-modal');
       if (editModal && !editModal.classList.contains('hidden')) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
         closeEditModal();
       }
     });
@@ -442,6 +463,7 @@ Game.UI = (function() {
     const readyCollection = Game.HomeCollections && Game.HomeCollections.getCollections
       ? Game.HomeCollections.getCollections().find(collection => collection.claimable)
       : null;
+    const campaignChapter = Game.Campaign?.getCurrentChapter?.() || null;
     const firstDayFocus = (() => {
       if ((state.time?.day || 1) !== 1) return null;
       const queueLength = Array.isArray(char.actionQueue) ? char.actionQueue.length : 0;
@@ -463,6 +485,8 @@ Game.UI = (function() {
     let next = makeFocus('Today', 'Choose a goal to start building momentum.', 'goals');
     if (criticalNeed) {
       next = makeFocus('Need Care', `${criticalNeed.label} is low. Open Do and fix it now.`, 'activities', 'urgent');
+    } else if (campaignChapter) {
+      next = makeFocus(`Chapter ${campaignChapter.number}`, campaignChapter.objective, campaignChapter.target, 'ready');
     } else if (firstDayFocus) {
       next = firstDayFocus;
     } else if (readyGoal) {
@@ -788,6 +812,9 @@ Game.UI = (function() {
       case 'social': buildSocialPanel(panel, closeHtml); break;
       case 'skills': buildSkillsPanel(panel, closeHtml); break;
       case 'legacy': buildLegacyPanel(panel, closeHtml); break;
+      case 'campaign':
+        if (Game.Campaign?.renderPanel) Game.Campaign.renderPanel(panel);
+        break;
     }
   }
 

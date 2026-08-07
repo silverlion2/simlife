@@ -1,14 +1,39 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
+const fs = require('fs');
 const path = require('path');
-const steamworks = require('steamworks.js');
 
-let client;
-try {
-  client = steamworks.init(480);
-  steamworks.electronEnableSteamOverlay();
-} catch (e) {
-  console.warn('Failed to initialize Steamworks', e);
-  client = null;
+if (process.env.SIMLIFE_TEST_USER_DATA) {
+  app.setPath('userData', path.resolve(process.env.SIMLIFE_TEST_USER_DATA));
+} else {
+  const appData = process.env.APPDATA;
+
+  if (appData) {
+    const legacyUserData = path.join(appData, 'the-game');
+    const brandedUserData = path.join(appData, 'SimLife Hearthbyte Edition');
+
+    try {
+      const legacyLocalStorage = path.join(legacyUserData, 'Local Storage');
+      const brandedLocalStorage = path.join(brandedUserData, 'Local Storage');
+      if (fs.existsSync(legacyLocalStorage) && !fs.existsSync(brandedLocalStorage)) {
+        fs.cpSync(legacyLocalStorage, brandedLocalStorage, { recursive: true });
+      }
+      app.setPath('userData', brandedUserData);
+    } catch (error) {
+      console.warn('Failed to migrate the legacy SimLife profile', error);
+    }
+  }
+}
+
+let client = null;
+const steamAppId = Number.parseInt(process.env.SIMLIFE_STEAM_APP_ID || '', 10);
+if (Number.isInteger(steamAppId) && steamAppId > 0) {
+  try {
+    const steamworks = require('steamworks.js');
+    client = steamworks.init(steamAppId);
+    steamworks.electronEnableSteamOverlay();
+  } catch (error) {
+    console.warn('Failed to initialize Steamworks', error);
+  }
 }
 
 function createWindow() {

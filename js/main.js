@@ -20,6 +20,8 @@ Game.Main = (function() {
     const canvas = document.getElementById('game-canvas');
     Game.Renderer.init(canvas);
     Game.UI.init();
+    if (Game.Campaign?.init) Game.Campaign.init();
+    if (Game.Shell?.init) Game.Shell.init();
 
     // Announcer overlay starts hidden via HTML class + CSS;
     // playAnnouncer() in ui.js handles showing/hiding it properly.
@@ -98,6 +100,10 @@ Game.Main = (function() {
       Game.UI.updateStatusBars();
       Game.UI.updateMoodletDisplay();
       Game.UI.updateQueueDisplay();
+    }
+
+    if (Game.Campaign?.update) {
+      Game.Campaign.update(delta * gameSpeed);
     }
 
     // ---- Auto-save (every 30 seconds of wall time) ----
@@ -418,17 +424,21 @@ Game.Main = (function() {
   function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (Game.Shell?.isOpen?.() && e.key !== 'Escape') return;
 
       switch (e.key) {
         case ' ':
           e.preventDefault();
-          gameSpeed = gameSpeed === 0 ? 1 : 0;
-          updateSpeedDisplay();
+          setSpeed(gameSpeed === 0 ? 1 : 0);
           break;
-        case '1': gameSpeed = 1; updateSpeedDisplay(); break;
-        case '2': gameSpeed = 3; updateSpeedDisplay(); break;
-        case '3': gameSpeed = 10; updateSpeedDisplay(); break;
+        case '1': setSpeed(1); break;
+        case '2': setSpeed(3); break;
+        case '3': setSpeed(10); break;
         case 'Escape':
+          if (Game.Shell?.isOpen?.()) {
+            Game.Shell.close();
+            break;
+          }
           if (Game.State.get().ui.mode === 'build') {
             if (Game.UI && Game.UI.cancelBuild) Game.UI.cancelBuild();
             break;
@@ -441,10 +451,26 @@ Game.Main = (function() {
             if (Game.UI && Game.UI.toggleStoreMode) Game.UI.toggleStoreMode();
             break;
           }
-          if (Game.Interaction) Game.Interaction.closePieMenu();
-          Game.Character.cancelActivity();
-          Game.Character.clearQueue();
-          Game.UI.updateQueueDisplay();
+          if (Game.Renderer?.isPieMenuOpen?.()) {
+            Game.Interaction?.closePieMenu?.();
+            break;
+          }
+          {
+            const sidePanel = document.getElementById('side-panel');
+            if (sidePanel && !sidePanel.classList.contains('hidden') && sidePanel.dataset.active) {
+              Game.UI.togglePanel(sidePanel.dataset.active);
+              break;
+            }
+          }
+          Game.Shell?.open?.();
+          break;
+        case 'b':
+        case 'B':
+          Game.UI?.togglePanel?.('build');
+          break;
+        case 'j':
+        case 'J':
+          Game.UI?.togglePanel?.('campaign');
           break;
         case 'r':
         case 'R':
@@ -492,13 +518,23 @@ Game.Main = (function() {
       btn.addEventListener('click', () => {
         const speed = parseInt(btn.dataset.speed);
         if (!isNaN(speed)) {
-          gameSpeed = speed;
-          updateSpeedDisplay();
+          setSpeed(speed);
         }
       });
     });
 
     // Zoom buttons already registered in setupCanvasEvents() — don't duplicate
+  }
+
+  function setSpeed(speed, options = {}) {
+    const allowed = [0, 1, 3, 10];
+    const nextSpeed = allowed.includes(Number(speed)) ? Number(speed) : 1;
+    gameSpeed = nextSpeed;
+    const state = Game.State?.get?.();
+    if (state?.time) state.time.speed = nextSpeed;
+    updateSpeedDisplay();
+    if (!options.silent && Game.Audio?.playClick) Game.Audio.playClick();
+    return gameSpeed;
   }
 
   function updateSpeedDisplay() {
@@ -520,7 +556,7 @@ Game.Main = (function() {
     }, 1000);
   }
 
-  return { init, getSpeed: () => gameSpeed, hitTestNPCWalker, spawnNPCWalker, tick };
+  return { init, getSpeed: () => gameSpeed, setSpeed, hitTestNPCWalker, spawnNPCWalker, tick };
 })();
 
 // Boot
