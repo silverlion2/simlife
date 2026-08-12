@@ -16,6 +16,7 @@ Game.Economy = (function() {
     econ.money += amount;
     if (amount > 0) econ.totalEarned += amount;
     else econ.totalSpent += Math.abs(amount);
+    if (amount > 0 && Game.Character?.checkAchievements) Game.Character.checkAchievements();
   }
 
   function canAfford(cost) { return getEcon().money >= cost; }
@@ -126,7 +127,9 @@ Game.Economy = (function() {
 
   // Bills (weekly)
   function calculateBills() {
-    const house = Game.State.getActiveMap();
+    const state = Game.State.get();
+    const house = state.maps.house || Game.State.getActiveMap();
+    if (!house) return 20;
     let baseBill = 20;
     baseBill += house.rooms.length * 15;
     baseBill += house.furniture.length * 3;
@@ -149,7 +152,9 @@ Game.Economy = (function() {
 
   // House value (for prestige)
   function calculateHouseValue() {
-    const house = Game.State.getActiveMap();
+    const state = Game.State.get();
+    const house = state.maps.house || Game.State.getActiveMap();
+    if (!house) return 0;
     let value = 0;
     for (const room of house.rooms) {
       const roomCfg = cfg.ROOMS[room.type];

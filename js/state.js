@@ -89,6 +89,7 @@ Game.State = (function() {
         moodlets: [],
         achievements: [],
         collection: [],
+        visitedMaps: ['house'],
         position: { x: 3, y: 3 },
         floor: 0,
         targetPosition: null,
@@ -115,6 +116,7 @@ Game.State = (function() {
             { id: 'furn_0', type: 'basic_bed', roomId: 'room_0', x: 2, y: 2 },
             { id: 'furn_1', type: 'lamp', roomId: 'room_0', x: 4, y: 2 },
             { id: 'furn_2', type: 'wardrobe', roomId: 'room_0', x: 3, y: 4 },
+            { id: 'furn_39', type: 'potted_flower', roomId: 'room_0', x: 2, y: 4 },
             
             // Bathroom
             { id: 'furn_3', type: 'toilet', roomId: 'room_1', x: 5, y: 2 },
@@ -135,7 +137,7 @@ Game.State = (function() {
             
             { id: 'furn_14', type: 'wide_bookcase', roomId: 'room_2', x: 2, y: 8 }, // w=3 (2,8 & 3,8 & 4,8)
             { id: 'furn_15', type: 'display_case', roomId: 'room_2', x: 6, y: 7 }, // h=2 (6,7 & 6,8)
-            { id: 'furn_36', type: 'arcade_machine', roomId: 'room_2', x: 6, y: 6 },
+            { id: 'furn_36', type: 'arcade_machine', roomId: 'room_2', x: 5, y: 7 },
 
             // Yard / Transport
             { id: 'furn_16', type: 'garden_plot', roomId: null, x: 2, y: 10 },
@@ -143,34 +145,35 @@ Game.State = (function() {
             { id: 'furn_18', type: 'garden_plot', roomId: null, x: 4, y: 10 },
             { id: 'furn_37', type: 'garden_bench', roomId: null, x: 8, y: 10 },
             { id: 'furn_38', type: 'bonsai_shrine', roomId: null, x: 11, y: 10 },
+            { id: 'furn_40', type: 'potted_flower', roomId: null, x: 6, y: 10 },
             
             { id: 'furn_19', type: 'map_portal', roomId: null, x: 4, y: 9, config: { targetMap: 'mail_room', targetX: 2, targetY: 2 } },
             { id: 'furn_20', type: 'subway_gate', roomId: null, x: 5, y: 9, config: { isHub: true } },
 
-            // Expanded Yard Decor
-            { id: 'furn_21', type: 'fountain', roomId: null, x: 16, y: 16 },
-            { id: 'furn_22', type: 'garden_bench', roomId: null, x: 14, y: 16 },
-            { id: 'furn_23', type: 'garden_bench', roomId: null, x: 18, y: 16 },
+            // Courtyard
+            { id: 'furn_21', type: 'fountain', roomId: null, x: 10, y: 13 },
+            { id: 'furn_22', type: 'garden_bench', roomId: null, x: 8, y: 13 },
+            { id: 'furn_23', type: 'garden_bench', roomId: null, x: 12, y: 13 },
             
-            // Trees around the borders
-            { id: 'furn_24', type: 'indoor_tree', roomId: null, x: 1, y: 20 },
-            { id: 'furn_25', type: 'indoor_tree', roomId: null, x: 5, y: 20 },
-            { id: 'furn_26', type: 'indoor_tree', roomId: null, x: 9, y: 20 },
-            { id: 'furn_27', type: 'indoor_tree', roomId: null, x: 13, y: 20 },
-            { id: 'furn_28', type: 'indoor_tree', roomId: null, x: 17, y: 20 },
-            { id: 'furn_29', type: 'indoor_tree', roomId: null, x: 21, y: 20 },
+            // Trees frame the active starter garden.
+            { id: 'furn_24', type: 'indoor_tree', roomId: null, x: 1, y: 13 },
+            { id: 'furn_25', type: 'indoor_tree', roomId: null, x: 4, y: 15 },
+            { id: 'furn_26', type: 'indoor_tree', roomId: null, x: 7, y: 16 },
+            { id: 'furn_27', type: 'indoor_tree', roomId: null, x: 10, y: 16 },
+            { id: 'furn_28', type: 'indoor_tree', roomId: null, x: 13, y: 15 },
+            { id: 'furn_29', type: 'indoor_tree', roomId: null, x: 16, y: 13 },
 
-            { id: 'furn_30', type: 'indoor_tree', roomId: null, x: 20, y: 2 },
-            { id: 'furn_31', type: 'indoor_tree', roomId: null, x: 20, y: 6 },
-            { id: 'furn_32', type: 'indoor_tree', roomId: null, x: 20, y: 10 },
-            { id: 'furn_33', type: 'indoor_tree', roomId: null, x: 20, y: 14 },
+            { id: 'furn_30', type: 'indoor_tree', roomId: null, x: 15, y: 1 },
+            { id: 'furn_31', type: 'indoor_tree', roomId: null, x: 16, y: 5 },
+            { id: 'furn_32', type: 'indoor_tree', roomId: null, x: 16, y: 9 },
+            { id: 'furn_33', type: 'indoor_tree', roomId: null, x: 16, y: 11 },
 
-            // Extra flair
-            { id: 'furn_34', type: 'bbq_grill', roomId: null, x: 16, y: 13 },
-            { id: 'furn_35', type: 'telescope', roomId: null, x: 18, y: 13 }
+            // Outdoor living nook
+            { id: 'furn_34', type: 'bbq_grill', roomId: null, x: 10, y: 10 },
+            { id: 'furn_35', type: 'telescope', roomId: null, x: 12, y: 10 }
           ],
           nextRoomId: 3,
-          nextFurnId: 39,
+          nextFurnId: 41,
           brokenFurniture: [],
         },
         mail_room: {
@@ -210,7 +213,7 @@ Game.State = (function() {
           rooms: [ { id: 'room_0', type: 'study', x: 0, y: 0, w: 16, h: 16 } ],
           furniture: [
             { id: 'furn_0', type: 'computer', roomId: 'room_0', x: 8, y: 8 },
-            { id: 'furn_1', type: 'basic_desk', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'basic_desk', roomId: 'room_0', x: 10, y: 8 },
             { id: 'furn_2', type: 'coffee_table', roomId: 'room_0', x: 4, y: 4 },
             { id: 'furn_3', type: 'wide_bookcase', roomId: 'room_0', x: 4, y: 12 }
           ],
@@ -223,7 +226,7 @@ Game.State = (function() {
             { id: 'furn_0', type: 'smart_stove', roomId: 'room_0', x: 8, y: 8 },
             { id: 'furn_1', type: 'smart_fridge', roomId: 'room_0', x: 6, y: 8 },
             { id: 'furn_2', type: 'counter', roomId: 'room_0', x: 10, y: 8 },
-            { id: 'furn_3', type: 'espresso', roomId: 'room_0', x: 10, y: 8 }
+            { id: 'furn_3', type: 'espresso', roomId: 'room_0', x: 11, y: 8 }
           ],
           nextRoomId: 1, nextFurnId: 4, brokenFurniture: []
         },
@@ -237,6 +240,67 @@ Game.State = (function() {
             { id: 'furn_3', type: 'indoor_tree', roomId: 'room_0', x: 12, y: 4 }
           ],
           nextRoomId: 1, nextFurnId: 4, brokenFurniture: []
+        },
+        science_lab: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'lab', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'printer_3d', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'workbench', roomId: 'room_0', x: 5, y: 8 },
+            { id: 'furn_2', type: 'aquarium', roomId: 'room_0', x: 11, y: 8 },
+            { id: 'furn_3', type: 'wide_bookcase', roomId: 'room_0', x: 5, y: 12 },
+            { id: 'furn_4', type: 'indoor_tree', roomId: 'room_0', x: 12, y: 3 }
+          ],
+          nextRoomId: 1, nextFurnId: 5, brokenFurniture: []
+        },
+        creative_studio: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'studio', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'drafting_table', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'grand_piano', roomId: 'room_0', x: 5, y: 3 },
+            { id: 'furn_2', type: 'decorated_table', roomId: 'room_0', x: 10, y: 4 },
+            { id: 'furn_3', type: 'vanity', roomId: 'room_0', x: 12, y: 10 },
+            { id: 'furn_4', type: 'potted_flower', roomId: 'room_0', x: 3, y: 12 }
+          ],
+          nextRoomId: 1, nextFurnId: 5, brokenFurniture: []
+        },
+        clinic: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'clinic', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'computer', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'basic_desk', roomId: 'room_0', x: 8, y: 9 },
+            { id: 'furn_2', type: 'good_bed', roomId: 'room_0', x: 11, y: 8 },
+            { id: 'furn_3', type: 'aquarium', roomId: 'room_0', x: 4, y: 4 },
+            { id: 'furn_4', type: 'nice_sofa', roomId: 'room_0', x: 4, y: 12 }
+          ],
+          nextRoomId: 1, nextFurnId: 5, brokenFurniture: []
+        },
+        entertainment_venue: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'stage', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'grand_piano', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'stereo', roomId: 'room_0', x: 5, y: 6 },
+            { id: 'furn_2', type: 'nice_sofa', roomId: 'room_0', x: 5, y: 12 },
+            { id: 'furn_3', type: 'arcade_machine', roomId: 'room_0', x: 12, y: 6 },
+            { id: 'furn_4', type: 'potted_flower', roomId: 'room_0', x: 12, y: 12 }
+          ],
+          nextRoomId: 1, nextFurnId: 5, brokenFurniture: []
+        },
+        education_campus: {
+          lotWidth: 16, lotHeight: 16,
+          rooms: [ { id: 'room_0', type: 'classroom', x: 0, y: 0, w: 16, h: 16 } ],
+          furniture: [
+            { id: 'furn_0', type: 'bookshelf', roomId: 'room_0', x: 8, y: 8 },
+            { id: 'furn_1', type: 'basic_desk', roomId: 'room_0', x: 4, y: 6 },
+            { id: 'furn_2', type: 'basic_desk', roomId: 'room_0', x: 7, y: 6 },
+            { id: 'furn_3', type: 'basic_desk', roomId: 'room_0', x: 10, y: 6 },
+            { id: 'furn_4', type: 'wide_bookcase', roomId: 'room_0', x: 5, y: 12 },
+            { id: 'furn_5', type: 'globe', roomId: 'room_0', x: 12, y: 10 }
+          ],
+          nextRoomId: 1, nextFurnId: 6, brokenFurniture: []
         }
       },
       economy: {
@@ -337,10 +401,37 @@ Game.State = (function() {
   let state = createNewState();
 
   // ----- SAVE MANAGER logic -----
+  function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function normalizeSaveMetadata(value) {
+    if (!isPlainObject(value) || typeof value.id !== 'string' || !value.id) return null;
+    return {
+      ...value,
+      name: typeof value.name === 'string' && value.name ? value.name : 'Recovered World',
+      characterName: typeof value.characterName === 'string' && value.characterName ? value.characterName : 'Unknown',
+      money: Number.isFinite(Number(value.money)) ? Number(value.money) : 0,
+      day: Number.isFinite(Number(value.day)) ? Number(value.day) : 1,
+      lastPlayed: Number.isFinite(Number(value.lastPlayed)) ? Number(value.lastPlayed) : 0,
+    };
+  }
+
+  function isValidStatePayload(value) {
+    return isPlainObject(value)
+      && isPlainObject(value.character)
+      && isPlainObject(value.economy)
+      && isPlainObject(value.time)
+      && isPlainObject(value.maps);
+  }
+
   function getIndex() {
     try {
       const data = localStorage.getItem(SAVE_INDEX_KEY);
-      return data ? JSON.parse(data) : [];
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.map(normalizeSaveMetadata).filter(Boolean);
     } catch(e) {
       return [];
     }
@@ -354,21 +445,25 @@ Game.State = (function() {
     const legacy = localStorage.getItem('simlife_save');
     const idx = getIndex();
     if (legacy && idx.length === 0) {
-      // Create a slot 1 from legacy
-      const stateObj = JSON.parse(legacy);
-      const slotId = 'save_old_1';
-      localStorage.setItem(slotId, legacy);
-      idx.push({
-        id: slotId,
-        name: 'Legacy World',
-        characterName: stateObj.character ? stateObj.character.name : 'Unknown',
-        money: stateObj.economy ? stateObj.economy.money : 0,
-        day: stateObj.time ? stateObj.time.day : 1,
-        lastPlayed: Date.now()
-      });
-      saveIndex(idx);
-      localStorage.removeItem('simlife_save'); // Clean up
-      console.log('Migrated legacy save to slot:', slotId);
+      try {
+        const stateObj = JSON.parse(legacy);
+        if (!isPlainObject(stateObj)) return;
+        const slotId = 'save_old_1';
+        localStorage.setItem(slotId, legacy);
+        idx.push({
+          id: slotId,
+          name: 'Legacy World',
+          characterName: stateObj.character ? stateObj.character.name : 'Unknown',
+          money: stateObj.economy ? stateObj.economy.money : 0,
+          day: stateObj.time ? stateObj.time.day : 1,
+          lastPlayed: Date.now()
+        });
+        saveIndex(idx);
+        localStorage.removeItem('simlife_save');
+        console.log('Migrated legacy save to slot:', slotId);
+      } catch (error) {
+        console.warn('Legacy save could not be migrated:', error);
+      }
     }
   }
 
@@ -429,6 +524,7 @@ Game.State = (function() {
         const data = localStorage.getItem(slotId);
         if (!data) return false;
         const saved = JSON.parse(data);
+        if (!isPlainObject(saved)) return false;
         const fresh = createNewState();
 
         // Data Migration: single house to maps object
@@ -526,35 +622,36 @@ Game.State = (function() {
     getActiveSlotId: function() { return activeSlotId; },
 
     exportToFile: function(slotId) {
-      const targetSlot = slotId || activeSlotId;
-      if (!targetSlot) return false;
-      if (targetSlot === activeSlotId) this.save(); // ensure local storage is up to date
-      
-      const saveData = JSON.parse(localStorage.getItem(targetSlot));
-      if (!saveData) return false;
+      try {
+        const targetSlot = slotId || activeSlotId;
+        if (!targetSlot) return false;
+        if (targetSlot === activeSlotId && !this.save()) return false;
 
-      let idx = getIndex();
-      const meta = idx.find(s => s.id === targetSlot);
-      
-      const exportObject = {
-          metadata: meta,
-          state: saveData
-      };
-      
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject));
-      const downloadAnchorNode = document.createElement('a');
-      downloadAnchorNode.setAttribute("href", dataStr);
-      downloadAnchorNode.setAttribute("download", "simlife_save_" + (meta ? meta.name.replace(/\s+/g, '_') : 'world') + ".json");
-      document.body.appendChild(downloadAnchorNode); 
-      downloadAnchorNode.click();
-      downloadAnchorNode.remove();
-      return true;
+        const rawSave = localStorage.getItem(targetSlot);
+        if (!rawSave) return false;
+        const saveData = JSON.parse(rawSave);
+        if (!isPlainObject(saveData)) return false;
+
+        const meta = getIndex().find(s => s.id === targetSlot);
+        const exportObject = { metadata: meta || { id: targetSlot, name: 'World' }, state: saveData };
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportObject));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute('href', dataStr);
+        downloadAnchorNode.setAttribute('download', `simlife_save_${(meta?.name || 'world').replace(/\s+/g, '_')}.json`);
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+        return true;
+      } catch (error) {
+        console.error('Failed to export save:', error);
+        return false;
+      }
     },
 
     importFromFile: function(fileContent) {
       try {
         const importObject = JSON.parse(fileContent);
-        if (!importObject.metadata || !importObject.state) {
+        if (!isPlainObject(importObject) || !isPlainObject(importObject.metadata) || !isValidStatePayload(importObject.state)) {
             console.error('Invalid save file format.');
             return false;
         }
@@ -562,11 +659,14 @@ Game.State = (function() {
         let idx = getIndex();
         // Generate a new slot ID to avoid collisions
         const newSlotId = 'save_' + Date.now();
-        importObject.metadata.id = newSlotId;
-        importObject.metadata.lastPlayed = Date.now();
+        const metadata = normalizeSaveMetadata({
+          ...importObject.metadata,
+          id: newSlotId,
+          lastPlayed: Date.now(),
+        });
         
         // Add to index
-        idx.push(importObject.metadata);
+        idx.push(metadata);
         saveIndex(idx);
         
         // Save state payload

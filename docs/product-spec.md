@@ -53,6 +53,12 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 - 2026-08-07: Make the first playable frame world-forward: a closer default camera, compact objective tracker, and no blocking tutorial.
 - 2026-08-07: Replace the reload-only in-game Menu action with a true pause surface containing resume, save, settings, controls, and main-menu actions.
 - 2026-08-07: Bundle Phaser locally so the Electron game remains playable without a network connection.
+- 2026-08-08: Replace the dark cartridge shell with a bright storybook presentation across menu, creator, gameplay HUD, dialogs, and pause; keep CRT scanlines available but off by default.
+- 2026-08-08: Add repeatable Electron visual capture through `npm run test:visual` for desktop and mobile review.
+- 2026-08-08: Complete the engine-wide visual pass across every system panel and transient overlay; fix zoom-aware camera centering, landscape the starter lot, and limit room labels to build mode.
+- 2026-08-09: Expand the offline world catalog from 48 to 130 embedded textures, including 32 custom household sprites, and require distinct silhouettes instead of generic furniture fallbacks.
+- 2026-08-09: Restore all eight career tracks with dedicated workplace maps and validate career, map, activity, room, furniture, and footprint contracts in the automated suite.
+- 2026-08-09: Harden save import/export and legacy migration against malformed storage, and invalidate stale asynchronous paths across cancellations and map transitions.
 
 ## Hearthbyte Edition release loop
 

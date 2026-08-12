@@ -18,6 +18,7 @@ Game.Main = (function() {
 
   function init() {
     const canvas = document.getElementById('game-canvas');
+    applyGraphicsMode(readGraphicsMode(), { persist: false, notify: false });
     Game.Renderer.init(canvas);
     Game.UI.init();
     if (Game.Campaign?.init) Game.Campaign.init();
@@ -343,13 +344,44 @@ Game.Main = (function() {
   }
 
   function toggleGraphicsMode() {
-    const lowGraphics = document.body.classList.toggle('low-graphics');
+    const nextMode = window.GRAPHICS_QUALITY === 'low' ? 'high' : 'low';
+    applyGraphicsMode(nextMode, { persist: true, notify: true });
+  }
+
+  function readGraphicsMode() {
+    try {
+      return localStorage.getItem('graphicsQuality') === 'low' ? 'low' : 'high';
+    } catch (error) {
+      return 'high';
+    }
+  }
+
+  function applyGraphicsMode(mode, options = {}) {
+    const normalizedMode = mode === 'low' ? 'low' : 'high';
+    const lowGraphics = normalizedMode === 'low';
+    window.GRAPHICS_QUALITY = normalizedMode;
+    document.body.classList.toggle('low-graphics', lowGraphics);
+
     const btn = document.getElementById('btn-toggle-graphics');
     if (btn) {
       btn.classList.toggle('active', !lowGraphics);
+      btn.textContent = lowGraphics ? '◐' : '✦';
       btn.title = lowGraphics ? 'Enable Enhanced Graphics (L)' : 'Disable Enhanced Graphics (L)';
+      btn.setAttribute('aria-label', btn.title);
+      btn.setAttribute('aria-pressed', String(!lowGraphics));
     }
-    Game.UI && Game.UI.showNotification(lowGraphics ? 'Graphics: performance mode' : 'Graphics: enhanced mode');
+    if (options.persist !== false) {
+      try {
+        localStorage.setItem('graphicsQuality', normalizedMode);
+      } catch (error) {
+        console.warn('Unable to persist graphics quality:', error);
+      }
+    }
+    if (Game.Renderer?.setBgDirty) Game.Renderer.setBgDirty();
+    if (options.notify && Game.UI?.showNotification) {
+      Game.UI.showNotification(lowGraphics ? 'Graphics: performance mode' : 'Graphics: enhanced mode');
+    }
+    return normalizedMode;
   }
 
   // ---- NPC Walker System ----
@@ -556,7 +588,16 @@ Game.Main = (function() {
     }, 1000);
   }
 
-  return { init, getSpeed: () => gameSpeed, setSpeed, hitTestNPCWalker, spawnNPCWalker, tick };
+  return {
+    init,
+    getSpeed: () => gameSpeed,
+    setSpeed,
+    getGraphicsMode: () => window.GRAPHICS_QUALITY || 'high',
+    setGraphicsMode: (mode) => applyGraphicsMode(mode, { persist: true, notify: false }),
+    hitTestNPCWalker,
+    spawnNPCWalker,
+    tick,
+  };
 })();
 
 // Boot

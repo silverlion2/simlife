@@ -42,8 +42,16 @@ SimLife is a static browser game that also runs inside Electron. The runtime loa
 - `Game.Renderer` owns camera zoom and presentation only. Its initial zoom is responsive and does not alter simulation coordinates.
 - `Game.Audio` owns the master mute and volume boundary. Settings persist in localStorage and are safe when Web Audio is unavailable.
 
-Campaign state is stored under `state.campaign`. Settings are stored under `simlife_settings_v2` because they apply across save slots. Existing saves call `Game.Campaign.ensureState()` during startup and receive defaults for missing fields.
+Campaign state is stored under `state.campaign`. Settings are stored under `simlife_settings_v3` because they apply across save slots. The v3 key makes the clearer, scanline-free presentation the default while retaining scanlines as an opt-in setting. Existing saves call `Game.Campaign.ensureState()` during startup and receive defaults for missing fields.
 
 Phaser, EasyStar, NavMesh, and the rex state manager load from pinned files under `vendor/`. CDN and production `node_modules` execution are not part of the shipping boot path. Steamworks is disabled by default and only initializes when a real `SIMLIFE_STEAM_APP_ID` is supplied for a Steam-specific build.
 
 Production Electron builds use the branded `SimLife Hearthbyte Edition` user-data directory. On first launch, `main.js` copies only the legacy profile's `Local Storage` directory when the branded profile has no local storage yet. Volatile Chromium caches are intentionally not migrated.
+
+## World asset pipeline
+
+- `js/assets.js` contains the original embedded world textures; generated `js/world_assets.js` extends that catalog without changing existing keys.
+- `assets/custom/generated_furniture/` contains normalized 256x256 household sprites. The original 4x4 source sheet and alpha-cleaned sheet remain under `assets/custom/` for reproducibility.
+- `scripts/extract-furniture-sheet.py` splits and edge-cleans the source sheet when Pillow is available. The extracted PNGs are committed, so this optional step is not required to run the game.
+- `npm run generate:world` embeds the extracted household sprites plus selected directional Kenney library, dungeon, and farm assets into the offline runtime bundle.
+- `Game.Renderer.getFurnitureTextureReport()` exposes category-to-texture coverage for the Electron regression test.

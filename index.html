@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SimLife — Build Your Dream Life</title>
+  <title>SimLife: Hearthbyte Edition</title>
   <meta name="description" content="A complete retro-cozy life simulation. Build a home, grow a career, make friends, master skills, and finish the New Roots campaign.">
-  <meta name="theme-color" content="#111827">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏡</text></svg>">
-  <link rel="stylesheet" href="css/main.css?v=5">
+  <meta name="theme-color" content="#4f9f8d">
+  <link rel="icon" type="image/png" href="assets/branding/hearthbyte-icon.png">
+  <link rel="stylesheet" href="css/main.css?v=6">
+  <link rel="stylesheet" href="css/pretty.css?v=3">
   
   <!-- Local runtime dependencies keep the Electron game fully playable offline. -->
   <script src="vendor/phaser.min.js"></script>
@@ -18,32 +19,43 @@
 <!-- Main Menu Screen (Starts visible) -->
 <div id="main-menu-screen" class="fs-screen">
   <div class="menu-content">
-    <div class="menu-kicker">HEARTHBYTE SYSTEM // DELUXE CARTRIDGE</div>
-    <h1 class="bounce-title">🏡 SimLife</h1>
-    <p class="subtitle">One tiny home. One big life. Your story starts at sunrise.</p>
-    <div class="menu-feature-strip" aria-label="Game features">
-      <span>1 PLAYER</span>
-      <span>8 CHAPTERS</span>
-      <span>LOCAL SAVE</span>
-    </div>
-    
-    <div class="menu-btn-group">
-      <button id="btn-mm-new">✨ New Game</button>
-      <button id="btn-mm-load">📂 Load Game</button>
-      
-      <div style="display: flex; gap: 10px; margin-top: 15px;">
-        <button id="btn-mm-export" style="background:#2E7D32; color:white; border-color:#1B5E20; flex:1">💾 Export</button>
-        <button id="btn-mm-import" style="background:#0288D1; color:white; border-color:#01579B; flex:1">📥 Import</button>
+    <section class="menu-brand" aria-label="SimLife Hearthbyte Edition">
+      <img class="menu-crest" src="assets/branding/hearthbyte-icon.png" alt="">
+      <div class="menu-brand-copy">
+        <div class="menu-kicker">A HEARTHBYTE STORY</div>
+        <h1 class="bounce-title">SimLife</h1>
+        <p class="subtitle">Build a little home. Grow a wonderfully big life.</p>
       </div>
-      <input type="file" id="file-import" accept=".json" style="display:none">
+      <div class="menu-feature-strip" aria-label="Game features">
+        <span>COZY BUILDING</span>
+        <span>8 CHAPTERS</span>
+        <span>OFFLINE PLAY</span>
+      </div>
+    </section>
 
-      <button id="btn-mm-wipe" style="background:#cc3333; color:white; border-color:#990000; margin-top: 15px;">🗑️ Wipe All Data</button>
-    </div>
-    <div class="menu-footer">
-      <span>v2.0</span>
-      <span>POINTER + KEYBOARD</span>
-      <span>OFFLINE READY</span>
-    </div>
+    <section class="menu-actions" aria-label="Main menu">
+      <div class="menu-actions-heading">
+        <span>Welcome home</span>
+        <strong>Where should we begin?</strong>
+      </div>
+      <div class="menu-btn-group">
+        <button id="btn-mm-new">✨ New Game</button>
+        <button id="btn-mm-load">📂 Load Game</button>
+
+        <div class="menu-utility-row">
+          <button id="btn-mm-export">💾 Export</button>
+          <button id="btn-mm-import">📥 Import</button>
+        </div>
+        <input type="file" id="file-import" accept=".json" style="display:none">
+
+        <button id="btn-mm-wipe">🗑️ Wipe All Data</button>
+      </div>
+      <div class="menu-footer">
+        <span>v2.0</span>
+        <span>POINTER + KEYBOARD</span>
+        <span>LOCAL SAVES</span>
+      </div>
+    </section>
   </div>
 </div>
 
@@ -51,27 +63,31 @@
 <div id="char-creation-screen" class="fs-screen hidden">
   <div class="menu-content wide">
     <button class="back-btn" id="btn-cc-back">← Back</button>
-    <h2>Create Your Sim</h2>
+    <div class="creator-heading">
+      <span>New beginnings</span>
+      <h2>Create Your Sim</h2>
+      <p>Choose a look, a name, and the little spark that makes them special.</p>
+    </div>
     
     <div class="cc-form">
       <div class="cc-scroll-fields">
         <div class="cc-field">
-          <label>World Name:</label>
+          <label>World Name</label>
           <input type="text" id="cc-world-name" value="My New Life" maxlength="20">
         </div>
 
         <div class="cc-field">
-          <label>Sim Name:</label>
+          <label>Sim Name</label>
           <input type="text" id="cc-sim-name" value="Alex" maxlength="15">
         </div>
 
         <div class="cc-field">
-          <label>Appearance:</label>
+          <label>Appearance</label>
           <div id="cc-avatar-editor"></div>
         </div>
 
         <div class="cc-field">
-          <label>Primary Trait:</label>
+          <label>Primary Trait</label>
           <div id="cc-trait-grid" class="trait-grid"></div>
         </div>
       </div>
@@ -124,18 +140,18 @@
 <!-- Pause / settings shell -->
 <div id="pause-overlay" class="pause-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="pause-title">
   <div class="pause-card">
-    <div class="pause-kicker">GAME SUSPENDED</div>
+    <div class="pause-kicker">A QUIET MOMENT</div>
     <h2 id="pause-title">SimLife</h2>
-    <p class="pause-subtitle">HEARTHBYTE EDITION</p>
+    <p class="pause-subtitle">Your little world is waiting.</p>
     <div class="pause-actions">
-      <button id="btn-pause-resume" class="pause-primary" type="button">RESUME</button>
-      <button id="btn-pause-save" type="button">SAVE WORLD</button>
-      <button id="btn-pause-controls" type="button" aria-expanded="false">CONTROLS</button>
-      <button id="btn-pause-settings" type="button" aria-expanded="false">SETTINGS</button>
-      <button id="btn-pause-menu" class="pause-danger" type="button">SAVE &amp; MAIN MENU</button>
+      <button id="btn-pause-resume" class="pause-primary" type="button">Resume</button>
+      <button id="btn-pause-save" type="button">Save world</button>
+      <button id="btn-pause-controls" type="button" aria-expanded="false">Controls</button>
+      <button id="btn-pause-settings" type="button" aria-expanded="false">Settings</button>
+      <button id="btn-pause-menu" class="pause-danger" type="button">Save &amp; main menu</button>
     </div>
     <div id="pause-controls-panel" class="pause-drawer hidden">
-      <h3>FIELD MANUAL</h3>
+      <h3>Controls</h3>
       <div class="control-grid">
         <span><kbd>CLICK</kbd> Move / interact</span>
         <span><kbd>SHIFT+CLICK</kbd> Queue action</span>
@@ -150,14 +166,14 @@
       </div>
     </div>
     <div id="pause-settings-panel" class="pause-drawer hidden">
-      <h3>SYSTEM SETTINGS</h3>
+      <h3>Game settings</h3>
       <label class="setting-row" for="setting-volume">
         <span>Master volume</span>
         <input id="setting-volume" type="range" min="0" max="100" step="5" value="30">
         <output id="setting-volume-value" for="setting-volume">30%</output>
       </label>
       <label class="setting-toggle"><input id="setting-muted" type="checkbox"><span>Mute audio</span></label>
-      <label class="setting-toggle"><input id="setting-scanlines" type="checkbox" checked><span>CRT scanlines</span></label>
+      <label class="setting-toggle"><input id="setting-scanlines" type="checkbox"><span>CRT scanlines</span></label>
       <label class="setting-toggle"><input id="setting-reduced-motion" type="checkbox"><span>Reduced motion</span></label>
       <label class="setting-toggle"><input id="setting-high-contrast" type="checkbox"><span>High contrast HUD</span></label>
     </div>
@@ -266,7 +282,7 @@
 <script src="js/config.js?v=2"></script>
 <script src="js/avatar_catalog.js?v=1"></script>
 <script src="js/appearance.js?v=1"></script>
-<script src="js/state.js?v=2"></script>
+<script src="js/state.js?v=3"></script>
 <script src="js/home_growth.js?v=1"></script>
 <script src="js/character.js?v=2"></script>
 <script src="js/economy.js?v=2"></script>
@@ -281,15 +297,16 @@
 <script src="js/prestige.js?v=2"></script>
 <script src="js/audio.js?v=2"></script>
 <script src="js/assets.js?v=1"></script>
+<script src="js/world_assets.js?v=1"></script>
 <script src="js/avatar_assets.js?v=1"></script>
 <script src="js/renderer_math.js?v=1"></script>
 <script src="js/renderer_helpers.js?v=1"></script>
 <script src="js/avatar_renderer.js?v=3"></script>
-<script src="js/renderer.js?v=9"></script>
+<script src="js/renderer.js?v=16"></script>
 <script src="js/autonomy.js?v=2"></script>
 <script src="js/interaction.js?v=2"></script>
 <script src="js/avatar_editor.js?v=2"></script>
-<script src="js/ui.js?v=3"></script>
+<script src="js/ui.js?v=5"></script>
 <script src="js/campaign.js?v=1"></script>
 <script src="js/shell.js?v=1"></script>
 <script src="js/main.js?v=3"></script>

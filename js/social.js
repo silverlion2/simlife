@@ -70,6 +70,7 @@ Game.Social = (function() {
     const newRel = getRelationship(npcId);
     if (rel < 40 && newRel >= 40) {
       Game.State.get().stats.friendsMade++;
+      Game.Character.checkAchievements?.();
       Game.UI && Game.UI.showNotification(`🎉 You and ${getNpcName(npcId)} are now friends!`);
     }
 

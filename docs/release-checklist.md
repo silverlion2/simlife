@@ -2,9 +2,9 @@
 
 ## Automated gates
 
-- [x] `web-sop doctor` has no errors.
+- [ ] `web-sop doctor` has no errors. Blocked locally: `web-sop` executable is unavailable.
 - [x] `npm test` passes.
-- [x] `web-sop check --mode fast` passes.
+- [ ] `web-sop check --mode fast` passes. Blocked locally: `web-sop` executable is unavailable.
 - [x] `git diff --check` passes.
 - [x] Windows package build passes when shipping an installer: `npm run build:win`.
 - [x] Installer uses the `SimLife Hearthbyte Edition` product identity and contains no test-only runtime dependencies.
@@ -14,7 +14,7 @@
 - [x] Critical journeys verified
 - [ ] Loading, empty, error, success, and partial states verified
 - [x] Mobile and desktop layouts verified
-- [x] Electron desktop launch verified
+- [ ] Electron desktop launch re-verified on a clean host (current Codex host is at 656 processes and Electron sandbox children return `launch-failed 49`)
 - [ ] Electron launch verified with external network requests blocked
 - [x] New Roots campaign advances and rewards only once
 - [ ] Pause, save, resume, controls, and settings verified
@@ -23,6 +23,11 @@
 - [x] Desktop gameplay and pause-shell screenshots reviewed
 - [x] Character creation preview shows the selected layered avatar clearly
 - [x] Initial desktop camera makes the starter home the dominant playfield subject
+- [x] Bright storybook palette is consistent across menu, creator, gameplay HUD, and pause
+- [x] Every engine panel, modal, notification, announcer, interaction wheel, and placement state uses the shared semantic palette
+- [ ] `npm run test:visual` recaptured on a clean host with the full 130-texture registry
+- [x] Camera centers correctly at responsive zoom levels and the starter landscaping remains visible around the HUD
+- [ ] Expanded 130-texture world bundle and 32 distinct household sprites reviewed in fresh desktop/mobile screenshots
 - [ ] Rollback procedure verified
 - [ ] Production smoke test completed if a hosted build is released
 

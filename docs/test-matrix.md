@@ -21,4 +21,10 @@
 | Pause shell | Press Escape during live play | Simulation pauses; resume restores the previous speed | E2E | Yes, `npm test` |
 | Settings persistence | Toggle audio, scanlines, or reduced motion | Preference applies immediately and persists after reload | E2E | Yes, `npm test` |
 | Retro HUD | Desktop and 390x844 viewport | Campaign objective, needs, and primary commands remain readable without central obstruction | Visual | Manual screenshots |
+| Storybook presentation | Menu, creator, gameplay, all system panels, event, notifications, announcer, interaction wheel, placement, and pause at desktop/mobile widths | Teal/ivory/gold/coral semantics remain consistent, the world stays centered and saturated, controls do not clip, and transient layers do not collide | Visual smoke | Yes, 27 screenshots via `npm run test:visual`, plus screenshot review |
+| World asset variety | Load a fresh starter home and enumerate furniture mappings | 125+ embedded world textures, 30+ distinct furniture mappings, 28+ generated household categories, 32 distinct 256x256 custom sprites, and no missing textures | Resource + E2E + visual | Yes, `npm test`, plus desktop/mobile gameplay screenshots |
+| Built-in map integrity | Validate every default map | Known room/furniture types, valid room references, in-bounds footprints, and no furniture overlaps | Unit | Yes, `npm test` |
+| Career contract | Enumerate every career | Eight careers, five progression levels, valid workplace/action references, and an available activity target | Unit | Yes, `npm test` |
+| Save corruption recovery | Load malformed index, legacy, slot, and import payloads | Menu remains usable, invalid data is rejected, and recoverable legacy data is preserved | Unit | Yes, `npm test` |
+| Travel and path lifecycle | Complete portal/subway travel and cancel an in-flight path request | Map transition completes, travel achievement records, and stale callbacks cannot resume movement | Unit | Yes, `npm test` |
 | Keyboard shortcuts | Use Space, 1-3, C/Home, B, J, and Escape | Pause, speed, camera, build, journal, and pause shell perform the documented action | E2E | Yes, `npm test` |

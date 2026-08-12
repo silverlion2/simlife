@@ -884,7 +884,7 @@ function checkHomeGrowthAndFamilySystems() {
 }
 
 function checkResources() {
-  const context = loadBrowserGlobals(['js/assets.js', 'js/avatar_catalog.js', 'js/avatar_assets.js', 'js/config.js']);
+  const context = loadBrowserGlobals(['js/assets.js', 'js/world_assets.js', 'js/avatar_catalog.js', 'js/avatar_assets.js', 'js/config.js']);
   const indexHtml = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
   const assetKeys = Object.keys(context.SIM_ASSETS || {});
   const avatarAssetKeys = Object.keys(context.SIM_AVATAR_ASSETS || {});
@@ -898,6 +898,8 @@ function checkResources() {
   const pngCount = countFiles(path.join(root, 'assets'), '.png');
   const avatarLayerPngNames = listPngFiles(path.join(root, 'assets', 'avatar_layers'));
   const avatarLayerPngNameSet = new Set(avatarLayerPngNames);
+  const generatedDir = path.join(root, 'assets', 'custom', 'generated_furniture');
+  const generatedPngNames = listPngFiles(generatedDir).filter(name => name.startsWith('generated_')).sort();
 
   if (/https:\/\/cdn\.jsdelivr\.net/i.test(indexHtml)) {
     fail('Expected production game dependencies to load locally, found a jsDelivr runtime script');
@@ -917,9 +919,11 @@ function checkResources() {
     }
   }
 
-  if (assetKeys.length < 40) fail(`Expected at least 40 embedded render assets, found ${assetKeys.length}`);
+  if (!indexHtml.includes('js/world_assets.js')) fail('Expected index.html to load js/world_assets.js');
+  if (assetKeys.length < 125) fail(`Expected at least 125 embedded render assets, found ${assetKeys.length}`);
   if (furnitureKeys.length < 70) fail(`Expected at least 70 furniture types, found ${furnitureKeys.length}`);
   if (pngCount < 1000) fail(`Expected an abundant PNG resource library, found ${pngCount}`);
+  if (generatedPngNames.length !== 32) fail(`Expected 32 custom furniture sprites, found ${generatedPngNames.length}`);
   const missingAvatarPngs = expectedAvatarPngNames.filter(name => !avatarLayerPngNameSet.has(name));
   if (missingAvatarPngs.length) fail(`Missing avatar layer PNGs: ${missingAvatarPngs.join(', ')}`);
 
@@ -941,6 +945,35 @@ function checkResources() {
     'libraryChair',
     'subway_turnstile',
     'map_portal',
+    'generated_bed',
+    'generated_sofa',
+    'generated_stove',
+    'generated_fridge',
+    'generated_toilet',
+    'generated_shower',
+    'generated_indoor_tree',
+    'generated_computer_desk',
+    'generated_arcade',
+    'generated_workbench',
+    'generated_kitchen_sink',
+    'generated_microwave',
+    'generated_espresso',
+    'generated_dishwasher',
+    'generated_bathroom_vanity',
+    'generated_flat_tv',
+    'generated_stereo',
+    'generated_game_console',
+    'generated_aquarium',
+    'generated_standing_mirror',
+    'generated_bbq_grill',
+    'generated_weight_bench',
+    'generated_changing_table',
+    'generated_3d_printer',
+    'generated_fireplace',
+    'generated_vanity',
+    'farm_plot_e',
+    'library_bookcase_e',
+    'dungeon_chair_e',
   ];
   const missing = requiredTextureKeys.filter(key => !context.SIM_ASSETS[key]);
   if (missing.length) fail(`Missing embedded texture keys: ${missing.join(', ')}`);
@@ -951,6 +984,33 @@ function checkResources() {
   const extraAvatar = avatarAssetKeys.filter(key => !expectedAvatarKeySet.has(key));
   if (extraAvatar.length) fail(`Unexpected avatar texture keys: ${extraAvatar.join(', ')}`);
 
+  const generatedHashes = new Set();
+  for (const name of generatedPngNames) {
+    const png = parsePngRgba(path.join(generatedDir, name));
+    if (png.width !== 256 || png.height !== 256) fail(`Expected ${name} to be 256x256, found ${png.width}x${png.height}`);
+    const cornerIndexes = [0, (png.width - 1) * 4, ((png.height - 1) * png.width) * 4, ((png.height * png.width) - 1) * 4];
+    if (cornerIndexes.some(index => png.pixels[index + 3] > 8)) fail(`Expected transparent corners in ${name}`);
+    let opaquePixels = 0;
+    let magentaPixels = 0;
+    let hash = 2166136261;
+    for (let index = 0; index < png.pixels.length; index += 4) {
+      const red = png.pixels[index];
+      const green = png.pixels[index + 1];
+      const blue = png.pixels[index + 2];
+      const alpha = png.pixels[index + 3];
+      if (alpha > 8) opaquePixels += 1;
+      if (alpha > 8 && red > 220 && blue > 220 && green < 80) magentaPixels += 1;
+      hash ^= red + (green << 8) + (blue << 16) + alpha;
+      hash = Math.imul(hash, 16777619);
+    }
+    if (opaquePixels < 1000) fail(`Expected substantial visible artwork in ${name}, found ${opaquePixels} opaque pixels`);
+    if (magentaPixels > 0) fail(`Expected chroma key removal in ${name}, found ${magentaPixels} magenta pixels`);
+    generatedHashes.add(hash >>> 0);
+  }
+  if (generatedHashes.size !== generatedPngNames.length) {
+    fail(`Expected every custom furniture sprite to be distinct, found ${generatedHashes.size}/${generatedPngNames.length} hashes`);
+  }
+
   const avatarQuality = checkAvatarLayerQuality(context.Game.AvatarCatalog);
 
   return {
@@ -960,8 +1020,154 @@ function checkResources() {
     avatarDirectionalItems: avatarQuality.directionalItems,
     avatarMaxLayerHeight: avatarQuality.maxLayerHeight,
     furnitureTypes: furnitureKeys.length,
+    generatedFurnitureSprites: generatedPngNames.length,
     pngResources: pngCount,
   };
+}
+
+function createGameLogicContext() {
+  const context = loadBrowserGlobals([
+    'js/config.js',
+    'js/avatar_catalog.js',
+    'js/appearance.js',
+    'js/state.js',
+    'js/economy.js',
+    'js/character.js',
+  ], {
+    document: {
+      createElement: () => ({
+        setAttribute: () => {},
+        click: () => {},
+        remove: () => {},
+      }),
+      body: { appendChild: () => {} },
+    },
+  });
+  context.Game.UI = { showNotification: () => {} };
+  context.Game.Renderer = {
+    transitionMap: () => {},
+    spawnFloatingBubble: () => {},
+    spawnExplosion: () => {},
+  };
+  return context;
+}
+
+function checkSaveManagerRobustness() {
+  const context = createGameLogicContext();
+  const storage = context.localStorage;
+
+  storage.setItem('simlife_saves_index', '{}');
+  if (context.Game.State.getSaves().length !== 0) fail('Expected object-shaped save index to recover as an empty list');
+
+  storage.setItem('simlife_save', '{broken');
+  if (context.Game.State.hasSave()) fail('Expected malformed legacy save not to create a slot');
+  if (storage.getItem('simlife_save') !== '{broken') fail('Expected malformed legacy data to remain available for recovery');
+
+  storage.setItem('simlife_saves_index', JSON.stringify([{ id: 'bad_slot', name: 'Bad Slot' }]));
+  storage.setItem('bad_slot', '{broken');
+  if (context.Game.State.exportToFile('bad_slot')) fail('Expected malformed slot export to fail safely');
+
+  const invalidImports = [
+    '{}',
+    JSON.stringify({ metadata: {}, state: 'not-an-object' }),
+    JSON.stringify({ metadata: {}, state: { character: {}, economy: {}, time: {}, maps: [] } }),
+  ];
+  for (const payload of invalidImports) {
+    if (context.Game.State.importFromFile(payload)) fail(`Expected invalid import to fail: ${payload}`);
+  }
+
+  const state = context.Game.State.get();
+  const validImport = JSON.stringify({ metadata: { name: 'Imported World' }, state });
+  if (!context.Game.State.importFromFile(validImport)) fail('Expected structurally valid save import to succeed');
+}
+
+function checkGameDataIntegrity() {
+  const context = createGameLogicContext();
+  const { Config, State, Economy, Character } = context.Game;
+  const state = State.get();
+  const careerEntries = Object.entries(Config.CAREERS);
+
+  if (careerEntries.length < 8) fail(`Expected eight complete careers, found ${careerEntries.length}`);
+  for (const [careerKey, career] of careerEntries) {
+    const map = state.maps[career.mapId];
+    const activity = Config.ACTIVITIES[career.actionKey];
+    if (!map) fail(`Career ${careerKey} references missing map ${career.mapId}`);
+    if (!activity) fail(`Career ${careerKey} references missing activity ${career.actionKey}`);
+    if (!career.levels || career.levels.length < 5) fail(`Career ${careerKey} lost progression levels`);
+    if (activity.furniture && !map.furniture.some(item => item.type.includes(activity.furniture))) {
+      fail(`Career ${careerKey} map lacks activity target ${activity.furniture}`);
+    }
+  }
+
+  for (const [mapId, map] of Object.entries(state.maps)) {
+    const roomIds = new Set(map.rooms.map(room => room.id));
+    const occupied = new Map();
+    for (const room of map.rooms) {
+      if (!Config.ROOMS[room.type]) fail(`Map ${mapId} uses unknown room type ${room.type}`);
+      if (room.x < 0 || room.y < 0 || room.x + room.w > map.lotWidth || room.y + room.h > map.lotHeight) {
+        fail(`Map ${mapId} room ${room.id} is outside lot bounds`);
+      }
+    }
+    for (const item of map.furniture) {
+      const def = Config.FURNITURE[item.type];
+      if (!def) fail(`Map ${mapId} uses unknown furniture ${item.type}`);
+      if (item.roomId !== null && item.roomId !== undefined && !roomIds.has(item.roomId)) {
+        fail(`Map ${mapId} furniture ${item.id} references missing room ${item.roomId}`);
+      }
+      const w = item.rotated ? def.h : def.w;
+      const h = item.rotated ? def.w : def.h;
+      if (item.x < 0 || item.y < 0 || item.x + w > map.lotWidth || item.y + h > map.lotHeight) {
+        fail(`Map ${mapId} furniture ${item.id} is outside lot bounds`);
+      }
+      for (let y = item.y; y < item.y + h; y += 1) {
+        for (let x = item.x; x < item.x + w; x += 1) {
+          const key = `${x},${y}`;
+          if (occupied.has(key)) fail(`Map ${mapId} furniture overlap at ${key}: ${occupied.get(key)} and ${item.id}`);
+          occupied.set(key, item.id);
+        }
+      }
+    }
+  }
+
+  const houseValue = Economy.calculateHouseValue();
+  state.character.mapId = 'downtown';
+  if (Economy.calculateHouseValue() !== houseValue) fail('Expected house value to remain stable while the character is away');
+
+  state.economy.money = 999999;
+  Economy.addMoney(1);
+  if (!state.character.achievements.includes('millionaire')) fail('Expected millionaire achievement to read economy money');
+
+  state.character.mapId = 'house';
+  const portal = state.maps.house.furniture.find(item => item.type === 'map_portal');
+  if (!Character.startActivity('travel', false, portal.id)) fail('Expected map portal travel activity to start');
+  state.character.targetPosition = null;
+  state.character.path = null;
+  state.character.isPathfinding = false;
+  Character.updateActivity(Config.ACTIVITIES.travel.duration);
+  if (state.character.mapId !== portal.config.targetMap) fail('Expected map portal activity to transition maps');
+
+  state.character.mapId = 'house';
+  const gate = state.maps.house.furniture.find(item => item.type === 'subway_gate');
+  gate.config.targetMap = 'downtown';
+  Character.startActivity('take_subway', false, gate.id);
+  state.character.targetPosition = null;
+  Character.updateActivity(Config.ACTIVITIES.take_subway.duration);
+  const universityGate = state.maps.downtown.furniture.find(item => item.type === 'subway_gate');
+  universityGate.config.targetMap = 'university';
+  Character.startActivity('take_subway', false, universityGate.id);
+  state.character.targetPosition = null;
+  Character.updateActivity(Config.ACTIVITIES.take_subway.duration);
+  if (!state.character.achievements.includes('globe_trotter')) fail('Expected major-location travel to unlock Globe Trotter');
+
+  let pathCallback = null;
+  context.Game.Renderer.findPath = (x, y, tx, ty, callback) => { pathCallback = callback; };
+  state.character.mapId = 'house';
+  state.character.targetPosition = { x: 7, y: 7 };
+  Character.updatePosition(0.016);
+  if (!pathCallback || !state.character.isPathfinding) fail('Expected movement to request an asynchronous path');
+  Character.cancelActivity();
+  pathCallback([{ x: 4, y: 4 }]);
+  if (state.character.path || state.character.isPathfinding) fail('Expected cancelled path callback to remain invalidated');
 }
 
 function checkCampaignBehavior() {
@@ -1587,6 +1793,42 @@ async function checkPauseShell(page) {
   return { before, paused, after };
 }
 
+async function checkGraphicsMode(page) {
+  const initial = await page.evaluate(() => ({
+    mode: window.Game.Main.getGraphicsMode(),
+    stored: localStorage.getItem('graphicsQuality'),
+    lowClass: document.body.classList.contains('low-graphics'),
+    pressed: document.getElementById('btn-toggle-graphics')?.getAttribute('aria-pressed'),
+  }));
+  if (initial.mode !== 'low' || initial.stored !== 'low' || !initial.lowClass || initial.pressed !== 'false') {
+    fail(`Expected stored low graphics mode to apply at boot: ${JSON.stringify(initial)}`);
+  }
+
+  await click(page, 'toggle enhanced graphics button', '#btn-toggle-graphics');
+  await waitForGameFunction(page, 'wait for enhanced graphics mode', () => (
+    window.Game.Main.getGraphicsMode() === 'high'
+      && localStorage.getItem('graphicsQuality') === 'high'
+      && !document.body.classList.contains('low-graphics')
+      && document.getElementById('btn-toggle-graphics')?.getAttribute('aria-pressed') === 'true'
+  ));
+
+  await page.keyboard.press('l');
+  await waitForGameFunction(page, 'wait for graphics keyboard toggle', () => (
+    window.Game.Main.getGraphicsMode() === 'low'
+      && localStorage.getItem('graphicsQuality') === 'low'
+      && document.body.classList.contains('low-graphics')
+  ));
+
+  return page.evaluate(() => {
+    window.Game.Main.setGraphicsMode('high');
+    return {
+      mode: window.Game.Main.getGraphicsMode(),
+      stored: localStorage.getItem('graphicsQuality'),
+      lowClass: document.body.classList.contains('low-graphics'),
+    };
+  });
+}
+
 async function checkElectronRuntime() {
   const testUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'simlife-test-'));
   const app = await electron.launch({
@@ -1604,6 +1846,8 @@ async function checkElectronRuntime() {
 
   try {
     await step('wait for Electron DOMContentLoaded', () => page.waitForLoadState('domcontentloaded', { timeout: STARTUP_TIMEOUT }));
+
+    await page.evaluate(() => localStorage.setItem('graphicsQuality', 'low'));
 
     await page.evaluate(() => {
       if (!window.Phaser || !window.Phaser.Game || window.__SIM_PERF_GAME_WRAPPED) return;
@@ -1654,6 +1898,7 @@ async function checkElectronRuntime() {
         canvas.clientHeight > 0;
     }, null, { timeout: STARTUP_TIMEOUT });
 
+    const graphicsMode = await checkGraphicsMode(page);
     const canvasNonBlank = await waitForCanvasNonBlank(page);
     const outOfBoundsPathResult = await page.evaluate(() => new Promise(resolve => {
       try {
@@ -1681,6 +1926,7 @@ async function checkElectronRuntime() {
         preloadedKeys: Object.keys(window.SIM_PRELOADED_IMAGES || {}).length,
         sceneChildren: window.__SIM_PHASER_GAME?.scene?.scenes?.[0]?.children?.list?.length || 0,
         initialAvatarDebug: window.Game.Renderer.getAvatarDebug && window.Game.Renderer.getAvatarDebug(),
+        furnitureTextureReport: window.Game.Renderer.getFurnitureTextureReport && window.Game.Renderer.getFurnitureTextureReport(),
         campaignShell: {
           current: window.Game.Campaign?.getCurrentChapter?.()?.id || null,
           objective: document.querySelector('.campaign-objective')?.textContent || '',
@@ -1694,6 +1940,7 @@ async function checkElectronRuntime() {
       };
     });
     result.canvasNonBlank = canvasNonBlank;
+    result.graphicsMode = graphicsMode;
     result.avatarPreview = avatarPreview;
     result.outOfBoundsPathResult = outOfBoundsPathResult;
     result.cameraControls = cameraControls;
@@ -1793,6 +2040,12 @@ async function checkElectronRuntime() {
     if (!result.campaignShell.current || !result.campaignShell.objective) {
       fail(`Expected an active campaign objective in the HUD: ${JSON.stringify(result.campaignShell)}`);
     }
+    if (!result.furnitureTextureReport || result.furnitureTextureReport.uniqueTextureCount < 30) {
+      fail(`Expected at least 30 distinct furniture texture mappings: ${JSON.stringify(result.furnitureTextureReport)}`);
+    }
+    if (result.furnitureTextureReport.generatedTextureCount < 28) {
+      fail(`Expected generated household art across at least 28 furniture categories: ${JSON.stringify(result.furnitureTextureReport)}`);
+    }
     if (!result.campaignShell.dailyKicker.startsWith('Chapter')) {
       fail(`Expected Daily Focus to follow the active campaign chapter: ${JSON.stringify(result.campaignShell)}`);
     }
@@ -1817,10 +2070,14 @@ async function checkElectronRuntime() {
   checkAvatarRendererBehavior();
   checkRendererAvatarPreloadFailures();
   checkStateAppearanceMigration();
+  checkSaveManagerRobustness();
+  checkGameDataIntegrity();
   checkHomeGrowthAndFamilySystems();
   checkCampaignBehavior();
   const resources = checkResources();
-  const runtime = await checkElectronRuntime();
+  const runtime = process.env.SIMLIFE_SKIP_ELECTRON === '1'
+    ? { skipped: true, reason: 'SIMLIFE_SKIP_ELECTRON=1' }
+    : await checkElectronRuntime();
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));
 })().catch(err => {
   console.error(err && err.stack ? err.stack : err);

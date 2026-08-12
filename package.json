@@ -7,7 +7,10 @@
   "main": "main.js",
   "scripts": {
     "test": "node scripts/verify-game.js",
+    "test:visual": "node scripts/capture-visuals.js",
     "generate:avatars": "node scripts/generate-avatar-assets.js",
+    "generate:world": "node scripts/generate-world-assets.js",
+    "generate:world:extract": "python scripts/extract-furniture-sheet.py",
     "start:desktop": "electron .",
     "build:win": "electron-builder --win",
     "sop:doctor": "web-sop doctor",
@@ -44,6 +47,7 @@
       "preload.js",
       "css/**/*",
       "js/**/*",
+      "!js/renderer_utf8.js",
       "vendor/**/*",
       "assets/**/*",
       "!assets/**/*.zip",

@@ -4,7 +4,7 @@
 
 - Visual tone: warm isometric life-sim with readable, game-like controls.
 - Typography: existing serif display for HUD/buttons, sans-serif for dense panel content.
-- Color tokens: dark translucent panels, gold trim for RPG chrome, teal/green for active/positive state, red for destructive or urgent state.
+- Color tokens: warm ivory surfaces, forest ink, teal/green active states, gold primary actions, and coral destructive or urgent states.
 - Spacing: compact HUD spacing; panels use 8px gaps and touch-safe controls.
 - Radius and elevation: cards and controls use 8px radius or less; panel shadows should clarify layering without hiding the playfield.
 - Motion: subtle hover/press movement only; avoid layout shifts during dynamic HUD updates.
@@ -41,12 +41,27 @@
 
 ## Hearthbyte Edition art direction
 
-- Fantasy: a complete 16-bit "cozy cartridge" life-sim presented through warm CRT-era console chrome.
-- Materials: midnight navy shell, ink-black recesses, brass pixels, mint/teal success, coral danger, and parchment text.
-- Typography: chunky display face for titles and controls; highly legible rounded sans for descriptions and dense panels.
-- Shape language: clipped pixel corners and double-line highlights on hero controls; modest 4-8px rounding inside dense panels.
-- Texture: restrained scanlines, dithered gradients, star specks, and edge vignette. Effects never reduce text contrast.
+- Fantasy: a bright 16-bit storybook life-sim with a welcoming garden palette and tactile cartridge-era controls.
+- Materials: warm ivory paper, fresh teal, leaf green, sunny gold, coral accents, and dark forest ink. Midnight navy is reserved for small recesses, not full screens.
+- Typography: chunky display face for titles and controls; highly legible rounded sans for descriptions and dense panels. Letter spacing remains neutral.
+- Shape language: strong pixel edges, restrained 4-8px rounding, two-pixel borders, and short offset shadows that make controls feel pressable.
+- Texture: subtle grid and foliage patterns, light color grading, and a shallow edge vignette. CRT scanlines are opt-in and never reduce text contrast.
 - Motion: short stepped transitions for rewards and menus; reduced-motion disables nonessential float, shimmer, and scanline movement.
+
+### Presentation surfaces
+
+- Main menu: split teal brand field and ivory action field over a bright sky-and-grass scene.
+- Character creation: ivory workspace with a larger layered avatar preview and mint garden editing surface.
+- Gameplay: the world remains visually dominant; HUD controls are separate translucent ivory islands rather than full-width dark ribbons.
+- World: the starter home is centered above the bottom HUD, lawn tiles blend into the procedural grass field, landscaping frames the active lot, and persistent room labels appear only during build mode.
+- Pause and dialogs: ivory modal surfaces with teal primary actions, coral danger states, and background blur that preserves world context.
+
+### System panels
+
+- Market, collections, goals, social, skills, legacy, campaign, career, activities, and build mode share the same ivory card, mint summary, and teal action hierarchy.
+- Locked content uses quiet gray-green surfaces; destructive actions use coral; sandbox and milestone states use gold.
+- Desktop panels use multi-column grids where scanning benefits. Mobile panels collapse to touch-safe single or two-column layouts without clipping.
+- Transient events, notifications, announcers, radial interactions, and placement controls use the same semantic palette and elevation rules.
 
 ### HUD hierarchy
 
@@ -56,3 +71,11 @@
 4. Deep systems behind the command dock or side panel.
 
 The center of the playfield stays clear. The campaign chip replaces the decorative title as the primary top-center control and opens the campaign journal.
+
+### World asset rules
+
+- Core household objects use unmistakable silhouettes: beds, sofas, appliances, bathroom fixtures, computers, exercise equipment, nursery pieces, workshop pieces, and garden centerpieces must not share generic crate or chair art.
+- Furniture stays on the same warm walnut, ivory, teal, leaf, coral, and brass palette as the shell while retaining dark pixel outlines for legibility over room floors.
+- Generated household sprites use transparent 256x256 bottom-aligned canvases. Curated Kenney assets retain directional east/north variants and the renderer chooses them from furniture rotation state.
+- Decorative repetition is broken with library, dungeon, and farm subfamilies. The first playable home must show indoor greenery, distinct fixtures, varied storage, cultivated plots, and a recognizable courtyard focal point.
+- Build cards preview normalized household sprites directly; legacy assets retain their readable semantic icon until their transparent source canvases are normalized for catalog use.

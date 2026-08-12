@@ -45,6 +45,10 @@ function createWindow() {
     }
   });
 
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    console.error('Renderer process exited:', details.reason, details.exitCode);
+  });
+
   mainWindow.loadFile('index.html');
 }
 

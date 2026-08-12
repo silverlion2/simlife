@@ -19,7 +19,6 @@ Game.UI = (function() {
     setupPlacementActions();
     setupPanelButtons();
     setupDailyFocus();
-    setupGraphicsToggle();
   }
 
   function getAppearancePrimaryColor(appearance) {
@@ -31,37 +30,6 @@ Game.UI = (function() {
 
   function getLegacyFormFromAppearance(appearance) {
     return appearance && appearance.form === 'witch' ? 'online_witch' : appearance.form;
-  }
-
-  function setupGraphicsToggle() {
-    window.GRAPHICS_QUALITY = localStorage.getItem('graphicsQuality') || 'high';
-    
-    const btn = document.getElementById('btn-toggle-graphics');
-    const updateBtn = () => {
-       if (btn) {
-           btn.textContent = window.GRAPHICS_QUALITY === 'high' ? '🔆' : '🌑';
-           btn.title = window.GRAPHICS_QUALITY === 'high' ? 'Graphics: High (Press L to lower)' : 'Graphics: Low (Press L to raise)';
-       }
-    };
-    updateBtn();
-
-    const toggle = () => {
-      window.GRAPHICS_QUALITY = window.GRAPHICS_QUALITY === 'high' ? 'low' : 'high';
-      localStorage.setItem('graphicsQuality', window.GRAPHICS_QUALITY);
-      updateBtn();
-      if (Game.Renderer && Game.Renderer.setBgDirty) {
-        Game.Renderer.setBgDirty(); // Force redshift to apply pipelines
-      }
-      showNotification(`Graphics set to ${window.GRAPHICS_QUALITY === 'high' ? 'High (Dynamic Lights)' : 'Low (Performance)'}`);
-    };
-
-    if (btn) btn.addEventListener('click', toggle);
-
-    document.addEventListener('keydown', (e) => {
-       if (e.key.toLowerCase() === 'l' && document.activeElement.tagName !== 'INPUT') {
-          toggle();
-       }
-    });
   }
 
   // ---- Main Menu Flow (New) ----
@@ -156,7 +124,10 @@ Game.UI = (function() {
       mm.classList.remove('hidden');
     });
 
-    document.getElementById('btn-cc-start').addEventListener('click', () => {
+    document.getElementById('btn-cc-start').addEventListener('click', event => {
+      const startButton = event.currentTarget;
+      if (startButton.disabled) return;
+      startButton.disabled = true;
       const worldName = document.getElementById('cc-world-name').value || 'My World';
       const simName = document.getElementById('cc-sim-name').value || 'Player';
       const appearance = createAvatarEditor ? createAvatarEditor.getAppearance() : Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF });
@@ -166,7 +137,7 @@ Game.UI = (function() {
       const traitKey = selectedTraitCard ? selectedTraitCard.dataset.key : 'neat';
 
       Game.State.createSave(worldName, { name: simName, trait: traitKey, color: color, form: form, appearance: appearance });
-      startGameLoop(cc);
+      setTimeout(() => startGameLoop(cc), 0);
     });
 
     // Load Screen Buttons
@@ -819,6 +790,15 @@ Game.UI = (function() {
   }
 
   function buildBuildPanel(panel, closeHtml) {
+    const furnitureTextureReport = Game.Renderer?.getFurnitureTextureReport?.();
+    const furnitureTextureByType = new Map((furnitureTextureReport?.mappings || []).map(entry => [entry.type, entry.texture]));
+    const furniturePreview = (type, fallbackIcon) => {
+      const textureKey = furnitureTextureByType.get(type);
+      if (!textureKey || !textureKey.startsWith('generated_')) return fallbackIcon;
+      const source = textureKey && window.SIM_ASSETS && window.SIM_ASSETS[textureKey];
+      if (!source) return fallbackIcon;
+      return `<img class="build-item-sprite" src="${source}" alt="" aria-hidden="true">`;
+    };
     let html = '<div class="dialog-header"><h3>🏗️ Build Mode</h3><button class="close-btn" onclick="Game.UI.togglePanel(\'build\')">&times;</button></div>';
     html += '<div class="dialog-content">';
     // Sell mode toggle
@@ -926,7 +906,7 @@ Game.UI = (function() {
         const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isFurnitureUnlocked(key));
         const lockReason = locked && Game.HomeGrowth.getFurnitureLockReason ? Game.HomeGrowth.getFurnitureLockReason(key) : '';
         html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('furniture','${key}')"`}>
-          <div class="build-item-icon">${furn.icon}</div>
+          <div class="build-item-icon">${furniturePreview(key, furn.icon)}</div>
           <div class="build-item-name">${furn.label}</div>
           <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + furn.cost)}</div>
         </div>`;
@@ -938,7 +918,7 @@ Game.UI = (function() {
         const furn = Game.Config.FURNITURE[object.type];
         if (!furn) continue;
         html += `<div class="build-item stored" onclick="Game.UI.startBuild('stored','${object.id}')">
-          <div class="build-item-icon">${furn.icon}</div>
+          <div class="build-item-icon">${furniturePreview(object.type, furn.icon)}</div>
           <div class="build-item-name">${furn.label}</div>
           <div class="build-item-cost">Owned</div>
         </div>`;

@@ -306,8 +306,7 @@ Game.Character = (function() {
 
     // Award money (e.g. harvesting)
     if (actCfg.earnings) {
-      const state = Game.State.get();
-      state.money = (state.money || 0) + actCfg.earnings;
+      Game.Economy.addMoney(actCfg.earnings);
       if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
          Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 1.0, `+$${actCfg.earnings}`, '#FFD700', '💰');
       }
@@ -347,9 +346,10 @@ Game.Character = (function() {
           furn.isFull = true;
           if (Game.UI) Game.UI.showNotification('🐟 Filled the pet bowl! Let\'s wait and see who comes by.');
           if (Game.Renderer && Game.Renderer.requestFullSync) Game.Renderer.requestFullSync();
-        } else if (type === 'take_subway') {
+        } else if (type === 'travel' || type === 'take_subway') {
            if (furn.config && furn.config.targetMap) {
               char.mapId = furn.config.targetMap;
+              recordMapVisit(char.mapId);
               char.position.x = furn.config.targetX || 4;
               char.position.y = furn.config.targetY || 8;
               char.targetPosition = null;
@@ -435,6 +435,8 @@ Game.Character = (function() {
     char.activityProgress = 0;
     char.targetPosition = null;
     char.path = null;
+    char.isPathfinding = false;
+    char.pathRequestId = (char.pathRequestId || 0) + 1;
   }
 
   function isAvailableActivity(activityKey) {
@@ -516,8 +518,11 @@ Game.Character = (function() {
       const ty = Math.floor(char.targetPosition.y);
       
       if (Game.Renderer && Game.Renderer.findPath) {
+        const requestId = (char.pathRequestId || 0) + 1;
+        char.pathRequestId = requestId;
         char.isPathfinding = true;
         Game.Renderer.findPath(rx, ry, tx, ty, (path) => {
+          if (char.pathRequestId !== requestId) return;
           char.isPathfinding = false;
           char.path = path;
           // EasyStar might return null if unreachable
@@ -610,12 +615,22 @@ Game.Character = (function() {
     const state = Game.State.get();
     const char = state.character;
     
-    if (state.money >= 1000000) unlockAchievement('millionaire');
+    if (state.economy.money >= 1000000) unlockAchievement('millionaire');
     if (char.skills.language >= 6) unlockAchievement('hsk_master');
+    if (state.stats.friendsMade >= 1) unlockAchievement('first_friend');
+    if (['house', 'downtown', 'university'].every(mapId => (char.visitedMaps || []).includes(mapId))) {
+      unlockAchievement('globe_trotter');
+    }
     if (char.collection && char.collection.length >= Object.keys(Game.Config.COLLECTIONS).length) {
       // you could add a collector achievement
     }
-    // more checks can be added here
+  }
+
+  function recordMapVisit(mapId) {
+    const char = getState();
+    if (!char.visitedMaps) char.visitedMaps = ['house'];
+    if (!char.visitedMaps.includes(mapId)) char.visitedMaps.push(mapId);
+    checkAchievements();
   }
 
   return {
@@ -643,5 +658,6 @@ Game.Character = (function() {
     isFurnitureBroken,
     breakFurniture,
     repairFurniture,
+    checkAchievements,
   };
 })();

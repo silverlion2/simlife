@@ -1,0 +1,578 @@
+[
+  {
+    "key": "generated_bed",
+    "file": "assets/custom/generated_furniture/generated_bed.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 1,
+    "sourceBounds": [
+      55,
+      73,
+      293,
+      299
+    ],
+    "outputBounds": [
+      9,
+      22,
+      247,
+      248
+    ]
+  },
+  {
+    "key": "generated_sofa",
+    "file": "assets/custom/generated_furniture/generated_sofa.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 2,
+    "sourceBounds": [
+      45,
+      81,
+      289,
+      288
+    ],
+    "outputBounds": [
+      8,
+      44,
+      248,
+      248
+    ]
+  },
+  {
+    "key": "generated_stove",
+    "file": "assets/custom/generated_furniture/generated_stove.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 3,
+    "sourceBounds": [
+      67,
+      82,
+      248,
+      301
+    ],
+    "outputBounds": [
+      37,
+      29,
+      218,
+      248
+    ]
+  },
+  {
+    "key": "generated_fridge",
+    "file": "assets/custom/generated_furniture/generated_fridge.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 4,
+    "sourceBounds": [
+      85,
+      39,
+      219,
+      304
+    ],
+    "outputBounds": [
+      67,
+      8,
+      188,
+      248
+    ]
+  },
+  {
+    "key": "generated_toilet",
+    "file": "assets/custom/generated_furniture/generated_toilet.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 5,
+    "sourceBounds": [
+      79,
+      55,
+      241,
+      265
+    ],
+    "outputBounds": [
+      47,
+      38,
+      209,
+      248
+    ]
+  },
+  {
+    "key": "generated_shower",
+    "file": "assets/custom/generated_furniture/generated_shower.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 6,
+    "sourceBounds": [
+      61,
+      25,
+      250,
+      293
+    ],
+    "outputBounds": [
+      43,
+      8,
+      212,
+      248
+    ]
+  },
+  {
+    "key": "generated_indoor_tree",
+    "file": "assets/custom/generated_furniture/generated_indoor_tree.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 7,
+    "sourceBounds": [
+      71,
+      21,
+      225,
+      286
+    ],
+    "outputBounds": [
+      58,
+      8,
+      197,
+      248
+    ]
+  },
+  {
+    "key": "generated_potted_flower",
+    "file": "assets/custom/generated_furniture/generated_potted_flower.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 8,
+    "sourceBounds": [
+      64,
+      50,
+      220,
+      267
+    ],
+    "outputBounds": [
+      50,
+      31,
+      206,
+      248
+    ]
+  },
+  {
+    "key": "generated_computer_desk",
+    "file": "assets/custom/generated_furniture/generated_computer_desk.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 9,
+    "sourceBounds": [
+      58,
+      13,
+      264,
+      237
+    ],
+    "outputBounds": [
+      25,
+      24,
+      231,
+      248
+    ]
+  },
+  {
+    "key": "generated_arcade",
+    "file": "assets/custom/generated_furniture/generated_arcade.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 10,
+    "sourceBounds": [
+      71,
+      0,
+      240,
+      250
+    ],
+    "outputBounds": [
+      47,
+      8,
+      209,
+      248
+    ]
+  },
+  {
+    "key": "generated_treadmill",
+    "file": "assets/custom/generated_furniture/generated_treadmill.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 11,
+    "sourceBounds": [
+      23,
+      10,
+      250,
+      248
+    ],
+    "outputBounds": [
+      14,
+      10,
+      241,
+      248
+    ]
+  },
+  {
+    "key": "generated_fountain",
+    "file": "assets/custom/generated_furniture/generated_fountain.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 12,
+    "sourceBounds": [
+      18,
+      16,
+      260,
+      229
+    ],
+    "outputBounds": [
+      8,
+      37,
+      248,
+      248
+    ]
+  },
+  {
+    "key": "generated_crib",
+    "file": "assets/custom/generated_furniture/generated_crib.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 13,
+    "sourceBounds": [
+      54,
+      0,
+      278,
+      232
+    ],
+    "outputBounds": [
+      16,
+      16,
+      240,
+      248
+    ]
+  },
+  {
+    "key": "generated_workbench",
+    "file": "assets/custom/generated_furniture/generated_workbench.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 14,
+    "sourceBounds": [
+      40,
+      0,
+      283,
+      244
+    ],
+    "outputBounds": [
+      8,
+      8,
+      247,
+      248
+    ]
+  },
+  {
+    "key": "generated_telescope",
+    "file": "assets/custom/generated_furniture/generated_telescope.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 15,
+    "sourceBounds": [
+      61,
+      0,
+      207,
+      224
+    ],
+    "outputBounds": [
+      55,
+      24,
+      201,
+      248
+    ]
+  },
+  {
+    "key": "generated_hot_tub",
+    "file": "assets/custom/generated_furniture/generated_hot_tub.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v1.png",
+    "sourceCell": 16,
+    "sourceBounds": [
+      0,
+      7,
+      268,
+      234
+    ],
+    "outputBounds": [
+      8,
+      45,
+      248,
+      248
+    ]
+  },
+  {
+    "key": "generated_kitchen_sink",
+    "file": "assets/custom/generated_furniture/generated_kitchen_sink.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 1,
+    "sourceBounds": [
+      52,
+      34,
+      284,
+      291
+    ],
+    "outputBounds": [
+      19,
+      8,
+      236,
+      248
+    ]
+  },
+  {
+    "key": "generated_microwave",
+    "file": "assets/custom/generated_furniture/generated_microwave.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 2,
+    "sourceBounds": [
+      46,
+      69,
+      282,
+      276
+    ],
+    "outputBounds": [
+      10,
+      41,
+      246,
+      248
+    ]
+  },
+  {
+    "key": "generated_espresso",
+    "file": "assets/custom/generated_furniture/generated_espresso.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 3,
+    "sourceBounds": [
+      35,
+      35,
+      248,
+      298
+    ],
+    "outputBounds": [
+      31,
+      8,
+      225,
+      248
+    ]
+  },
+  {
+    "key": "generated_dishwasher",
+    "file": "assets/custom/generated_furniture/generated_dishwasher.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 4,
+    "sourceBounds": [
+      30,
+      46,
+      250,
+      295
+    ],
+    "outputBounds": [
+      22,
+      8,
+      234,
+      248
+    ]
+  },
+  {
+    "key": "generated_bathroom_vanity",
+    "file": "assets/custom/generated_furniture/generated_bathroom_vanity.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 5,
+    "sourceBounds": [
+      42,
+      8,
+      257,
+      303
+    ],
+    "outputBounds": [
+      40,
+      8,
+      215,
+      248
+    ]
+  },
+  {
+    "key": "generated_flat_tv",
+    "file": "assets/custom/generated_furniture/generated_flat_tv.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 6,
+    "sourceBounds": [
+      11,
+      27,
+      268,
+      305
+    ],
+    "outputBounds": [
+      17,
+      8,
+      239,
+      248
+    ]
+  },
+  {
+    "key": "generated_stereo",
+    "file": "assets/custom/generated_furniture/generated_stereo.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 7,
+    "sourceBounds": [
+      3,
+      49,
+      278,
+      276
+    ],
+    "outputBounds": [
+      8,
+      50,
+      248,
+      248
+    ]
+  },
+  {
+    "key": "generated_game_console",
+    "file": "assets/custom/generated_furniture/generated_game_console.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 8,
+    "sourceBounds": [
+      9,
+      40,
+      251,
+      285
+    ],
+    "outputBounds": [
+      9,
+      8,
+      246,
+      248
+    ]
+  },
+  {
+    "key": "generated_aquarium",
+    "file": "assets/custom/generated_furniture/generated_aquarium.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 9,
+    "sourceBounds": [
+      51,
+      24,
+      265,
+      279
+    ],
+    "outputBounds": [
+      27,
+      8,
+      228,
+      248
+    ]
+  },
+  {
+    "key": "generated_standing_mirror",
+    "file": "assets/custom/generated_furniture/generated_standing_mirror.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 10,
+    "sourceBounds": [
+      47,
+      13,
+      191,
+      270
+    ],
+    "outputBounds": [
+      61,
+      8,
+      195,
+      248
+    ]
+  },
+  {
+    "key": "generated_bbq_grill",
+    "file": "assets/custom/generated_furniture/generated_bbq_grill.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 11,
+    "sourceBounds": [
+      0,
+      22,
+      242,
+      276
+    ],
+    "outputBounds": [
+      13,
+      8,
+      242,
+      248
+    ]
+  },
+  {
+    "key": "generated_weight_bench",
+    "file": "assets/custom/generated_furniture/generated_weight_bench.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 12,
+    "sourceBounds": [
+      6,
+      30,
+      275,
+      281
+    ],
+    "outputBounds": [
+      8,
+      24,
+      248,
+      248
+    ]
+  },
+  {
+    "key": "generated_changing_table",
+    "file": "assets/custom/generated_furniture/generated_changing_table.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 13,
+    "sourceBounds": [
+      39,
+      10,
+      270,
+      265
+    ],
+    "outputBounds": [
+      19,
+      8,
+      236,
+      248
+    ]
+  },
+  {
+    "key": "generated_3d_printer",
+    "file": "assets/custom/generated_furniture/generated_3d_printer.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 14,
+    "sourceBounds": [
+      26,
+      0,
+      231,
+      267
+    ],
+    "outputBounds": [
+      36,
+      8,
+      220,
+      248
+    ]
+  },
+  {
+    "key": "generated_fireplace",
+    "file": "assets/custom/generated_furniture/generated_fireplace.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 15,
+    "sourceBounds": [
+      0,
+      0,
+      267,
+      280
+    ],
+    "outputBounds": [
+      13,
+      8,
+      242,
+      248
+    ]
+  },
+  {
+    "key": "generated_vanity",
+    "file": "assets/custom/generated_furniture/generated_vanity.png",
+    "sourceSheet": "generated-furniture-sheet-alpha-v2.png",
+    "sourceCell": 16,
+    "sourceBounds": [
+      3,
+      0,
+      243,
+      282
+    ],
+    "outputBounds": [
+      26,
+      8,
+      230,
+      248
+    ]
+  }
+]

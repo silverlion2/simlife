@@ -4,11 +4,11 @@
 window.Game = window.Game || {};
 
 Game.Shell = (function() {
-  const SETTINGS_KEY = 'simlife_settings_v2';
+  const SETTINGS_KEY = 'simlife_settings_v3';
   const DEFAULTS = {
     volume: 30,
     muted: false,
-    scanlines: true,
+    scanlines: false,
     reducedMotion: false,
     highContrast: false,
   };

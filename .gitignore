@@ -4,6 +4,7 @@ output/
 __pycache__/
 browser_*.txt
 *.py
+!scripts/extract-furniture-sheet.py
 
 # Antigravity Persistent Memory
 .gemini/

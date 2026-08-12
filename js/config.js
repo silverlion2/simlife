@@ -100,6 +100,12 @@ Game.Config = {
     patio:      { label: 'Patio',      icon: '☀️', minW: 2, minH: 2, maxW: 5, maxH: 5, baseCost: 600,  floorColor: '#B0BEC5', wallColor: '#90A4AE' },
     workshop:   { label: 'Workshop',   icon: '🛠️', minW: 2, minH: 2, maxW: 4, maxH: 4, baseCost: 1200, floorColor: '#9E9E9E', wallColor: '#616161' },
     subway:     { label: 'Subway Station', icon: '🚇', minW: 3, minH: 3, maxW: 5, maxH: 5, baseCost: 0, floorColor: '#B0BEC5', wallColor: '#546E7A' },
+    office:     { label: 'Office',      icon: '🏢', minW: 3, minH: 3, maxW: 8, maxH: 8, baseCost: 1600, floorColor: '#D7D3C8', wallColor: '#4F7C78' },
+    lab:        { label: 'Laboratory',  icon: '🔬', minW: 3, minH: 3, maxW: 8, maxH: 8, baseCost: 1800, floorColor: '#CBD8D7', wallColor: '#527478' },
+    studio:     { label: 'Art Studio',  icon: '🎨', minW: 3, minH: 3, maxW: 8, maxH: 8, baseCost: 1500, floorColor: '#D8C9B0', wallColor: '#A15C48' },
+    clinic:     { label: 'Clinic',      icon: '🩺', minW: 3, minH: 3, maxW: 8, maxH: 8, baseCost: 1900, floorColor: '#D8E2DF', wallColor: '#4D7F72' },
+    stage:      { label: 'Venue',       icon: '🎤', minW: 3, minH: 3, maxW: 8, maxH: 8, baseCost: 1700, floorColor: '#4C4147', wallColor: '#9C4B52' },
+    classroom:  { label: 'Classroom',   icon: '🍎', minW: 3, minH: 3, maxW: 8, maxH: 8, baseCost: 1500, floorColor: '#D9CFB7', wallColor: '#587167' },
   },
 
   // ----------------------------------------------------------
@@ -222,7 +228,7 @@ Game.Config = {
   // ----------------------------------------------------------
   CAREERS: {
     business: {
-      label: 'Business', icon: '💼', keySkill: 'charisma',
+      label: 'Business', icon: '💼', keySkill: 'charisma', mapId: 'business_hq', actionKey: 'work_business',
       levels: [
         { title: 'Mail Room Clerk',   salary: 60,  scheduleStart: 9, scheduleEnd: 17, skillReq: 0 },
         { title: 'Office Assistant',   salary: 100, scheduleStart: 9, scheduleEnd: 17, skillReq: 2 },
@@ -232,7 +238,7 @@ Game.Config = {
       ],
     },
     tech: {
-      label: 'Tech', icon: '💻', keySkill: 'tech',
+      label: 'Tech', icon: '💻', keySkill: 'tech', mapId: 'tech_office', actionKey: 'work_tech',
       levels: [
         { title: 'QA Tester',         salary: 70,  scheduleStart: 10, scheduleEnd: 18, skillReq: 0 },
         { title: 'Junior Developer',   salary: 120, scheduleStart: 10, scheduleEnd: 18, skillReq: 2 },
@@ -242,7 +248,7 @@ Game.Config = {
       ],
     },
     culinary: {
-      label: 'Culinary', icon: '🍳', keySkill: 'cooking',
+      label: 'Culinary', icon: '🍳', keySkill: 'cooking', mapId: 'culinary_kitchen', actionKey: 'work_culinary',
       levels: [
         { title: 'Dishwasher',        salary: 45,  scheduleStart: 8, scheduleEnd: 15, skillReq: 0 },
         { title: 'Line Cook',          salary: 80,  scheduleStart: 8, scheduleEnd: 15, skillReq: 2 },
@@ -252,7 +258,7 @@ Game.Config = {
       ],
     },
     science: {
-      label: 'Science', icon: '🔬', keySkill: 'logic',
+      label: 'Science', icon: '🔬', keySkill: 'logic', mapId: 'science_lab', actionKey: 'work_science',
       levels: [
         { title: 'Lab Assistant',      salary: 65,  scheduleStart: 8, scheduleEnd: 16, skillReq: 0 },
         { title: 'Research Associate',  salary: 110, scheduleStart: 8, scheduleEnd: 16, skillReq: 2 },
@@ -262,7 +268,7 @@ Game.Config = {
       ],
     },
     creative: {
-      label: 'Creative', icon: '🎨', keySkill: 'creativity',
+      label: 'Creative', icon: '🎨', keySkill: 'creativity', mapId: 'creative_studio', actionKey: 'work_creative',
       levels: [
         { title: 'Freelance Artist',   salary: 40,  scheduleStart: 10, scheduleEnd: 16, skillReq: 0 },
         { title: 'Graphic Designer',   salary: 90,  scheduleStart: 10, scheduleEnd: 16, skillReq: 2 },
@@ -272,7 +278,7 @@ Game.Config = {
       ],
     },
     medicine: {
-      label: 'Medicine', icon: '🩺', keySkill: 'logic',
+      label: 'Medicine', icon: '🩺', keySkill: 'logic', mapId: 'clinic', actionKey: 'work_medicine',
       levels: [
         { title: 'Orderly',            salary: 50,  scheduleStart: 8, scheduleEnd: 18, skillReq: 0 },
         { title: 'EMT',                salary: 100, scheduleStart: 8, scheduleEnd: 18, skillReq: 2 },
@@ -282,7 +288,7 @@ Game.Config = {
       ],
     },
     entertainment: {
-      label: 'Entertainment', icon: '🎤', keySkill: 'charisma',
+      label: 'Entertainment', icon: '🎤', keySkill: 'charisma', mapId: 'entertainment_venue', actionKey: 'work_entertainment',
       levels: [
         { title: 'Open Mic Comic',     salary: 30,  scheduleStart: 18, scheduleEnd: 23, skillReq: 0 },
         { title: 'Standup Regular',    salary: 80,  scheduleStart: 18, scheduleEnd: 23, skillReq: 2 },
@@ -292,7 +298,7 @@ Game.Config = {
       ],
     },
     education: {
-      label: 'Education', icon: '🍎', keySkill: 'logic',
+      label: 'Education', icon: '🍎', keySkill: 'logic', mapId: 'education_campus', actionKey: 'work_education',
       levels: [
         { title: 'Substitute Teacher', salary: 40,  scheduleStart: 8, scheduleEnd: 15, skillReq: 0 },
         { title: 'Teacher',            salary: 90,  scheduleStart: 8, scheduleEnd: 15, skillReq: 2 },
@@ -429,52 +435,18 @@ Game.Config = {
   },
 
   // ----------------------------------------------------------
-  // Careers (Map-based Workplaces)
-  // ----------------------------------------------------------
-  CAREERS: {
-    tech: {
-      label: 'Tech Corp', 
-      keySkill: 'tech', 
-      mapId: 'tech_office',
-      actionKey: 'work_tech',
-      levels: [
-        { title: 'Helpdesk', salary: 80, skillReq: 0, scheduleStart: 9, scheduleEnd: 17 },
-        { title: 'Junior Dev', salary: 200, skillReq: 3, scheduleStart: 9, scheduleEnd: 17 },
-        { title: 'Senior Dev', salary: 600, skillReq: 6, scheduleStart: 10, scheduleEnd: 18 }
-      ]
-    },
-    culinary: {
-      label: 'Gourmet Kitchen', 
-      keySkill: 'cooking', 
-      mapId: 'culinary_kitchen',
-      actionKey: 'work_culinary',
-      levels: [
-        { title: 'Dishwasher', salary: 50, skillReq: 0, scheduleStart: 12, scheduleEnd: 20 },
-        { title: 'Line Cook', salary: 150, skillReq: 3, scheduleStart: 14, scheduleEnd: 22 },
-        { title: 'Executive Chef', salary: 500, skillReq: 6, scheduleStart: 16, scheduleEnd: 24 }
-      ]
-    },
-    business: {
-      label: 'Business HQ', 
-      keySkill: 'logic', 
-      mapId: 'business_hq',
-      actionKey: 'work_business',
-      levels: [
-        { title: 'Mailroom', salary: 60, skillReq: 0, scheduleStart: 8, scheduleEnd: 16 },
-        { title: 'Manager', salary: 180, skillReq: 3, scheduleStart: 9, scheduleEnd: 17 },
-        { title: 'Executive', salary: 800, skillReq: 7, scheduleStart: 10, scheduleEnd: 16 }
-      ]
-    }
-  },
-
-  // ----------------------------------------------------------
   // Activities (things you can do with furniture/rooms)
   // ----------------------------------------------------------
   ACTIVITIES: {
     browse_jobs:  { label: 'Browse Jobs',    duration: 30,  needs: { fun: 5 },      room: 'study',    furniture: 'computer', icon: '💼' },
     work_tech:    { label: 'Coding',         duration: 480, needs: { energy: -20 }, room: '*',        furniture: 'computer', icon: '💻', skill: 'tech', xp: 5 },
     work_culinary:{ label: 'Cooking Prep',   duration: 480, needs: { energy: -25 }, room: '*',        furniture: 'smart_stove', icon: '🍳', skill: 'cooking', xp: 5 },
-    work_business:{ label: 'Meeting',        duration: 480, needs: { energy: -15 }, room: '*',        furniture: 'basic_desk', icon: '📈', skill: 'logic', xp: 5 },
+    work_business:{ label: 'Meeting',        duration: 480, needs: { energy: -15 }, room: '*',        furniture: 'basic_desk', icon: '📈', skill: 'charisma', xp: 5 },
+    work_science: { label: 'Research',       duration: 480, needs: { energy: -20 }, room: '*',        furniture: 'printer_3d', icon: '🔬', skill: 'logic', xp: 5 },
+    work_creative:{ label: 'Design Session', duration: 360, needs: { energy: -15, fun: 5 }, room: '*', furniture: 'drafting_table', icon: '🎨', skill: 'creativity', xp: 5 },
+    work_medicine:{ label: 'Patient Rounds', duration: 600, needs: { energy: -25 }, room: '*',        furniture: 'computer', icon: '🩺', skill: 'logic', xp: 5 },
+    work_entertainment:{ label: 'Perform',   duration: 300, needs: { energy: -20, fun: 10 }, room: '*', furniture: 'grand_piano', icon: '🎤', skill: 'charisma', xp: 5 },
+    work_education:{ label: 'Teach Class',   duration: 420, needs: { energy: -18 }, room: '*',        furniture: 'bookshelf', icon: '🍎', skill: 'logic', xp: 5 },
     sleep:        { label: 'Sleep',          duration: 480, needs: { energy: 80 },  room: 'bedroom',  furniture: 'bed',    icon: '💤', moodlet: { name: 'Well Rested', value: 8, duration: 240, icon: '😴' } },
     nap:          { label: 'Take a Nap',     duration: 120, needs: { energy: 30 },  room: 'bedroom',  furniture: 'bed',    icon: '😴', moodlet: { name: 'Refreshed', value: 4, duration: 120, icon: '💤' } },
     cook:         { label: 'Cook a Meal',    duration: 30,  needs: { hunger: 25 },  room: 'kitchen',  furniture: 'stove',  icon: '🍳', skill: 'cooking', xp: 15, moodlet: { name: 'Home Cooked', value: 6, duration: 180, icon: '🍳' } },

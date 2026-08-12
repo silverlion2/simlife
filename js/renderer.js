@@ -41,9 +41,9 @@ Game.Renderer = (function() {
     const viewportWidth = Number(width) || window.innerWidth || 1280;
     const viewportHeight = Number(height) || window.innerHeight || 720;
     if (viewportWidth <= 620 || viewportHeight <= 560) return 1.12;
-    if (viewportWidth >= 1500) return 1.62;
-    if (viewportWidth >= 1100) return 1.5;
-    return 1.3;
+    if (viewportWidth >= 1500) return 1.78;
+    if (viewportWidth >= 1100) return 1.65;
+    return 1.42;
   }
 
   class MainScene extends Phaser.Scene {
@@ -71,22 +71,22 @@ Game.Renderer = (function() {
       mainScene = this;
       this.cameraFollowsCharacter = true;
       this.userAdjustedZoom = false;
-      this.cameras.main.setBackgroundColor('#25451f');
+      this.cameras.main.setBackgroundColor('#6f9f5f');
 
       const backdropGraphics = this.make.graphics({ x: 0, y: 0, add: false });
-      backdropGraphics.fillStyle(0x3b6232, 1);
+      backdropGraphics.fillStyle(0x84bc70, 1);
       backdropGraphics.fillRect(0, 0, 128, 128);
       for (let i = 0; i < 92; i++) {
         const x = (i * 37) % 128;
         const y = (i * 61) % 128;
-        const tint = i % 4 === 0 ? 0x517c3f : (i % 4 === 1 ? 0x2f4f2a : (i % 4 === 2 ? 0x7f9650 : 0x2f6f61));
-        backdropGraphics.fillStyle(tint, 0.16);
+        const tint = i % 4 === 0 ? 0xb3d985 : (i % 4 === 1 ? 0x67a96d : (i % 4 === 2 ? 0xd2df94 : 0x63b4a2));
+        backdropGraphics.fillStyle(tint, 0.22);
         backdropGraphics.fillRect(x, y, 2 + (i % 4), 1);
       }
       for (let i = 0; i < 16; i++) {
         const x = (i * 53 + 11) % 128;
         const y = (i * 29 + 17) % 128;
-        backdropGraphics.fillStyle(i % 2 === 0 ? 0xf3d778 : 0xd66b6b, 0.28);
+        backdropGraphics.fillStyle(i % 2 === 0 ? 0xffdc78 : 0xf08b7f, 0.44);
         backdropGraphics.fillCircle(x, y, 1);
       }
       backdropGraphics.generateTexture('grass_backdrop', 128, 128);
@@ -94,7 +94,7 @@ Game.Renderer = (function() {
       this.terrainBackdrop.setOrigin(0, 0);
       this.terrainBackdrop.setScrollFactor(0);
       this.terrainBackdrop.setDepth(-1000000);
-      this.terrainBackdrop.setAlpha(0.94);
+      this.terrainBackdrop.setAlpha(1);
       
       if (this.game.renderer.type === Phaser.WEBGL) {
           // Phaser 4: Pipelines and old postFX removed.
@@ -237,10 +237,10 @@ Game.Renderer = (function() {
     getCenteredCameraScroll(focus) {
       if (!focus || !Number.isFinite(focus.x) || !Number.isFinite(focus.y)) return null;
       const cam = this.cameras.main;
-      const zoom = cam.zoom || 1;
+      const verticalBias = cam.height <= 620 ? 28 : 62;
       return {
-        x: focus.x - (cam.width / (2 * zoom)),
-        y: focus.y - (cam.height / (2 * zoom))
+        x: focus.x - (cam.width / 2),
+        y: focus.y - (cam.height / 2) + verticalBias
       };
     }
 
@@ -393,13 +393,42 @@ Game.Renderer = (function() {
             }
           } else {
             tile.setTexture('floor');
-            tile.setTint(pickGroundTint(x, y, false));
-            tile.setAlpha(1);
+            tile.setTint(0xc9d5a4);
+            tile.setAlpha(0.18);
+            this.drawGroundTileWash(x, y, pickGroundTint(x, y, false));
           }
       }
 
-      this.drawRoomNameplates(visibleRooms);
+      if (Game.State.get().ui.mode === 'build') this.drawRoomNameplates(visibleRooms);
       this.drawAmbientScenery(activeMap, w, h);
+    }
+
+    drawGroundTileWash(x, y, fillColor) {
+      const p1 = isoProject(x, y);
+      const p2 = isoProject(x + 1, y);
+      const p3 = isoProject(x + 1, y + 1);
+      const p4 = isoProject(x, y + 1);
+      const center = isoProject(x + 0.5, y + 0.5);
+      const wash = this.add.graphics();
+      this.gridSprites.push(wash);
+      wash.fillStyle(fillColor, 0.48);
+      wash.lineStyle(1, 0x5f965c, 0.025);
+      wash.beginPath();
+      wash.moveTo(p1.x, p1.y);
+      wash.lineTo(p2.x, p2.y);
+      wash.lineTo(p3.x, p3.y);
+      wash.lineTo(p4.x, p4.y);
+      wash.closePath();
+      wash.fillPath();
+      wash.strokePath();
+
+      const detailSeed = Math.abs((x * 19 + y * 23 + x * y * 3) % 11);
+      if (detailSeed === 2 || detailSeed === 7) {
+        wash.fillStyle(detailSeed === 2 ? 0xf4d46f : 0x4f8f62, 0.7);
+        wash.fillRect(center.x - 7 + (x % 4), center.y - 2 + (y % 3), 2, 2);
+        wash.fillRect(center.x + 4 - (y % 3), center.y + 2, 1, 2);
+      }
+      wash.depth = (x + y) * 10 - 4.4;
     }
 
     drawRoomNameplates(rooms) {
@@ -411,14 +440,14 @@ Game.Renderer = (function() {
           fontFamily: 'Nunito, sans-serif',
           fontSize: '10px',
           fontStyle: '700',
-          color: '#fff8e6',
-          backgroundColor: 'rgba(32, 25, 21, 0.5)',
+          color: '#fffaf0',
+          backgroundColor: 'rgba(40, 104, 95, 0.82)',
           padding: { x: 5, y: 2 },
-          stroke: '#201915',
-          strokeThickness: 2,
-          shadow: { offsetX: 0, offsetY: 1, color: '#000000', blur: 2, fill: true }
+          stroke: '#28685f',
+          strokeThickness: 1,
+          shadow: { offsetX: 0, offsetY: 2, color: '#163f3a', blur: 2, fill: true }
         }).setOrigin(0.5, 0.5);
-        text.setAlpha(0.56);
+        text.setAlpha(0.86);
         text.setDepth((room.x + room.y) * 10 - 2.2);
         this.gridSprites.push(text);
       }
@@ -447,7 +476,7 @@ Game.Renderer = (function() {
     getRenderedGroundTileKeys(activeMap, w, h) {
       const keys = new Set();
       const fullMapBudget = 1600;
-      const contentMargin = activeMap === Game.State.get().maps.house ? 5 : 3;
+      const contentMargin = activeMap === Game.State.get().maps.house ? 3 : 2;
 
       const addTile = (x, y) => {
         if (x < 0 || y < 0 || x >= w || y >= h) return;
@@ -497,14 +526,10 @@ Game.Renderer = (function() {
     drawAmbientScenery(activeMap, w, h) {
       if (!activeMap || activeMap !== Game.State.get().maps.house) return;
       const props = [
-        { key: 'hayStack', x: -2, y: 6, scale: 0.18 },
-        { key: 'hay', x: 1, y: h - 3, scale: 0.18 },
-        { key: 'crate', x: 7, y: h + 1, scale: 0.18 },
-        { key: 'fence', x: w - 2, y: 5, scale: 0.20 },
-        { key: 'wooden_fence_e', x: 10, y: -1, scale: 0.18 },
-        { key: 'wooden_fence_n', x: w + 1, y: 12, scale: 0.18 },
-        { key: 'hay', x: w - 5, y: h - 1, scale: 0.18 },
-        { key: 'crate', x: -3, y: h - 7, scale: 0.17 },
+        { key: 'hayStack', x: 0, y: 8, scale: 0.18 },
+        { key: 'crate', x: 9, y: 8, scale: 0.17 },
+        { key: 'wooden_fence_e', x: 0, y: 3, scale: 0.18 },
+        { key: 'wooden_fence_n', x: 9, y: 10, scale: 0.18 },
       ];
 
       for (const prop of props) {
@@ -694,27 +719,24 @@ Game.Renderer = (function() {
       // Time of day: Color-graded lighting cycle
       const hour = state.time.hour || 0;
       let darkness = 0;
-      let tintColor = 0x040822; // Deep blue night (default)
+      let tintColor = 0x101b3b; // Soft indigo night (default)
       if (hour < 5 || hour > 20) {
-          darkness = 0.55; tintColor = 0x040822; // Night: deep navy
+          darkness = 0.42; tintColor = 0x101b3b; // Night: readable indigo
       } else if (hour >= 5 && hour < 7) {
-          // Dawn: warm golden rise
-          darkness = 0.55 - ((hour - 5)/2)*0.45;
-          tintColor = 0x8B4513; // Warm sienna dawn
+          // Dawn: a light peach wash that preserves world colors.
+          darkness = 0.24 - ((hour - 5)/2)*0.16;
+          tintColor = 0xf2a36f;
       } else if (hour >= 7 && hour < 9) {
-          // Morning: fading golden warmth
-          darkness = 0.10 - ((hour - 7)/2)*0.10;
-          tintColor = 0xD2691E; // Chocolate morning glow
+          darkness = 0.08 - ((hour - 7)/2)*0.08;
+          tintColor = 0xffcf86;
       } else if (hour >= 9 && hour < 17) {
           darkness = 0; // Full daylight, no overlay
       } else if (hour >= 17 && hour < 19) {
-          // Sunset: warm amber -> deep orange
-          darkness = ((hour - 17)/2)*0.30;
-          tintColor = 0xFF6347; // Tomato sunset
+          darkness = ((hour - 17)/2)*0.18;
+          tintColor = 0xf08772;
       } else if (hour >= 19 && hour <= 20) {
-          // Dusk: transition to blue
-          darkness = 0.30 + ((hour - 19))*0.25;
-          tintColor = 0x191970; // Midnight blue dusk
+          darkness = 0.18 + ((hour - 19))*0.22;
+          tintColor = 0x33477f;
       }
       if (this.shadowOverlay) {
           this.shadowOverlay.setFillStyle(tintColor);
@@ -1025,17 +1047,17 @@ Game.Renderer = (function() {
        const blocker = this.add.rectangle(0, 0, 8000, 8000, 0x000000, 0).setInteractive();
        blocker.on('pointerdown', () => this.closePieMenu());
        
-       const halo = this.add.circle(0, 0, radius + buttonRadius + 16, 0x120d0a, 0.24);
-       halo.setStrokeStyle(2, 0xffd77a, 0.18);
+       const halo = this.add.circle(0, 0, radius + buttonRadius + 16, 0x3f9185, 0.12);
+       halo.setStrokeStyle(2, 0xf2bd58, 0.5);
        const ring = this.add.circle(0, 0, radius, 0x000000, 0);
-       ring.setStrokeStyle(2, 0x45c0b3, 0.28);
-       const bg = this.add.circle(0, 0, 28, 0x201915, 0.94).setInteractive();
-       bg.setStrokeStyle(2, 0xffd77a, 0.75);
+       ring.setStrokeStyle(2, 0x3f9185, 0.65);
+       const bg = this.add.circle(0, 0, 28, 0xfffaf0, 0.98).setInteractive();
+       bg.setStrokeStyle(2, 0xf2bd58, 0.95);
        const cancel = this.add.text(0, 0, centerTitle || '✕', {
           fontSize: '20px',
-          color: '#ffffff',
-          stroke: '#000000',
-          strokeThickness: 3
+          color: '#28685f',
+          stroke: '#fffaf0',
+          strokeThickness: 1
        }).setOrigin(0.5);
        this.pieMenu.add([blocker, halo, ring, bg, cancel]);
        
@@ -1049,34 +1071,34 @@ Game.Renderer = (function() {
           const ix = Math.cos(angle) * radius;
           const iy = Math.sin(angle) * radius;
           
-          const btnBg = this.add.circle(ix, iy, buttonRadius, item.locked ? 0x5f5a55 : 0x2e241f, 0.96).setInteractive({ useHandCursor: true });
-          btnBg.setStrokeStyle(2, item.locked ? 0x777777 : 0xffd77a, item.locked ? 0.55 : 0.9);
+          const btnBg = this.add.circle(ix, iy, buttonRadius, item.locked ? 0xaab4ad : 0x3f9185, 0.98).setInteractive({ useHandCursor: true });
+          btnBg.setStrokeStyle(2, item.locked ? 0xd3d9d4 : 0xfffaf0, item.locked ? 0.75 : 0.95);
           const btnIcon = this.add.text(ix, iy - 10, item.locked ? '🔒' : item.icon, {
              fontSize: isCompactWheel ? '22px' : '24px',
-             stroke: '#000000',
-             strokeThickness: 3
+             stroke: '#fffaf0',
+             strokeThickness: 2
           }).setOrigin(0.5);
           const btnText = this.add.text(ix, iy + 20, item.label, {
              fontFamily: 'Nunito, sans-serif',
              fontSize: isCompactWheel ? '10px' : '12px',
-             color: '#ffffff',
-             backgroundColor: '#201915dd',
+             color: '#263b3b',
+             backgroundColor: '#fffaf0f2',
              padding: { x: 5, y: 3 },
              align: 'center',
              wordWrap: { width: isCompactWheel ? 76 : 96 },
-             stroke: '#000000',
-             strokeThickness: 2
+             stroke: '#fffaf0',
+             strokeThickness: 1
           }).setOrigin(0.5);
 
           btnBg.on('pointerover', () => {
-             btnBg.setFillStyle(0x3f2f27, 1);
-             btnBg.setStrokeStyle(3, 0x45c0b3, 1);
+             btnBg.setFillStyle(0x28685f, 1);
+             btnBg.setStrokeStyle(3, 0xf2bd58, 1);
              btnIcon.setScale(1.08);
              btnText.setScale(1.04);
           });
           btnBg.on('pointerout', () => {
-             btnBg.setFillStyle(item.locked ? 0x777777 : 0x2e241f, 0.94);
-             btnBg.setStrokeStyle(2, item.locked ? 0x777777 : 0xffd77a, item.locked ? 0.55 : 0.9);
+             btnBg.setFillStyle(item.locked ? 0xaab4ad : 0x3f9185, 0.98);
+             btnBg.setStrokeStyle(2, item.locked ? 0xd3d9d4 : 0xfffaf0, item.locked ? 0.75 : 0.95);
              btnIcon.setScale(1);
              btnText.setScale(1);
           });
@@ -1169,7 +1191,7 @@ Game.Renderer = (function() {
          }
       }
       
-      const ghostColor = isValid ? 0x7ee081 : 0xff5d5d;
+      const ghostColor = isValid ? 0x62c98c : 0xe96f68;
       const p1 = isoProject(ghost.x, ghost.y);
       const p2 = isoProject(ghost.x + footprintW, ghost.y);
       const p3 = isoProject(ghost.x + footprintW, ghost.y + footprintH);
@@ -1273,11 +1295,12 @@ Game.Renderer = (function() {
         }
         if (!this.charLabel) {
           this.charLabel = this.add.text(0, 0, charObj.name || '🧑 You', {
-            fontSize: '12px',
+            fontSize: '11px',
             fontFamily: 'Nunito, sans-serif',
-            color: '#ffffff',
-            stroke: '#000000',
-            strokeThickness: 3,
+            color: '#fffdf5',
+            backgroundColor: '#173f3acc',
+            padding: { x: 4, y: 2 },
+            strokeThickness: 0,
             align: 'center'
           }).setOrigin(0.5, 1);
         }
@@ -1301,11 +1324,12 @@ Game.Renderer = (function() {
         
         // Name tag
         this.charLabel = this.add.text(0, 0, charObj.name || '🧑 You', {
-          fontSize: '12px',
+          fontSize: '11px',
           fontFamily: 'Nunito, sans-serif',
-          color: '#ffffff',
-          stroke: '#000000',
-          strokeThickness: 3,
+          color: '#fffdf5',
+          backgroundColor: '#173f3acc',
+          padding: { x: 4, y: 2 },
+          strokeThickness: 0,
           align: 'center'
         }).setOrigin(0.5, 1);
         
@@ -1401,7 +1425,7 @@ Game.Renderer = (function() {
       }
       if (this.charLabel) {
         this.charLabel.setText(charObj.name || '🧑 You');
-        this.charLabel.setPosition(pt.x, pt.y - 45); // Move name up slightly to make room
+        this.charLabel.setPosition(pt.x, pt.y - 78);
         this.charLabel.depth = depthBase + 1;
       }
 
@@ -1578,6 +1602,18 @@ Game.Renderer = (function() {
       let scale = 0.21;
       let originY = 0.76;
 
+      if (textureKey && textureKey.startsWith('generated_')) {
+        const compactGenerated = new Set([
+          'generated_fountain',
+          'generated_hot_tub',
+          'generated_treadmill',
+        ]);
+        return {
+          scale: compactGenerated.has(textureKey) ? 0.30 : 0.34,
+          originY: 0.94,
+        };
+      }
+
       if (textureKey === 'grandPiano_se') return { scale: 0.115, originY: 0.76 };
       if (textureKey === 'bonsaiShrine_se') return { scale: 0.105, originY: 0.78 };
       if (textureKey === 'map_portal' || textureKey === 'subway_turnstile') return { scale: 0.25, originY: 0.82 };
@@ -1605,18 +1641,75 @@ Game.Renderer = (function() {
 
     getTextureForFurn(type, furnState) {
       const config = Game.Config.FURNITURE[type] || {};
+      const generatedTextures = {
+        basic_bed: 'generated_bed',
+        good_bed: 'generated_bed',
+        luxury_bed: 'generated_bed',
+        basic_sofa: 'generated_sofa',
+        nice_sofa: 'generated_sofa',
+        basic_stove: 'generated_stove',
+        good_stove: 'generated_stove',
+        smart_stove: 'generated_stove',
+        fridge: 'generated_fridge',
+        smart_fridge: 'generated_fridge',
+        toilet: 'generated_toilet',
+        basic_shower: 'generated_shower',
+        bathtub: 'generated_hot_tub',
+        hot_tub: 'generated_hot_tub',
+        plant: 'generated_potted_flower',
+        potted_flower: 'generated_potted_flower',
+        indoor_tree: 'generated_indoor_tree',
+        computer: 'generated_computer_desk',
+        good_computer: 'generated_computer_desk',
+        arcade_machine: 'generated_arcade',
+        treadmill: 'generated_treadmill',
+        fountain: 'generated_fountain',
+        crib: 'generated_crib',
+        workbench: 'generated_workbench',
+        telescope: 'generated_telescope',
+        sink_k: 'generated_kitchen_sink',
+        microwave: 'generated_microwave',
+        espresso: 'generated_espresso',
+        dishwasher: 'generated_dishwasher',
+        sink_b: 'generated_bathroom_vanity',
+        basic_tv: 'generated_flat_tv',
+        big_tv: 'generated_flat_tv',
+        stereo: 'generated_stereo',
+        game_console: 'generated_game_console',
+        aquarium: 'generated_aquarium',
+        mirror: 'generated_standing_mirror',
+        bbq_grill: 'generated_bbq_grill',
+        weights: 'generated_weight_bench',
+        changing_table: 'generated_changing_table',
+        printer_3d: 'generated_3d_printer',
+        fireplace: 'generated_fireplace',
+        vanity: 'generated_vanity',
+      };
+      if (generatedTextures[type] && this.textureExists(generatedTextures[type])) {
+        return generatedTextures[type];
+      }
+
       if (config.texture && this.textureExists(config.texture)) return config.texture;
 
-      if(type === 'display_case') return 'displayCase';
-      if(type === 'candle_stand') return 'candleStand';
-      if(type === 'decorated_table') return 'decoratedTable';
-      if(type === 'wide_bookcase') return 'wideBookcase';
-      if(type === 'cushion') return 'floorCarpet';
+      if(type === 'display_case' || type === 'china_cabinet') {
+          return this.orientedTexture(furnState, 'library_display_books_e', 'library_display_books_n', 'displayCase');
+      }
+      if(type === 'candle_stand' || type === 'lamp' || type === 'fireplace') {
+          return this.orientedTexture(furnState, 'library_candle_double_e', 'library_candle_double_n', 'candleStand');
+      }
+      if(type === 'decorated_table') {
+          return this.orientedTexture(furnState, 'library_table_decorated_e', 'library_table_decorated_n', 'decoratedTable');
+      }
+      if(type === 'wide_bookcase') {
+          return this.orientedTexture(furnState, 'library_bookcase_ladder_e', 'library_bookcase_ladder_n', 'wideBookcase');
+      }
+      if(type === 'cushion' || type === 'yoga_mat' || type === 'rug') {
+          return this.orientedTexture(furnState, 'library_carpet_small_e', 'library_carpet_small_n', 'floorCarpet');
+      }
       if(type === 'grand_piano') return this.firstExisting(['grandPiano_se'], 'longTable');
       if(type === 'bonsai_shrine') return this.firstExisting(['bonsaiShrine_se'], 'hayStack');
-      if(type === 'lamp' || type === 'fireplace') return 'candleStand';
       if(type === 'rustic_armchair' || type === 'recliner' || type === 'dining_chairs') {
-          return this.orientedTexture(furnState, 'rustic_armchair_e', 'rustic_armchair_n', 'libraryChair');
+          return this.orientedTexture(furnState, 'dungeon_chair_e', 'dungeon_chair_n', 'libraryChair');
       }
       if(type === 'vintage_tv' || type === 'basic_tv' || type === 'big_tv') {
           return this.orientedTexture(furnState, 'vintage_tv_e', 'vintage_tv_n', 'displayCase');
@@ -1625,42 +1718,54 @@ Game.Renderer = (function() {
           return this.orientedTexture(furnState, 'vintage_stereo_e', 'vintage_stereo_n', 'displayCase');
       }
       if(type === 'bookshelf' || type === 'study_shelf' || type === 'display_shelf') {
-          return this.orientedTexture(furnState, 'bookcase_e', 'bookcase_n', 'bookcaseWideBooks');
+          return this.orientedTexture(furnState, 'library_bookcase_e', 'library_bookcase_n', 'bookcaseWideBooks');
       }
-      if(type === 'bookcase') return this.orientedTexture(furnState, 'bookcase_e', 'bookcase_n', 'bookcaseWideBooks');
-      if(type === 'toy_chest' || type === 'dresser' || type === 'wardrobe') return 'chestClosed';
-      if(type === 'china_cabinet' || type === 'globe' || type === 'dartboard' || type === 'painting' || type === 'arcade_machine' || type === 'printer_3d') return 'displayCase';
-      if(type === 'crib' || type === 'hammock') return 'hayStack';
-      if(type === 'treadmill' || type === 'workbench') return 'longTable';
-      if(type === 'weights' || type === 'fountain') return 'barrel';
-      if(type === 'yoga_mat') return 'floorCarpet';
-      if(type === 'telescope') return 'displayCase';
-      if(type === 'language_book') return 'bookcaseWideBooks';
+      if(type === 'bookcase') {
+          return this.orientedTexture(furnState, 'library_bookcase_e', 'library_bookcase_n', 'bookcaseWideBooks');
+      }
+      if(type === 'toy_chest' || type === 'dresser') {
+          return this.orientedTexture(furnState, 'dungeon_chest_open_e', 'dungeon_chest_open_n', 'chestClosed');
+      }
+      if(type === 'wardrobe') {
+          return this.orientedTexture(furnState, 'dungeon_crates_e', 'dungeon_crates_n', 'chestClosed');
+      }
+      if(type === 'globe' || type === 'language_book') {
+          return this.orientedTexture(furnState, 'library_bookstand_e', 'library_bookstand_n', 'bookcaseWideBooks');
+      }
+      if(type === 'dartboard' || type === 'painting' || type === 'printer_3d') {
+          return this.orientedTexture(furnState, 'library_display_open_e', 'library_display_open_n', 'displayCase');
+      }
+      if(type === 'hammock') return this.orientedTexture(furnState, 'farm_hay_stack_e', 'farm_hay_stack_n', 'hayStack');
+      if(type === 'weights') return this.orientedTexture(furnState, 'dungeon_short_table_chairs_e', 'dungeon_short_table_chairs_n', 'barrel');
       if(type === 'staircase') return 'planks';
 
       if(type === 'subway_gate') return 'subway_turnstile';
       if(type === 'map_portal') return 'map_portal';
 
-      if(type === 'pet_bowl') return furnState && furnState.isFull ? 'chestClosed' : 'crate';
-      if(type === 'potted_flower') return 'hayStack'; 
+      if(type === 'pet_bowl') {
+          return this.orientedTexture(furnState, 'farm_sack_e', 'farm_sack_n', furnState && furnState.isFull ? 'chestClosed' : 'crate');
+      }
       if(type === 'garden_plot') {
           if (furnState && (furnState.cropState === 'ready' || furnState.cropState === 'growing')) {
-              return this.firstExisting(['crop_corn'], 'hay');
+              return this.orientedTexture(furnState, 'farm_corn_young_e', 'farm_corn_young_n', 'crop_corn');
           }
-          return 'floorCarpet';
+          return this.orientedTexture(furnState, 'farm_plot_e', 'farm_plot_n', 'floorCarpet');
       }
 
-      if(type.includes('bed')) return 'hayStack';
-      if(type.includes('dresser') || type.includes('wardrobe') || type.includes('fridge')) return 'chestClosed';
-      if(type.includes('coffee_table')) return 'tableShort';
-      if(type.includes('table') || type.includes('desk') || type.includes('bench') || type.includes('counter')) return 'longTable';
+      if(type.includes('bed')) return 'generated_bed';
+      if(type.includes('dresser') || type.includes('wardrobe')) return this.orientedTexture(furnState, 'dungeon_crates_e', 'dungeon_crates_n', 'chestClosed');
+      if(type.includes('coffee_table')) return this.orientedTexture(furnState, 'dungeon_round_table_e', 'dungeon_round_table_n', 'tableShort');
+      if(type === 'dining_table') return this.orientedTexture(furnState, 'library_table_chairs_e', 'library_table_chairs_n', 'longTable');
+      if(type.includes('table') || type.includes('desk') || type.includes('bench') || type.includes('counter')) {
+          return this.orientedTexture(furnState, 'library_table_large_e', 'library_table_large_n', 'longTable');
+      }
       if(type.includes('sofa') || type.includes('chair') || type.includes('recliner') || type.includes('toilet') || type.includes('vanity')) return 'libraryChair';
       if(type.includes('tv') || type.includes('computer') || type.includes('console') || type.includes('aquarium') || type.includes('mirror')) return 'displayCase';
       if(type.includes('stove') || type.includes('sink') || type.includes('tub') || type.includes('microwave') || type.includes('espresso') || type.includes('dishwasher') || type.includes('fire') || type.includes('bbq')) return 'barrel';
-      if(type.includes('shelf') || type.includes('bookcase')) return 'bookcaseWideBooks';
-      if(type.includes('rug') || type.includes('mat')) return 'floorCarpet';
-      if(type.includes('plant') || type.includes('tree') || type.includes('plot')) return 'hay';
-      return 'crate'; // Generic fallback
+      if(type.includes('shelf') || type.includes('bookcase')) return this.orientedTexture(furnState, 'library_bookcase_e', 'library_bookcase_n', 'bookcaseWideBooks');
+      if(type.includes('rug') || type.includes('mat')) return this.orientedTexture(furnState, 'library_carpet_small_e', 'library_carpet_small_n', 'floorCarpet');
+      if(type.includes('plant') || type.includes('tree')) return 'generated_potted_flower';
+      return this.orientedTexture(furnState, 'dungeon_crates_e', 'dungeon_crates_n', 'crate');
     }
 
     syncFurniture(houseObj) {
@@ -1937,8 +2042,8 @@ Game.Renderer = (function() {
 
   function pickGroundTint(x, y, outer) {
     const palette = outer
-      ? [0x42682f, 0x4d7438, 0x557d40, 0x3f6230]
-      : [0x77aa64, 0x82b96e, 0x6fa15f, 0x8fbd73];
+      ? [0x79ae68, 0x6fa55f, 0x84b873, 0x75a968]
+      : [0x82b96c, 0x8fc477, 0x78ad64, 0x98ca7d];
     const idx = Math.abs((x * 31 + y * 17 + x * y * 7) % palette.length);
     return palette[idx];
   }
@@ -2217,6 +2322,21 @@ function startPhaser(canvasEl) {
     }
   }
 
+  function getFurnitureTextureReport() {
+    if (!mainScene || !Game.Config || !Game.Config.FURNITURE) return null;
+    const mappings = Object.keys(Game.Config.FURNITURE).map(type => ({
+      type,
+      texture: mainScene.getTextureForFurn(type, {}),
+    }));
+    const uniqueTextures = Array.from(new Set(mappings.map(entry => entry.texture)));
+    return {
+      mappings,
+      uniqueTextures,
+      uniqueTextureCount: uniqueTextures.length,
+      generatedTextureCount: uniqueTextures.filter(key => key.startsWith('generated_')).length,
+    };
+  }
+
   function spawnParticles(x, y, count = 20, color = '#FFFF00') {
     if (!mainScene) return;
     const pt = isoProject(x, y);
@@ -2317,6 +2437,7 @@ function startPhaser(canvasEl) {
         spriteCount: familySpriteMap.size,
         ids: Array.from(familySpriteMap.keys()),
       };
-    }
+    },
+    getFurnitureTextureReport,
   };
 })();
