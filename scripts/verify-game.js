@@ -1831,8 +1831,11 @@ async function checkGraphicsMode(page) {
 
 async function checkElectronRuntime() {
   const testUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'simlife-test-'));
+  const electronArgs = process.env.CI
+    ? ['--enable-unsafe-swiftshader', root]
+    : [root];
   const app = await electron.launch({
-    args: [root],
+    args: electronArgs,
     env: { ...process.env, SIMLIFE_TEST_USER_DATA: testUserData },
   });
   const page = await app.firstWindow({ timeout: 60000 });
