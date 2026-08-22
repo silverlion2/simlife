@@ -216,7 +216,7 @@ Game.Main = (function() {
     const season = time.season || 'spring';
     const sc = Game.Config.SEASONS[season];
     if (sc) {
-      const roll = Math.random();
+      const roll = Game.Random.float();
       let cumul = 0;
       time.weather = 'clear';
       for (const [w, chance] of Object.entries(sc.weatherChance)) {
@@ -306,7 +306,7 @@ Game.Main = (function() {
                 const dist = Math.sqrt(dx*dx + dy*dy);
                 if (dist < 0.2) {
                     pet.targetPosition = null;
-                    pet.timer = Math.random() * 10 + 5; // Idle for 5-15 in-game minutes
+                    pet.timer = Game.Random.float() * 10 + 5; // Idle for 5-15 in-game minutes
                 } else {
                     const speed = 0.05 * minutes; // Very slow wandering
                     pet.position.x += (dx/dist) * speed;
@@ -317,8 +317,8 @@ Game.Main = (function() {
                 if (pet.timer <= 0) {
                     // Pick a new random spot in the lot bounds
                     pet.targetPosition = {
-                        x: 1 + Math.random() * (activeMap.lotWidth - 2),
-                        y: 1 + Math.random() * (activeMap.lotHeight - 2)
+                        x: 1 + Game.Random.float() * (activeMap.lotWidth - 2),
+                        y: 1 + Game.Random.float() * (activeMap.lotHeight - 2)
                     };
                 }
             }
@@ -394,7 +394,7 @@ Game.Main = (function() {
     // Spawn timer
     npcSpawnTimer -= delta;
     if (npcSpawnTimer <= 0) {
-      npcSpawnTimer = 40 + Math.random() * 50;
+      npcSpawnTimer = 40 + Game.Random.float() * 50;
       spawnNPCWalker();
     }
 
@@ -426,8 +426,8 @@ Game.Main = (function() {
     const available = npcs.filter(n => !activeIds.includes(n.id));
     if (available.length === 0 || state.npcWalkers.length >= 3) return;
 
-    const chosen = available[Math.floor(Math.random() * available.length)];
-    const fromLeft = Math.random() > 0.5;
+    const chosen = available[Game.Random.int(0, available.length - 1)];
+    const fromLeft = Game.Random.float() > 0.5;
     const pathY = activeMap.lotHeight + 0.5;
 
     state.npcWalkers.push({
@@ -436,7 +436,7 @@ Game.Main = (function() {
       position: { x: fromLeft ? -2 : activeMap.lotWidth + 2, y: pathY },
       direction: fromLeft ? 1 : -1,
       active: true,
-      phase: Math.random() * Math.PI * 2,
+      phase: Game.Random.float() * Math.PI * 2,
       lifeTimer: 60,
     });
   }
@@ -457,15 +457,17 @@ Game.Main = (function() {
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
       if (Game.Shell?.isOpen?.() && e.key !== 'Escape') return;
+      const configuredSpeed = Game.Config.TIME.SPEED_KEYS[e.key];
+      if (configuredSpeed !== undefined) {
+        setSpeed(configuredSpeed);
+        return;
+      }
 
       switch (e.key) {
         case ' ':
           e.preventDefault();
           setSpeed(gameSpeed === 0 ? 1 : 0);
           break;
-        case '1': setSpeed(1); break;
-        case '2': setSpeed(3); break;
-        case '3': setSpeed(10); break;
         case 'Escape':
           if (Game.Shell?.isOpen?.()) {
             Game.Shell.close();
@@ -559,7 +561,7 @@ Game.Main = (function() {
   }
 
   function setSpeed(speed, options = {}) {
-    const allowed = [0, 1, 3, 10];
+    const allowed = Game.Config.TIME.SPEEDS;
     const nextSpeed = allowed.includes(Number(speed)) ? Number(speed) : 1;
     gameSpeed = nextSpeed;
     const state = Game.State?.get?.();

@@ -23,6 +23,16 @@ body {
   letter-spacing: 0;
 }
 
+.runtime-status-card {
+  color: var(--pretty-ink);
+  background: var(--pretty-paper);
+  border: 3px solid var(--pretty-teal-dark);
+  box-shadow: 0 10px 0 rgba(40, 104, 95, 0.28), 0 24px 70px var(--pretty-shadow);
+}
+
+.runtime-status[data-status="partial"] .runtime-status-card { border-color: var(--pretty-gold); }
+.runtime-status[data-status="error"] .runtime-status-card { border-color: var(--pretty-coral-dark); }
+
 #game-canvas {
   filter: saturate(1.16) brightness(1.06) contrast(0.98);
 }

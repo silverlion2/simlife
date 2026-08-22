@@ -15,6 +15,7 @@ Game.Renderer = (function() {
   let mainScene = null;
   let easyStar = null;
   let currentGrid = null;
+  let signalsBound = false;
   
   // Grid metrics
   const TILE_W = RendererMath.TILE_W;
@@ -2049,8 +2050,33 @@ Game.Renderer = (function() {
   }
 
   function init(canvasEl) {
+    bindSignals();
     window.SIM_PRELOADED_IMAGES = window.SIM_PRELOADED_IMAGES || {};
     window.SIM_PRELOADED_AVATAR_IMAGES = window.SIM_PRELOADED_AVATAR_IMAGES || {};
+
+    if (Game.AssetLoader) {
+      setRuntimeStatus('loading', 'Preparing your world…', 'Loading local world and avatar assets.');
+      Promise.all([
+        Game.AssetLoader.loadGroup('starterWorld'),
+        Game.AssetLoader.loadGroup('avatars'),
+      ]).then(([worldReport, avatarReport]) => {
+        if (worldReport.status === 'error') {
+          setRuntimeStatus('error', 'World assets could not load', `${worldReport.failed} required assets failed. Retry to continue.`);
+          return;
+        }
+        if (avatarReport.status === 'partial') {
+          setRuntimeStatus('partial', 'World ready with limited avatars', `${avatarReport.failed} optional avatar layers were unavailable.`);
+          window.setTimeout(() => setRuntimeStatus('success'), 2200);
+        } else {
+          setRuntimeStatus('success');
+        }
+        startPhaser(canvasEl);
+      }).catch(error => {
+        console.error('Asset startup failed:', error);
+        setRuntimeStatus('error', 'The game could not start', error.message || 'Asset loading failed.');
+      });
+      return;
+    }
 
     const entries = [
       ...Object.entries(window.SIM_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_IMAGES, isAvatar: false })),
@@ -2087,6 +2113,22 @@ Game.Renderer = (function() {
     }
 }
 
+  function bindSignals() {
+    if (signalsBound || !Game.Signals) return;
+    signalsBound = true;
+    Game.Signals.on('effect:bubble', payload => {
+      if (payload) spawnFloatingBubble(payload.x, payload.y, payload.text, payload.color, payload.icon);
+    });
+    Game.Signals.on('effect:explosion', payload => {
+      if (payload) spawnExplosion(payload.x, payload.y, payload.scale);
+    });
+    Game.Signals.on('renderer:sync', () => setBgDirty());
+    Game.Signals.on('map:transition', () => transitionMap());
+    Game.Signals.on('path:find', payload => {
+      if (payload) findPath(payload.startX, payload.startY, payload.endX, payload.endY, payload.callback);
+    });
+  }
+
 function startPhaser(canvasEl) {
     canvasEl = canvasEl || document.getElementById('game-canvas');
     if (typeof EasyStar !== 'undefined') {
@@ -2100,7 +2142,7 @@ function startPhaser(canvasEl) {
     // Phaser 4 removed Pipelines. TiltShift is now handled via CSS overlays.
     // Initialize Phaser
     const config = {
-      type: Phaser.WEBGL,
+      type: Phaser.AUTO !== undefined ? Phaser.AUTO : Phaser.WEBGL,
       canvas: canvasEl,
       width: parentEl.clientWidth || window.innerWidth,
       height: parentEl.clientHeight || window.innerHeight,
@@ -2122,7 +2164,36 @@ function startPhaser(canvasEl) {
         }]
       }
     };
-    phaserGame = new Phaser.Game(config);
+    try {
+      phaserGame = new Phaser.Game(config);
+      if (canvasEl && canvasEl.addEventListener) {
+        canvasEl.addEventListener('webglcontextlost', event => {
+          event.preventDefault();
+          setRuntimeStatus('error', 'Graphics context was lost', 'Save your world if possible, then retry the renderer.');
+        });
+        canvasEl.addEventListener('webglcontextrestored', () => setRuntimeStatus('success'));
+      }
+    } catch (error) {
+      console.error('Renderer initialization failed:', error);
+      setRuntimeStatus('error', 'Graphics could not initialize', 'Neither WebGL nor Canvas could start on this device.');
+    }
+  }
+
+  function setRuntimeStatus(status, title = '', message = '') {
+    const overlay = document.getElementById('runtime-status');
+    if (!overlay) return;
+    const titleEl = document.getElementById('runtime-status-title');
+    const messageEl = document.getElementById('runtime-status-message');
+    const retry = document.getElementById('btn-runtime-retry');
+    overlay.dataset.status = status;
+    overlay.classList.toggle('hidden', status === 'success');
+    if (titleEl && title) titleEl.textContent = title;
+    if (messageEl && message) messageEl.textContent = message;
+    if (retry) {
+      retry.classList.toggle('hidden', status !== 'error');
+      retry.onclick = status === 'error' ? () => window.location.reload() : null;
+    }
+    Game.Signals?.emit('runtime:status', { status, title, message });
   }
 
   // render() removed — Phaser handles rendering automatically
@@ -2224,10 +2295,10 @@ function startPhaser(canvasEl) {
   function getRandomRoomPosition() {
     const activeMap = Game.State.getActiveMap();
     if (!activeMap || activeMap.rooms.length === 0) return null;
-    const room = activeMap.rooms[Math.floor(Math.random() * activeMap.rooms.length)];
+    const room = activeMap.rooms[Game.Random.int(0, activeMap.rooms.length - 1)];
     return {
-      x: room.x + Math.floor(Math.random() * room.w),
-      y: room.y + Math.floor(Math.random() * room.h)
+      x: room.x + Game.Random.int(0, room.w - 1),
+      y: room.y + Game.Random.int(0, room.h - 1)
     };
   }
 

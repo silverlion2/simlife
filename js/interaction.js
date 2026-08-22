@@ -137,7 +137,7 @@ Game.Interaction = (function() {
         lockReason: '',
         callback: () => {
           const handiness = Game.Character.getSkillLevel('handiness');
-          const success = Math.random() < (0.4 + handiness * 0.06);
+          const success = Game.Random.float() < (0.4 + handiness * 0.06);
           if (success) {
             Game.Character.repairFurniture(furn.id);
             Game.Character.addSkillXp('handiness', 25);

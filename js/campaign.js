@@ -242,7 +242,7 @@ Game.Campaign = (function() {
       const progress = getChapterProgress(chapter, state);
       const status = isComplete ? 'COMPLETE' : (isCurrent ? 'ACTIVE' : 'LOCKED');
       const action = isCurrent
-        ? `<button class="campaign-go" type="button" onclick="Game.Campaign.goToObjective('${chapter.target}')">GO</button>`
+        ? `<button class="campaign-go" type="button" data-action="campaign-go" data-target-panel="${chapter.target}">GO</button>`
         : '';
 
       return `
@@ -268,7 +268,7 @@ Game.Campaign = (function() {
           <span class="dialog-kicker">STORY JOURNAL</span>
           <h3>New Roots</h3>
         </div>
-        <button class="close-btn" type="button" onclick="Game.UI.togglePanel('campaign')" aria-label="Close campaign journal">&times;</button>
+        <button class="close-btn" type="button" data-action="close-panel" data-panel="campaign" aria-label="Close campaign journal">&times;</button>
       </div>
       <div class="dialog-content campaign-panel-content">
         <section class="campaign-summary">

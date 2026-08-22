@@ -6,6 +6,11 @@ window.Game = window.Game || {};
 Game.Social = (function() {
   const cfg = Game.Config;
 
+  function notify(message) {
+    if (Game.Signals) Game.Signals.emit('notification', { message });
+    else Game.UI?.showNotification?.(message);
+  }
+
   function getSocial() { return Game.State.get().social; }
 
   function getRelationship(npcId) {
@@ -54,8 +59,9 @@ Game.Social = (function() {
     const charisma = Game.Character.getSkillLevel('charisma');
     const prestigeBonus = (Game.State.get().prestige.upgrades.family_values || 0) * 0.20;
     const [minGain, maxGain] = intCfg.relGain;
-    let gain = minGain + Math.random() * (maxGain - minGain);
+    let gain = minGain + Game.Random.float() * (maxGain - minGain);
     gain *= (1 + charisma * 0.1 + prestigeBonus);
+    gain *= Number(cfg.TRAITS[char.trait]?.effects?.relGainMult) || 1;
     gain = Math.round(gain);
 
     setRelationship(npcId, rel + gain);
@@ -71,7 +77,8 @@ Game.Social = (function() {
     if (rel < 40 && newRel >= 40) {
       Game.State.get().stats.friendsMade++;
       Game.Character.checkAchievements?.();
-      Game.UI && Game.UI.showNotification(`🎉 You and ${getNpcName(npcId)} are now friends!`);
+      notify(`🎉 You and ${getNpcName(npcId)} are now friends!`);
+      Game.Signals?.emit('relationship:friend', { npcId, relationship: newRel });
     }
 
     // Marriage
@@ -79,7 +86,7 @@ Game.Social = (function() {
       getSocial().married = true;
       getSocial().romanticTarget = npcId;
       char.spouse = npcId;
-      Game.UI && Game.UI.showNotification(`💒 You married ${getNpcName(npcId)}! Congratulations!`);
+      notify(`💒 You married ${getNpcName(npcId)}! Congratulations!`);
       return { success: true, msg: `💍 ${getNpcName(npcId)} said YES!`, gain };
     }
 

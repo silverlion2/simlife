@@ -107,6 +107,31 @@ function checkRendererMathHelpers() {
   }
 }
 
+function checkFoundationPrimitives() {
+  const context = loadBrowserGlobals(['js/random.js', 'js/signals.js', 'js/asset_loader.js'], {
+    SIM_ASSETS: { bed: 'bed.png' },
+    SIM_AVATAR_ASSETS: { avatar: 'avatar.png' },
+    SIM_PRELOADED_IMAGES: {},
+    SIM_PRELOADED_AVATAR_IMAGES: {},
+  });
+  context.Game.Random.seed('foundation');
+  const first = [context.Game.Random.float(), context.Game.Random.float(), context.Game.Random.int(2, 5)];
+  context.Game.Random.seed('foundation');
+  const second = [context.Game.Random.float(), context.Game.Random.float(), context.Game.Random.int(2, 5)];
+  if (JSON.stringify(first) !== JSON.stringify(second)) fail('Expected seeded Game.Random sequences to be repeatable');
+  context.Game.Random.reset();
+
+  let signalPayload = null;
+  const unsubscribe = context.Game.Signals.on('verify', payload => { signalPayload = payload; });
+  if (context.Game.Signals.emit('verify', { ok: true }) !== 1 || !signalPayload?.ok) fail('Expected Game.Signals to deliver payloads');
+  unsubscribe();
+  if (context.Game.Signals.emit('verify', {}) !== 0) fail('Expected Game.Signals unsubscribe to remove handler');
+
+  for (const group of ['shell', 'starterWorld', 'avatars', 'buildCatalog', 'careers', 'optionalMaps']) {
+    if (!context.Game.AssetManifest.getGroup(group)) fail(`Missing asset manifest group: ${group}`);
+  }
+}
+
 function checkRendererDataHelpers() {
   const context = loadBrowserGlobals(['js/renderer_helpers.js']);
   const helpers = context.Game.RendererHelpers;
@@ -394,6 +419,7 @@ function checkAvatarRendererBehavior() {
 
 function checkRendererAvatarPreloadFailures() {
   const addedTextures = {};
+  let createdConfig = null;
   const context = loadBrowserGlobals(['js/renderer_math.js', 'js/renderer_helpers.js', 'js/renderer.js'], {
     console: { log: () => {}, error: () => {}, warn: () => {} },
     SIM_ASSETS: { base_missing: 'base-missing.png' },
@@ -411,11 +437,13 @@ function checkRendererAvatarPreloadFailures() {
       }),
     },
     Phaser: {
+      AUTO: 'AUTO',
       WEBGL: 'WEBGL',
       Scale: { RESIZE: 'RESIZE', CENTER_BOTH: 'CENTER_BOTH' },
       Scene: class {},
       Game: class {
         constructor(config) {
+          createdConfig = config;
           this.config = config;
           const scene = new config.scene();
           scene.textures = {
@@ -437,6 +465,8 @@ function checkRendererAvatarPreloadFailures() {
 
   vm.runInContext('Game.Renderer.init(document.getElementById("game-canvas"));', context);
 
+  if (createdConfig?.type !== 'AUTO') fail(`Expected Phaser automatic renderer selection, found ${createdConfig?.type}`);
+
   if (!Object.prototype.hasOwnProperty.call(context.window.SIM_PRELOADED_IMAGES, 'base_missing')) {
     fail('Expected failed base asset to keep legacy blank-image fallback');
   }
@@ -453,6 +483,8 @@ function checkRendererAvatarPreloadFailures() {
 
 function checkStateAppearanceMigration() {
   const context = loadBrowserGlobals([
+    'js/random.js',
+    'js/signals.js',
     'js/config.js',
     'js/avatar_catalog.js',
     'js/appearance.js',
@@ -460,6 +492,13 @@ function checkStateAppearanceMigration() {
   ]);
 
   const state = context.Game.State.get();
+  if (state.version !== 2 || context.Game.State.SAVE_VERSION !== 2) fail('Expected new saves to use schema version 2');
+  const migrationProbe = { version: 1, character: {}, house: { marker: true }, customFutureField: { keep: true } };
+  const migratedProbe = context.Game.State.migrateStatePayload(migrationProbe);
+  if (migratedProbe.version !== 2 || !migratedProbe.maps.house.marker || !migratedProbe.customFutureField.keep) {
+    fail(`Expected v1 migration to preserve unknown fields: ${JSON.stringify(migratedProbe)}`);
+  }
+  if (context.Game.State.migrateStatePayload(migratedProbe) !== migratedProbe) fail('Expected save migration to be idempotent');
   if (!state.character.appearance) fail('Expected new state character.appearance');
   if (state.character.appearance.form !== 'witch') fail(`Expected default form witch, found ${state.character.appearance.form}`);
 
@@ -556,6 +595,8 @@ function checkStateAppearanceMigration() {
 
 function checkHomeGrowthAndFamilySystems() {
   const context = loadBrowserGlobals([
+    'js/random.js',
+    'js/signals.js',
     'js/config.js',
     'js/avatar_catalog.js',
     'js/appearance.js',
@@ -1027,13 +1068,17 @@ function checkResources() {
 
 function createGameLogicContext() {
   const context = loadBrowserGlobals([
+    'js/random.js',
+    'js/signals.js',
     'js/config.js',
     'js/avatar_catalog.js',
     'js/appearance.js',
     'js/state.js',
     'js/economy.js',
     'js/character.js',
+    'js/social.js',
   ], {
+    console: { log: () => {}, warn: () => {}, error: () => {} },
     document: {
       createElement: () => ({
         setAttribute: () => {},
@@ -1050,6 +1095,100 @@ function createGameLogicContext() {
     spawnExplosion: () => {},
   };
   return context;
+}
+
+function checkTraitBehavior() {
+  const context = createGameLogicContext();
+  const character = context.Game.Character;
+  const earnedXp = (trait, skill) => {
+    context.Game.State.reset();
+    const traitState = context.Game.State.get().character;
+    traitState.trait = trait;
+    for (const need of Object.keys(traitState.needs)) traitState.needs[need] = 60;
+    character.addSkillXp(skill, 10);
+    return traitState.skillXp[skill];
+  };
+  const expectXpMultiplier = (trait, skill, multiplier) => {
+    const base = earnedXp('neat', skill);
+    const boosted = earnedXp(trait, skill);
+    if (Math.abs(boosted / base - multiplier) > 0.0001) {
+      fail(`Expected ${trait} ${skill} XP multiplier ${multiplier}, found ${boosted / base}`);
+    }
+  };
+
+  expectXpMultiplier('creative', 'creativity', 1.3);
+  expectXpMultiplier('genius', 'logic', 1.25);
+  expectXpMultiplier('genius', 'tech', 1.25);
+  expectXpMultiplier('athletic', 'fitness', 1.25);
+  expectXpMultiplier('glutton', 'cooking', 1.2);
+
+  context.Game.State.get().character.trait = 'neat';
+  context.Game.State.get().character.needs.hygiene = 100;
+  character.updateNeeds(60);
+  if (Math.abs(context.Game.State.get().character.needs.hygiene - 98.6) > 0.001) fail('Expected Neat hygiene decay multiplier');
+
+  context.Game.State.reset();
+  context.Game.State.get().character.trait = 'lazy';
+  context.Game.State.get().character.needs.energy = 100;
+  character.updateNeeds(60);
+  if (Math.abs(context.Game.State.get().character.needs.energy - 94.8) > 0.001) fail('Expected Lazy energy decay multiplier');
+
+  context.Game.State.reset();
+  context.Game.State.get().character.trait = 'glutton';
+  context.Game.State.get().character.needs.hunger = 100;
+  character.updateNeeds(60);
+  if (Math.abs(context.Game.State.get().character.needs.hunger - 95.8) > 0.001) fail('Expected Glutton hunger decay multiplier');
+
+  context.Game.State.reset();
+  context.Game.State.get().character.trait = 'creative';
+  character.addMoodlet({ name: 'Test', value: 1, duration: 100, icon: 'T' });
+  if (context.Game.State.get().character.moodlets[0].duration !== 130) fail('Expected Creative moodlet duration multiplier');
+
+  context.Game.State.reset();
+  context.Game.State.get().character.trait = 'athletic';
+  if (character.getEffectiveEnergyCost({ energyCost: 20 }) !== 15) fail('Expected Athletic energy cost multiplier');
+
+  context.Game.State.reset();
+  context.Game.State.get().character.trait = 'lazy';
+  context.Game.State.get().character.needs.energy = 40;
+  if (!character.startActivity('nap', false)) fail('Expected nap to start');
+  context.Game.State.get().character.targetPosition = null;
+  context.Game.State.get().character.currentActivity.elapsed = 120;
+  character.updateActivity(1);
+  if (context.Game.State.get().character.needs.energy !== 85) fail(`Expected Lazy nap to restore 45 energy, found ${context.Game.State.get().character.needs.energy}`);
+
+  context.Game.State.reset();
+  const socialState = context.Game.State.get();
+  socialState.character.trait = 'neat';
+  context.Game.Random.seed('social-trait');
+  const base = context.Game.Social.interact('npc_maya', 'small_talk').gain;
+  socialState.social.relationships.npc_maya = 0;
+  socialState.character.trait = 'charming';
+  context.Game.Random.seed('social-trait');
+  const charming = context.Game.Social.interact('npc_maya', 'small_talk').gain;
+  if (!(charming > base)) fail(`Expected Charming relationship gain above ${base}, found ${charming}`);
+
+  let breakSeed = null;
+  for (let index = 0; index < 100 && breakSeed === null; index++) {
+    context.Game.Random.seed(`break-${index}`);
+    const roll = context.Game.Random.float();
+    if (roll >= 0.4 && roll < 0.8) breakSeed = `break-${index}`;
+  }
+  if (!breakSeed) fail('Expected to find deterministic furniture break seed');
+  const runBreakCheck = trait => {
+    context.Game.State.reset();
+    const breakState = context.Game.State.get();
+    breakState.character.trait = trait;
+    context.Game.Config.FURNITURE.basic_stove.breakChance = 0.4;
+    context.Game.Random.seed(breakSeed);
+    if (!character.startActivity('cook', false)) fail('Expected cooking activity to start for breakage trait test');
+    breakState.character.targetPosition = null;
+    breakState.character.currentActivity.elapsed = breakState.character.currentActivity.duration;
+    character.updateActivity(1);
+    return breakState.maps.house.brokenFurniture.includes('furn_7');
+  };
+  if (runBreakCheck('neat')) fail('Expected base trait not to break stove at deterministic roll');
+  if (!runBreakCheck('clumsy')) fail('Expected Clumsy break multiplier to break stove at deterministic roll');
 }
 
 function checkSaveManagerRobustness() {
@@ -1077,8 +1216,17 @@ function checkSaveManagerRobustness() {
   }
 
   const state = context.Game.State.get();
-  const validImport = JSON.stringify({ metadata: { name: 'Imported World' }, state });
-  if (!context.Game.State.importFromFile(validImport)) fail('Expected structurally valid save import to succeed');
+  const legacyState = JSON.parse(JSON.stringify(state));
+  legacyState.version = 1;
+  legacyState.house = legacyState.maps.house;
+  delete legacyState.maps;
+  const validImport = JSON.stringify({ metadata: { name: 'Imported v1 World' }, state: legacyState });
+  if (!context.Game.State.importFromFile(validImport)) fail('Expected structurally valid v1 save import to succeed');
+  const importedMeta = context.Game.State.getSaves().find(entry => entry.name === 'Imported v1 World');
+  const importedState = importedMeta && JSON.parse(storage.getItem(importedMeta.id));
+  if (!importedState || importedState.version !== 2 || !importedState.maps?.house) {
+    fail('Expected imported v1 save to be migrated before storage');
+  }
 }
 
 function checkGameDataIntegrity() {
@@ -1838,6 +1986,9 @@ async function checkElectronRuntime() {
     args: electronArgs,
     env: { ...process.env, SIMLIFE_TEST_USER_DATA: testUserData },
   });
+  const electronProcess = app.process();
+  electronProcess?.stdout?.on('data', chunk => process.stdout.write(`[electron] ${chunk}`));
+  electronProcess?.stderr?.on('data', chunk => process.stderr.write(`[electron] ${chunk}`));
   const page = await app.firstWindow({ timeout: 60000 });
   const pageErrors = [];
   const consoleErrors = [];
@@ -2049,38 +2200,71 @@ async function checkElectronRuntime() {
     if (result.furnitureTextureReport.generatedTextureCount < 28) {
       fail(`Expected generated household art across at least 28 furniture categories: ${JSON.stringify(result.furnitureTextureReport)}`);
     }
-    if (!result.campaignShell.dailyKicker.startsWith('Chapter')) {
-      fail(`Expected Daily Focus to follow the active campaign chapter: ${JSON.stringify(result.campaignShell)}`);
+    if (result.campaignShell.dailyKicker.startsWith('Chapter')) {
+      fail(`Expected Daily Focus to remain contextual instead of duplicating the campaign chip: ${JSON.stringify(result.campaignShell)}`);
     }
     result.mobileHud = await checkMobileHudLayout(page);
 
     return result;
   } finally {
     await app.close();
+    let processLeak = false;
+    if (electronProcess && electronProcess.exitCode === null) {
+      const exited = await Promise.race([
+        new Promise(resolve => electronProcess.once('exit', () => resolve(true))),
+        new Promise(resolve => setTimeout(() => resolve(false), 3000)),
+      ]);
+      if (!exited && electronProcess.exitCode === null) {
+        processLeak = true;
+        electronProcess.kill();
+      }
+    }
     const resolvedTemp = path.resolve(os.tmpdir());
     const resolvedUserData = path.resolve(testUserData);
     if (resolvedUserData.startsWith(resolvedTemp + path.sep) && path.basename(resolvedUserData).startsWith('simlife-test-')) {
-      fs.rmSync(resolvedUserData, { recursive: true, force: true });
+      let cleaned = false;
+      for (let attempt = 0; attempt < 8 && !cleaned; attempt++) {
+        try {
+          fs.rmSync(resolvedUserData, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
+          cleaned = true;
+        } catch (error) {
+          if (!['EPERM', 'EBUSY', 'ENOTEMPTY'].includes(error.code)) throw error;
+          await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)));
+        }
+      }
+      if (!cleaned) console.warn(`Electron assertions passed, but deferred temp cleanup: ${resolvedUserData}`);
     }
+    if (processLeak) throw new Error(`Electron process leak detected for PID ${electronProcess.pid}`);
   }
 }
 
 (async () => {
-  checkSyntax();
-  checkRendererMathHelpers();
-  checkRendererDataHelpers();
-  checkAppearanceHelpers();
-  checkAvatarRendererBehavior();
-  checkRendererAvatarPreloadFailures();
-  checkStateAppearanceMigration();
-  checkSaveManagerRobustness();
-  checkGameDataIntegrity();
-  checkHomeGrowthAndFamilySystems();
-  checkCampaignBehavior();
-  const resources = checkResources();
-  const runtime = process.env.SIMLIFE_SKIP_ELECTRON === '1'
-    ? { skipped: true, reason: 'SIMLIFE_SKIP_ELECTRON=1' }
-    : await checkElectronRuntime();
+  const scopeArg = process.argv.find(arg => arg.startsWith('--scope='));
+  const scope = scopeArg ? scopeArg.split('=')[1] : 'all';
+  if (!['all', 'pure', 'electron'].includes(scope)) fail(`Unknown verification scope: ${scope}`);
+  let resources = null;
+  let runtime = null;
+  if (scope !== 'electron') {
+    checkSyntax();
+    checkFoundationPrimitives();
+    checkRendererMathHelpers();
+    checkRendererDataHelpers();
+    checkAppearanceHelpers();
+    checkAvatarRendererBehavior();
+    checkRendererAvatarPreloadFailures();
+    checkStateAppearanceMigration();
+    checkSaveManagerRobustness();
+    checkGameDataIntegrity();
+    checkHomeGrowthAndFamilySystems();
+    checkCampaignBehavior();
+    checkTraitBehavior();
+    resources = checkResources();
+  }
+  if (scope !== 'pure') {
+    runtime = process.env.SIMLIFE_SKIP_ELECTRON === '1'
+      ? { skipped: true, reason: 'SIMLIFE_SKIP_ELECTRON=1' }
+      : await checkElectronRuntime();
+  }
   console.log(JSON.stringify({ ok: true, resources, runtime }, null, 2));
 })().catch(err => {
   console.error(err && err.stack ? err.stack : err);

@@ -59,6 +59,8 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 - 2026-08-09: Expand the offline world catalog from 48 to 130 embedded textures, including 32 custom household sprites, and require distinct silhouettes instead of generic furniture fallbacks.
 - 2026-08-09: Restore all eight career tracks with dedicated workplace maps and validate career, map, activity, room, furniture, and footprint contracts in the automated suite.
 - 2026-08-09: Harden save import/export and legacy migration against malformed storage, and invalidate stale asynchronous paths across cancellations and map transitions.
+- 2026-08-22: Preserve the static module facade while adding deterministic services, save schema v2, registered UI panels, grouped asset readiness, Canvas fallback, and independently runnable pure/Electron verification gates.
+- 2026-08-22: Keep campaign objectives in the top campaign chip; reserve Daily Focus for urgent needs, current activity, queue state, rewards, and contextual next actions.
 
 ## Hearthbyte Edition release loop
 

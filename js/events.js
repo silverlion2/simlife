@@ -15,7 +15,7 @@ Game.Events = (function() {
     events.cooldown -= deltaMinutes;
     if (events.cooldown <= 0) {
       triggerRandomEvent();
-      events.cooldown = 720 + Math.random() * 720; // 12-24 game hours between events
+      events.cooldown = 720 + Game.Random.float() * 720; // 12-24 game hours between events
     }
   }
 
@@ -24,9 +24,10 @@ Game.Events = (function() {
     const pool = cfg.EVENTS.filter(e => !events.history.slice(-6).includes(e.id));
     if (pool.length === 0) return;
 
-    const event = pool[Math.floor(Math.random() * pool.length)];
+    const event = pool[Game.Random.int(0, pool.length - 1)];
     events.activeEvent = { ...event };
-    Game.UI && Game.UI.showEvent(event);
+    if (Game.Signals) Game.Signals.emit('event:show', event);
+    else Game.UI?.showEvent?.(event);
   }
 
   function handleChoice(choiceIndex) {
@@ -66,10 +67,10 @@ Game.Events = (function() {
         if (playerLevel < reqLevel) {
           if (choice.skillCheck.failCost) {
             Game.Economy.addMoney(choice.skillCheck.failCost);
-            Game.UI && Game.UI.showNotification(`❌ Skill check failed! Lost $${Math.abs(choice.skillCheck.failCost)}`);
+            Game.Signals?.emit('notification', { message: `❌ Skill check failed! Lost $${Math.abs(choice.skillCheck.failCost)}` });
           }
         } else {
-          Game.UI && Game.UI.showNotification(`✅ Skill check passed!`);
+          Game.Signals?.emit('notification', { message: '✅ Skill check passed!' });
         }
       }
     }
@@ -89,7 +90,7 @@ Game.Events = (function() {
     // Relationship boost
     if (choice.relBoost && choice.relBoost.random) {
       const npcs = Game.Config.NPCS;
-      const randomNpc = npcs[Math.floor(Math.random() * npcs.length)];
+      const randomNpc = npcs[Game.Random.int(0, npcs.length - 1)];
       const current = Game.Social.getRelationship(randomNpc.id);
       Game.Social.setRelationship(randomNpc.id, current + choice.relBoost.random);
     }
@@ -100,7 +101,8 @@ Game.Events = (function() {
     Game.State.get().stats.eventsHandled++;
 
     events.activeEvent = null;
-    Game.UI && Game.UI.hideEvent();
+    if (Game.Signals) Game.Signals.emit('event:hide');
+    else Game.UI?.hideEvent?.();
   }
 
   return {

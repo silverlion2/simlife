@@ -5,6 +5,7 @@ window.Game = window.Game || {};
 
 Game.State = (function() {
   const SAVE_INDEX_KEY = 'simlife_saves_index';
+  const SAVE_VERSION = 2;
   let activeSlotId = null;
 
   function isMissingColor(color) {
@@ -71,7 +72,7 @@ Game.State = (function() {
     const lotH = cfg.STARTING_STATE.lotHeight;
 
     return {
-      version: 1,
+      version: SAVE_VERSION,
       character: {
         name: 'Player',
         needs: { hunger: 80, energy: 100, hygiene: 90, fun: 70, social: 60, comfort: 70, bladder: 100 },
@@ -79,7 +80,7 @@ Game.State = (function() {
         skillXp: { cooking: 0, fitness: 0, charisma: 0, tech: 0, creativity: 0, logic: 0, gardening: 0, handiness: 0, language: 0 },
         career: null,
         lifeStage: 'young_adult',
-        trait: Object.keys(cfg.TRAITS || {})[Math.floor(Math.random() * Object.keys(cfg.TRAITS || {}).length)] || 'neat',
+        trait: Object.keys(cfg.TRAITS || {})[Game.Random.int(0, Math.max(0, Object.keys(cfg.TRAITS || {}).length - 1))] || 'neat',
         form: 'online_witch',
         color: 0x88CCFF, // Default corn tint
         appearance: Game.Appearance ? Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF }) : null,
@@ -425,6 +426,27 @@ Game.State = (function() {
       && isPlainObject(value.maps);
   }
 
+  function migrateStatePayload(saved, freshState = createNewState()) {
+    if (!isPlainObject(saved)) throw new TypeError('Save payload must be an object');
+    let version = Number.isInteger(saved.version) ? saved.version : 1;
+    if (version > SAVE_VERSION) {
+      throw new Error(`Save version ${version} is newer than supported version ${SAVE_VERSION}`);
+    }
+    while (version < SAVE_VERSION) {
+      if (version !== 1) throw new Error(`No migration registered for save version ${version}`);
+      if (saved.house && !saved.maps) {
+        saved.maps = { house: saved.house, mail_room: freshState.maps.mail_room };
+        delete saved.house;
+      }
+      if (!saved.character) saved.character = {};
+      if (!saved.character.mapId) saved.character.mapId = 'house';
+      version = 2;
+      saved.version = version;
+    }
+    saved.version = SAVE_VERSION;
+    return saved;
+  }
+
   function getIndex() {
     try {
       const data = localStorage.getItem(SAVE_INDEX_KEY);
@@ -468,6 +490,8 @@ Game.State = (function() {
   }
 
   return {
+    SAVE_VERSION,
+    migrateStatePayload,
     get: function() { return state; },
     getActiveMap: function() { return state.maps[state.character.mapId]; },
 
@@ -482,6 +506,7 @@ Game.State = (function() {
       try {
         // Create a deep clone for saving so we don't modify the live state
         const saveData = JSON.parse(JSON.stringify(state));
+        saveData.version = SAVE_VERSION;
         syncLegacyAppearanceFields(saveData.character);
         
         // Strip transient/runtime-only properties from the saved data
@@ -511,9 +536,11 @@ Game.State = (function() {
           });
         }
         saveIndex(idx);
+        Game.Signals?.emit('save:success', { slotId: activeSlotId, version: SAVE_VERSION });
         return true;
       } catch(e) {
         console.error('Save failed:', e);
+        Game.Signals?.emit('save:error', { operation: 'save', error: e });
         return false;
       }
     },
@@ -523,19 +550,10 @@ Game.State = (function() {
       try {
         const data = localStorage.getItem(slotId);
         if (!data) return false;
-        const saved = JSON.parse(data);
+        let saved = JSON.parse(data);
         if (!isPlainObject(saved)) return false;
         const fresh = createNewState();
-
-        // Data Migration: single house to maps object
-        if (saved.house && !saved.maps) {
-          saved.maps = { house: saved.house, mail_room: fresh.maps.mail_room };
-          delete saved.house;
-        }
-        if (saved.character && !saved.character.mapId) {
-          saved.character.mapId = 'house';
-        }
-        if (!saved.character) saved.character = {};
+        saved = migrateStatePayload(saved, fresh);
         syncLegacyAppearanceFields(saved.character);
 
         state = deepMerge(fresh, saved);
@@ -555,9 +573,11 @@ Game.State = (function() {
         if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState(state);
         
         activeSlotId = slotId;
+        Game.Signals?.emit('save:loaded', { slotId, version: state.version });
         return true;
       } catch(e) {
         console.error('Load slot failed:', e);
+        Game.Signals?.emit('save:error', { operation: 'load', slotId, error: e });
         return false;
       }
     },
@@ -651,9 +671,17 @@ Game.State = (function() {
     importFromFile: function(fileContent) {
       try {
         const importObject = JSON.parse(fileContent);
-        if (!isPlainObject(importObject) || !isPlainObject(importObject.metadata) || !isValidStatePayload(importObject.state)) {
+        if (!isPlainObject(importObject) || !isPlainObject(importObject.metadata) || !isPlainObject(importObject.state)) {
             console.error('Invalid save file format.');
             return false;
+        }
+
+        // Validate the fully migrated copy before changing the slot index. This
+        // keeps legacy v1 imports compatible and makes malformed imports atomic.
+        const migratedState = migrateStatePayload(importObject.state);
+        if (!isValidStatePayload(migratedState)) {
+          console.error('Invalid save state payload.');
+          return false;
         }
         
         let idx = getIndex();
@@ -670,10 +698,12 @@ Game.State = (function() {
         saveIndex(idx);
         
         // Save state payload
-        localStorage.setItem(newSlotId, JSON.stringify(importObject.state));
+        localStorage.setItem(newSlotId, JSON.stringify(migratedState));
+        Game.Signals?.emit('save:imported', { slotId: newSlotId, metadata });
         return true;
       } catch (e) {
         console.error('Failed to import save:', e);
+        Game.Signals?.emit('save:error', { operation: 'import', error: e });
         return false;
       }
     },

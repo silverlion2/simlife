@@ -48,6 +48,15 @@ Phaser, EasyStar, NavMesh, and the rex state manager load from pinned files unde
 
 Production Electron builds use the branded `SimLife Hearthbyte Edition` user-data directory. On first launch, `main.js` copies only the legacy profile's `Local Storage` directory when the branded profile has no local storage yet. Volatile Chromium caches are intentionally not migrated.
 
+## Foundation v2 boundaries
+
+- `Game.Random` is the only source for gameplay randomness. It uses native randomness in normal play and accepts a deterministic seed in tests.
+- `Game.Signals` is the event boundary for simulation-to-view notifications. Existing module facades remain compatible while new work should emit signals instead of reaching into DOM code.
+- `Game.AssetManifest` defines stable domain groups and `Game.AssetLoader` owns image timeout, partial-load reporting, retry, and readiness.
+- Save payloads use schema version 2. Missing versions are treated as v1 and pass through ordered, idempotent migrations that preserve unknown fields.
+- `Game.UI` coordinates registered panel builders and delegated `data-action` events; panel markup contains no inline JavaScript handlers.
+- Phaser selects the best available renderer through `Phaser.AUTO`; runtime loading, partial, renderer-error, and recovery states are DOM overlays.
+
 ## World asset pipeline
 
 - `js/assets.js` contains the original embedded world textures; generated `js/world_assets.js` extends that catalog without changing existing keys.

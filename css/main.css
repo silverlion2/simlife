@@ -38,6 +38,25 @@ body {
 /* ---- Utility ---- */
 .hidden { display: none !important; }
 
+.runtime-status {
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(25, 49, 45, 0.62);
+}
+
+.runtime-status-card {
+  width: min(420px, 100%);
+  padding: 24px;
+  text-align: center;
+}
+
+.runtime-status-card p { margin: 10px 0 18px; }
+.runtime-status-card button { min-width: 120px; min-height: 40px; }
+
 /* ---- Full-Screen Overlays (Menus) ---- */
 .fs-screen {
   position: fixed;

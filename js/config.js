@@ -10,7 +10,8 @@ Game.Config = {
   TIME: {
     START_HOUR: 6,
     MINUTES_PER_SECOND: 1,    // 1 game minute = 1 real second at 1x
-    SPEEDS: [0, 1, 2, 3],
+    SPEEDS: [0, 1, 3, 10],
+    SPEED_KEYS: { '1': 1, '2': 3, '3': 10 },
     DAY_LENGTH: 24,            // hours
     YOUNG_ADULT_DAYS: 30,
     ADULT_DAYS: 70,
@@ -57,7 +58,7 @@ Game.Config = {
   // Character Traits
   // ----------------------------------------------------------
   TRAITS: {
-    neat:      { label: 'Neat',      icon: '✨', desc: 'Hygiene decays slower, cleaning is faster', effects: { hygieneDecay: -0.3, cleanSpeed: 1.5 } },
+    neat:      { label: 'Neat',      icon: '✨', desc: 'Hygiene decays 30% slower', effects: { hygieneDecay: -0.3 } },
     clumsy:    { label: 'Clumsy',    icon: '🤕', desc: 'Furniture breaks more often', effects: { breakMult: 2.0 } },
     creative:  { label: 'Creative',  icon: '🎨', desc: '+30% creativity XP, moodlets last longer', effects: { creativityXP: 1.3, moodletDuration: 1.3 } },
     lazy:      { label: 'Lazy',      icon: '😴', desc: 'Energy decays faster, naps restore more', effects: { energyDecay: 1.3, napBonus: 1.5 } },

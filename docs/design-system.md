@@ -31,6 +31,9 @@
 - Error: failed build/activity actions use notifications with a concrete reason when available.
 - Success: build, market, collection, activity, and social actions notify and refresh their panels.
 - Partial: locked Build items show lock reasons and disabled controls.
+- Runtime loading: centered ivory status card explains that local assets are being prepared without replacing the main-menu shell.
+- Runtime partial: gold-edged status card identifies optional asset loss while allowing the playable world to continue.
+- Renderer error: coral-edged status card names the graphics failure and exposes a retry action.
 
 ## Accessibility
 

@@ -18,6 +18,18 @@ async function capture(page, name) {
   await page.screenshot({ path: path.join(output, `pretty-${name}.png`) });
 }
 
+async function captureRuntimeState(page, status, title, message) {
+  await page.evaluate(({ status, title, message }) => {
+    const overlay = document.getElementById('runtime-status');
+    overlay.dataset.status = status;
+    overlay.classList.remove('hidden');
+    document.getElementById('runtime-status-title').textContent = title;
+    document.getElementById('runtime-status-message').textContent = message;
+    document.getElementById('btn-runtime-retry').classList.toggle('hidden', status !== 'error');
+  }, { status, title, message });
+  await capture(page, `runtime-${status}-desktop`);
+}
+
 async function openPanel(page, panelName) {
   await page.evaluate(name => {
     const panel = document.getElementById('side-panel');
@@ -58,6 +70,10 @@ async function closePanel(page) {
     await page.waitForLoadState('domcontentloaded');
     await page.setViewportSize({ width: 1440, height: 900 });
     await capture(page, 'menu-desktop');
+    await captureRuntimeState(page, 'loading', 'Preparing your world…', 'Loading local world and avatar assets.');
+    await captureRuntimeState(page, 'partial', 'World ready with limited avatars', 'Some optional avatar layers were unavailable.');
+    await captureRuntimeState(page, 'error', 'Graphics could not initialize', 'Retry the renderer to continue.');
+    await page.evaluate(() => document.getElementById('runtime-status').classList.add('hidden'));
 
     await page.setViewportSize({ width: 430, height: 820 });
     await page.waitForTimeout(300);

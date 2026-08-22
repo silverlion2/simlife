@@ -3,7 +3,9 @@
 ## Automated gates
 
 - [ ] `web-sop doctor` has no errors. Blocked locally: `web-sop` executable is unavailable.
-- [x] `npm test` passes.
+- [ ] `npm test` passes. Pure/data passes; Electron is pending a clean host because Chromium children currently exit with `launch-failed 49`.
+- [x] Pure/data and Electron gates are independently runnable through `npm run test:pure` and `npm run test:electron`.
+- [x] `npm audit --audit-level=high --registry=https://registry.npmjs.org` reports zero vulnerabilities.
 - [ ] `web-sop check --mode fast` passes. Blocked locally: `web-sop` executable is unavailable.
 - [x] `git diff --check` passes.
 - [x] Windows package build passes when shipping an installer: `npm run build:win`.
@@ -14,7 +16,7 @@
 - [x] Critical journeys verified
 - [ ] Loading, empty, error, success, and partial states verified
 - [x] Mobile and desktop layouts verified
-- [ ] Electron desktop launch re-verified on a clean host (current Codex host is at 656 processes and Electron sandbox children return `launch-failed 49`)
+- [ ] Electron desktop launch re-verified on a clean host (the current resource-constrained Codex host rejects Electron sandbox children with `launch-failed 49` before DOM startup)
 - [ ] Electron launch verified with external network requests blocked
 - [x] New Roots campaign advances and rewards only once
 - [ ] Pause, save, resume, controls, and settings verified
@@ -25,7 +27,7 @@
 - [x] Initial desktop camera makes the starter home the dominant playfield subject
 - [x] Bright storybook palette is consistent across menu, creator, gameplay HUD, and pause
 - [x] Every engine panel, modal, notification, announcer, interaction wheel, and placement state uses the shared semantic palette
-- [ ] `npm run test:visual` recaptured on a clean host with the full 130-texture registry
+- [ ] `npm run test:visual` recaptured on a clean host with the full 130-texture registry and the loading/partial/error recovery states
 - [x] Camera centers correctly at responsive zoom levels and the starter landscaping remains visible around the HUD
 - [ ] Expanded 130-texture world bundle and 32 distinct household sprites reviewed in fresh desktop/mobile screenshots
 - [ ] Rollback procedure verified

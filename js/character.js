@@ -8,6 +8,21 @@ Game.Character = (function() {
 
   function getState() { return Game.State.get().character; }
 
+  function getTraitEffects() {
+    return cfg.TRAITS[getState().trait]?.effects || {};
+  }
+
+  function notify(message) {
+    if (Game.Signals) Game.Signals.emit('notification', { message });
+    else Game.UI?.showNotification?.(message);
+  }
+
+  function emitView(eventName, payload) {
+    if (Game.Signals) Game.Signals.emit(eventName, payload);
+    else if (eventName === 'effect:bubble') Game.Renderer?.spawnFloatingBubble?.(payload.x, payload.y, payload.text, payload.color, payload.icon);
+    else if (eventName === 'effect:explosion') Game.Renderer?.spawnExplosion?.(payload.x, payload.y, payload.scale);
+  }
+
   // ---- Need Decay ----
   function updateNeeds(deltaMinutes) {
     const char = getState();
@@ -16,7 +31,12 @@ Game.Character = (function() {
 
     for (const [key, needCfg] of Object.entries(cfg.NEEDS)) {
       if (char.currentActivity && char.currentActivity.type === 'sleep' && key === 'energy') continue;
-      const decay = needCfg.decayPerHour * deltaHours * (1 + prestigeDecay);
+      const effects = getTraitEffects();
+      let traitMultiplier = 1;
+      if (key === 'hygiene' && Number.isFinite(effects.hygieneDecay)) traitMultiplier *= 1 + effects.hygieneDecay;
+      if (key === 'energy' && Number.isFinite(effects.energyDecay)) traitMultiplier *= effects.energyDecay;
+      if (key === 'hunger' && Number.isFinite(effects.hungerDecay)) traitMultiplier *= effects.hungerDecay;
+      const decay = needCfg.decayPerHour * deltaHours * (1 + prestigeDecay) * traitMultiplier;
       char.needs[key] = Math.max(0, char.needs[key] - decay);
     }
 
@@ -56,14 +76,16 @@ Game.Character = (function() {
   // ---- Moodlet System ----
   function addMoodlet(moodletDef) {
     const char = getState();
+    const durationMultiplier = Number(getTraitEffects().moodletDuration) || 1;
+    const duration = moodletDef.duration * durationMultiplier;
     // Remove existing moodlet with same name (refresh it)
     char.moodlets = char.moodlets.filter(m => m.name !== moodletDef.name);
     char.moodlets.push({
       name: moodletDef.name,
       value: moodletDef.value,
       icon: moodletDef.icon,
-      remaining: moodletDef.duration, // in game minutes
-      duration: moodletDef.duration,
+      remaining: duration, // in game minutes
+      duration,
     });
     // Cap at 8 active moodlets
     if (char.moodlets.length > 8) char.moodlets.shift();
@@ -136,7 +158,7 @@ Game.Character = (function() {
     while (char.skillXp[skillKey] >= skillCfg.xpPerLevel && char.skills[skillKey] < skillCfg.maxLevel) {
       char.skillXp[skillKey] -= skillCfg.xpPerLevel;
       char.skills[skillKey]++;
-      Game.UI && Game.UI.showNotification(`⭐ ${skillCfg.label} leveled up to ${char.skills[skillKey]}!`);
+      notify(`⭐ ${skillCfg.label} leveled up to ${char.skills[skillKey]}!`);
     }
   }
 
@@ -150,6 +172,7 @@ Game.Character = (function() {
     if (char.actionQueue.length >= 6) return false;
     if (!isAvailableActivity(activityKey)) return false;
     char.actionQueue.push(activityKey);
+    Game.Signals?.emit('activity:queued', { activityKey, queueLength: char.actionQueue.length });
     return true;
   }
 
@@ -177,11 +200,12 @@ Game.Character = (function() {
     const activeMap = Game.State.getActiveMap();
 
     // Check energy cost
-    if (actCfg.energyCost && char.needs.energy < actCfg.energyCost) return false;
+    const energyCost = getEffectiveEnergyCost(actCfg);
+    if (energyCost && char.needs.energy < energyCost) return false;
 
     // Check money cost
     if (actCfg.cost && !Game.Economy.canAfford(actCfg.cost)) {
-        if (Game.UI) Game.UI.showNotification(`Not enough money for ${actCfg.label}!`);
+        notify(`Not enough money for ${actCfg.label}!`);
         return false;
     }
 
@@ -194,6 +218,7 @@ Game.Character = (function() {
       isAutonomous: !fromQueue && char.autonomy?.thought === activityKey,
     };
     char.activityProgress = 0;
+    Game.Signals?.emit('activity:started', { activityKey, fromQueue: !!fromQueue, targetFurnId });
 
     // Move to room
     if (actCfg.room) {
@@ -258,14 +283,17 @@ Game.Character = (function() {
     if (actCfg.needs) {
       for (const [need, value] of Object.entries(actCfg.needs)) {
         if (char.needs[need] !== undefined) {
-          char.needs[need] = Math.min(100, Math.max(0, char.needs[need] + value));
+          let adjustedValue = value;
+          if (type === 'nap' && need === 'energy') adjustedValue *= Number(getTraitEffects().napBonus) || 1;
+          char.needs[need] = Math.min(100, Math.max(0, char.needs[need] + adjustedValue));
         }
       }
     }
 
     // Apply energy cost
-    if (actCfg.energyCost) {
-      char.needs.energy = Math.max(0, char.needs.energy - actCfg.energyCost);
+    const energyCost = getEffectiveEnergyCost(actCfg);
+    if (energyCost) {
+      char.needs.energy = Math.max(0, char.needs.energy - energyCost);
     }
     
     // Deduct monetary cost
@@ -281,9 +309,7 @@ Game.Character = (function() {
     // Apply moodlet
     if (actCfg.moodlet) {
       addMoodlet(actCfg.moodlet);
-      if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
-         Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y, '+ Moodlet', '#9C27B0', '🎭');
-      }
+      emitView('effect:bubble', { x: char.position.x, y: char.position.y, text: '+ Moodlet', color: '#9C27B0', icon: '🎭' });
     }
 
     // Floating text for big Need boosts
@@ -293,23 +319,21 @@ Game.Character = (function() {
        for (const [n, v] of Object.entries(actCfg.needs)) {
           if (v > maxVal) { maxVal = v; bestNeed = n; }
        }
-       if (maxVal > 0 && Game.Renderer && Game.Renderer.spawnFloatingBubble) {
+       if (maxVal > 0) {
           let mainColor = '#4CAF50';
           if (bestNeed === 'fun') mainColor = '#FF9800';
           else if (bestNeed === 'energy' || bestNeed === 'bladder') mainColor = '#FFEB3B';
           else if (bestNeed === 'social') mainColor = '#E91E63';
           else if (bestNeed === 'hygiene') mainColor = '#03A9F4';
           
-          Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 0.5, `+${maxVal} ${bestNeed}`, mainColor, actCfg.icon || '✨');
+          emitView('effect:bubble', { x: char.position.x, y: char.position.y - 0.5, text: `+${maxVal} ${bestNeed}`, color: mainColor, icon: actCfg.icon || '✨' });
        }
     }
 
     // Award money (e.g. harvesting)
     if (actCfg.earnings) {
       Game.Economy.addMoney(actCfg.earnings);
-      if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
-         Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 1.0, `+$${actCfg.earnings}`, '#FFD700', '💰');
-      }
+      emitView('effect:bubble', { x: char.position.x, y: char.position.y - 1.0, text: `+$${actCfg.earnings}`, color: '#FFD700', icon: '💰' });
     }
 
     // Custom Furniture Logic (e.g. Garden Plots)
@@ -329,12 +353,10 @@ Game.Character = (function() {
             const cropCfg = Game.Config.CROPS[furn.cropType];
             if (cropCfg) {
               Game.Economy.addMoney(cropCfg.sellPrice);
-              if (Game.UI) Game.UI.showNotification(`🌾 Harvested ${cropCfg.label} and sold it for $${cropCfg.sellPrice}!`);
-              if (Game.Renderer && Game.Renderer.spawnFloatingBubble) {
-                 Game.Renderer.spawnFloatingBubble(char.position.x, char.position.y - 1.0, `+$${cropCfg.sellPrice}`, '#FFD700', '💰');
-              }
+              notify(`🌾 Harvested ${cropCfg.label} and sold it for $${cropCfg.sellPrice}!`);
+              emitView('effect:bubble', { x: char.position.x, y: char.position.y - 1.0, text: `+$${cropCfg.sellPrice}`, color: '#FFD700', icon: '💰' });
             } else {
-              if (Game.UI) Game.UI.showNotification('🌾 Harvested unknown crop!');
+              notify('🌾 Harvested unknown crop!');
             }
           }
 
@@ -344,8 +366,8 @@ Game.Character = (function() {
           furn.needsWater = false;
         } else if (type === 'fill_bowl') {
           furn.isFull = true;
-          if (Game.UI) Game.UI.showNotification('🐟 Filled the pet bowl! Let\'s wait and see who comes by.');
-          if (Game.Renderer && Game.Renderer.requestFullSync) Game.Renderer.requestFullSync();
+          notify('🐟 Filled the pet bowl! Let\'s wait and see who comes by.');
+          Game.Signals?.emit('renderer:sync');
         } else if (type === 'travel' || type === 'take_subway') {
            if (furn.config && furn.config.targetMap) {
               char.mapId = furn.config.targetMap;
@@ -354,8 +376,8 @@ Game.Character = (function() {
               char.position.y = furn.config.targetY || 8;
               char.targetPosition = null;
               char.actionQueue = [];
-              if (Game.Renderer && Game.Renderer.transitionMap) Game.Renderer.transitionMap();
-              Game.UI && Game.UI.showNotification(`🚇 Arrived at ${furn.config.targetMap}!`);
+              Game.Signals?.emit('map:transition');
+              notify(`🚇 Arrived at ${furn.config.targetMap}!`);
            }
         }
       }
@@ -364,28 +386,25 @@ Game.Character = (function() {
     if (type === 'buy_souvenir') {
        const collections = Object.values(Game.Config.COLLECTIONS);
        if (collections.length > 0) {
-         const item = collections[Math.floor(Math.random() * collections.length)];
+         const item = collections[Game.Random.int(0, collections.length - 1)];
          if (!char.collection.includes(item.id)) {
            char.collection.push(item.id);
-           Game.UI && Game.UI.showNotification(`🎁 Got a new souvenir: ${item.icon} ${item.label}!`);
+           notify(`🎁 Got a new souvenir: ${item.icon} ${item.label}!`);
          } else {
-           Game.UI && Game.UI.showNotification(`🎁 Got a duplicate: ${item.icon} ${item.label}.`);
+           notify(`🎁 Got a duplicate: ${item.icon} ${item.label}.`);
          }
        }
     }
 
     if (type === 'browse_jobs') {
-       if (Game.UI && Game.UI.togglePanel) {
-           Game.UI.togglePanel('career');
-       } else {
-           Game.UI && Game.UI.showNotification('🏢 Job Board opening... (WIP)');
-       }
+       if (Game.Signals) Game.Signals.emit('panel:open', { panel: 'career' });
+       else Game.UI?.togglePanel?.('career');
     }
 
     if (type === 'invite_over') {
        if (Game.Main && Game.Main.spawnNPCWalker) {
           Game.Main.spawnNPCWalker();
-          if (Game.UI) Game.UI.showNotification('👋 A friend has arrived to visit!');
+          notify('👋 A friend has arrived to visit!');
        }
     }
 
@@ -412,9 +431,9 @@ Game.Character = (function() {
           }
           // Higher handiness reduces break chance
           chance *= Math.max(0.2, 1 - char.skills.handiness * 0.08);
-          if (Math.random() < chance) {
+          if (Game.Random.float() < chance) {
             breakFurniture(usedFurn.id);
-            Game.UI && Game.UI.showNotification(`⚠️ ${fc.label} broke down! Use Repair to fix it.`);
+            notify(`⚠️ ${fc.label} broke down! Use Repair to fix it.`);
           }
         }
       }
@@ -422,11 +441,18 @@ Game.Character = (function() {
 
     // Visual feedback: only spawn explosion for physical activities
     const physicalActivities = ['cook', 'exercise', 'repair', 'grill', 'tinker', 'harvest_crop', 'plant_seed', 'invite_over'];
-    if (physicalActivities.includes(type) && Game.Renderer && Game.Renderer.spawnExplosion) {
+    if (physicalActivities.includes(type)) {
       const pos = char.targetPosition || char.position;
-      Game.Renderer.spawnExplosion(pos.x + 0.5, pos.y + 0.5, 0.5);
+      emitView('effect:explosion', { x: pos.x + 0.5, y: pos.y + 0.5, scale: 0.5 });
     }
-    Game.UI && Game.UI.showNotification(`✅ ${actCfg.label} complete!`);
+    notify(`✅ ${actCfg.label} complete!`);
+    Game.Signals?.emit('activity:completed', { activityKey: type, targetFurnId });
+  }
+
+  function getEffectiveEnergyCost(activityConfig) {
+    const baseCost = Number(activityConfig?.energyCost) || 0;
+    const multiplier = Number(getTraitEffects().energyCostMult) || 1;
+    return baseCost * multiplier;
   }
 
   function cancelActivity() {
@@ -497,9 +523,7 @@ Game.Character = (function() {
             char.vz = 0;
             
             // Spawn a dust explosion on landing
-            if (Game.Renderer && Game.Renderer.spawnExplosion) {
-                Game.Renderer.spawnExplosion(char.position.x, char.position.y, 0.3);
-            }
+            emitView('effect:explosion', { x: char.position.x, y: char.position.y, scale: 0.3 });
         }
     }
 
@@ -517,11 +541,11 @@ Game.Character = (function() {
       const tx = Math.floor(char.targetPosition.x);
       const ty = Math.floor(char.targetPosition.y);
       
-      if (Game.Renderer && Game.Renderer.findPath) {
+      if (Game.Signals) {
         const requestId = (char.pathRequestId || 0) + 1;
         char.pathRequestId = requestId;
         char.isPathfinding = true;
-        Game.Renderer.findPath(rx, ry, tx, ty, (path) => {
+        const receivePath = (path) => {
           if (char.pathRequestId !== requestId) return;
           char.isPathfinding = false;
           char.path = path;
@@ -529,9 +553,16 @@ Game.Character = (function() {
           if (!path || path.length === 0) {
              char.targetPosition = null; 
              char.path = null;
-             Game.UI && Game.UI.showNotification("🚫 I can't reach that!");
+             notify("🚫 I can't reach that!");
           }
-        });
+        };
+        const handled = Game.Signals.emit('path:find', { startX: rx, startY: ry, endX: tx, endY: ty, callback: receivePath });
+        if (!handled && Game.Renderer?.findPath) {
+          Game.Renderer.findPath(rx, ry, tx, ty, receivePath);
+        } else if (!handled) {
+          char.isPathfinding = false;
+          char.path = [{ x: tx, y: ty }];
+        }
       } else {
         // Fallback if no Renderer path
         char.path = [{x: tx, y: ty}];
@@ -563,9 +594,7 @@ Game.Character = (function() {
         char.targetPosition = null;
         char.path = null;
         char.wasMoving = false;
-        if (Game.Renderer && Game.Renderer.spawnExplosion) {
-           Game.Renderer.spawnExplosion(char.position.x, char.position.y, 0.4);
-        }
+        emitView('effect:explosion', { x: char.position.x, y: char.position.y, scale: 0.4 });
       }
     } else {
       char.wasMoving = true;
@@ -605,9 +634,7 @@ Game.Character = (function() {
     if (!char.achievements.includes(id)) {
       char.achievements.push(id);
       const ach = Game.Config.ACHIEVEMENTS[id];
-      if (ach && Game.UI) {
-        Game.UI.showNotification(`🏆 Achievement Unlocked: ${ach.icon} ${ach.label}!`);
-      }
+      if (ach) notify(`🏆 Achievement Unlocked: ${ach.icon} ${ach.label}!`);
     }
   }
 
@@ -634,6 +661,7 @@ Game.Character = (function() {
   }
 
   return {
+    getEffectiveEnergyCost,
     updateNeeds,
     getMood,
     getMoodInfo,

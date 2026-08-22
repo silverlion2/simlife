@@ -10,8 +10,12 @@ Game.UI = (function() {
   let editAvatarEditor = null;
   let editDraftAppearance = null;
   let buildPanelTab = 'rooms';
+  const panelBuilders = new Map();
+  const panelAssetGroups = Object.freeze({ build: 'buildCatalog', market: 'buildCatalog', career: 'careers' });
+  let signalsBound = false;
 
   function init() {
+    registerDefaultPanels();
     buildStatusPanel();
     buildMoodletBar();
     buildQueueBar();
@@ -19,6 +23,33 @@ Game.UI = (function() {
     setupPlacementActions();
     setupPanelButtons();
     setupDailyFocus();
+    if (!signalsBound && Game.Signals) {
+      signalsBound = true;
+      Game.Signals.on('notification', payload => showNotification(payload?.message || String(payload || '')));
+      Game.Signals.on('save:error', () => showNotification('Save data could not be updated. Your existing slot was left intact.'));
+      Game.Signals.on('event:show', payload => showEvent(payload));
+      Game.Signals.on('event:hide', () => hideEvent());
+      Game.Signals.on('panel:open', payload => payload?.panel && togglePanel(payload.panel));
+    }
+  }
+
+  function registerPanel(name, builder) {
+    if (typeof builder !== 'function') throw new TypeError(`Panel builder for ${name} must be a function`);
+    panelBuilders.set(name, builder);
+  }
+
+  function registerDefaultPanels() {
+    if (panelBuilders.size) return;
+    registerPanel('build', buildBuildPanel);
+    registerPanel('market', buildMarketPanel);
+    registerPanel('collections', buildCollectionsPanel);
+    registerPanel('goals', buildGoalsPanel);
+    registerPanel('activities', buildActivitiesPanel);
+    registerPanel('career', buildCareerPanel);
+    registerPanel('social', buildSocialPanel);
+    registerPanel('skills', buildSkillsPanel);
+    registerPanel('legacy', buildLegacyPanel);
+    registerPanel('campaign', panel => Game.Campaign?.renderPanel?.(panel));
   }
 
   function getAppearancePrimaryColor(appearance) {
@@ -434,7 +465,6 @@ Game.UI = (function() {
     const readyCollection = Game.HomeCollections && Game.HomeCollections.getCollections
       ? Game.HomeCollections.getCollections().find(collection => collection.claimable)
       : null;
-    const campaignChapter = Game.Campaign?.getCurrentChapter?.() || null;
     const firstDayFocus = (() => {
       if ((state.time?.day || 1) !== 1) return null;
       const queueLength = Array.isArray(char.actionQueue) ? char.actionQueue.length : 0;
@@ -456,8 +486,6 @@ Game.UI = (function() {
     let next = makeFocus('Today', 'Choose a goal to start building momentum.', 'goals');
     if (criticalNeed) {
       next = makeFocus('Need Care', `${criticalNeed.label} is low. Open Do and fix it now.`, 'activities', 'urgent');
-    } else if (campaignChapter) {
-      next = makeFocus(`Chapter ${campaignChapter.number}`, campaignChapter.objective, campaignChapter.target, 'ready');
     } else if (firstDayFocus) {
       next = firstDayFocus;
     } else if (readyGoal) {
@@ -741,6 +769,47 @@ Game.UI = (function() {
         if (window.innerWidth > 620) setMobilePanelMenu(false);
       });
     }
+
+    const sidePanel = document.getElementById('side-panel');
+    if (sidePanel && !sidePanel.dataset.actionsBound) {
+      sidePanel.dataset.actionsBound = 'true';
+      sidePanel.addEventListener('click', handlePanelAction);
+    }
+  }
+
+  function handlePanelAction(event) {
+    const control = event.target.closest('[data-action]');
+    if (!control || control.disabled) return;
+    const action = control.dataset.action;
+    const number = key => Number(control.dataset[key]);
+    const panelName = control.dataset.panel || document.getElementById('side-panel')?.dataset.active;
+    if (action === 'close-panel') togglePanel(panelName);
+    else if (action === 'toggle-sell') toggleSellMode();
+    else if (action === 'toggle-store') toggleStoreMode();
+    else if (action === 'toggle-sandbox') toggleSandboxMode();
+    else if (action === 'set-floor') setBuildFloor(number('floor'));
+    else if (action === 'travel-floor') travelToFloor(number('floor'));
+    else if (action === 'buy-floor') buyFloor();
+    else if (action === 'expand-lot') expandLot();
+    else if (action === 'resize-room') resizeRoom(control.dataset.roomId, number('widthDelta'), number('heightDelta'));
+    else if (action === 'furnish-room') furnishRoom(control.dataset.roomId, control.dataset.preset);
+    else if (action === 'build-tab') setBuildPanelTab(control.dataset.tab);
+    else if (action === 'start-build') startBuild(control.dataset.buildType, control.dataset.key);
+    else if (action === 'buy-market') buyMarketOffer(control.dataset.offerId);
+    else if (action === 'craft-object') craftObject(control.dataset.recipeId);
+    else if (action === 'claim-goal') claimHomeGoal(control.dataset.goalId);
+    else if (action === 'claim-collection') claimCollection(control.dataset.collectionKey);
+    else if (action === 'start-activity') startActivityFromPanel(control.dataset.activityKey);
+    else if (action === 'quit-career') { Game.Economy.quitCareer(); togglePanel('career'); }
+    else if (action === 'join-career') { Game.Economy.joinCareer(control.dataset.careerKey); togglePanel('career'); }
+    else if (action === 'social-interaction') doSocialInteraction(control.dataset.npcId, control.dataset.interactionKey);
+    else if (action === 'start-family') startFamily();
+    else if (action === 'family-care') doFamilyCare(control.dataset.memberId, control.dataset.careKey);
+    else if (action === 'assign-routine') assignFamilyRoutine(control.dataset.memberId, control.dataset.routineKey);
+    else if (action === 'edit-sim') openEditModal();
+    else if (action === 'prestige' && window.confirm('Start next generation?')) Game.Prestige.doPrestige();
+    else if (action === 'buy-prestige') { Game.Prestige.buyUpgrade(control.dataset.upgradeKey); togglePanel('legacy'); }
+    else if (action === 'campaign-go') Game.Campaign.goToObjective(control.dataset.targetPanel);
   }
 
   function setSidePanelOpen(isOpen) {
@@ -772,21 +841,21 @@ Game.UI = (function() {
     panel.classList.remove('hidden');
     setSidePanelOpen(true);
 
-    const closeHtml = `<button class="panel-close" onclick="Game.UI.togglePanel('${panelName}')">✕</button>`;
-    switch (panelName) {
-      case 'build': buildBuildPanel(panel, closeHtml); break;
-      case 'market': buildMarketPanel(panel, closeHtml); break;
-      case 'collections': buildCollectionsPanel(panel, closeHtml); break;
-      case 'goals': buildGoalsPanel(panel, closeHtml); break;
-      case 'activities': buildActivitiesPanel(panel, closeHtml); break;
-      case 'career': buildCareerPanel(panel, closeHtml); break;
-      case 'social': buildSocialPanel(panel, closeHtml); break;
-      case 'skills': buildSkillsPanel(panel, closeHtml); break;
-      case 'legacy': buildLegacyPanel(panel, closeHtml); break;
-      case 'campaign':
-        if (Game.Campaign?.renderPanel) Game.Campaign.renderPanel(panel);
-        break;
-    }
+    const closeHtml = `<button class="panel-close" type="button" data-action="close-panel" data-panel="${panelName}">✕</button>`;
+    const builder = panelBuilders.get(panelName);
+    const assetGroup = panelAssetGroups[panelName];
+    if (builder && assetGroup && Game.AssetLoader && !Game.AssetLoader.isLoaded(assetGroup)) {
+      panel.innerHTML = `${closeHtml}<div class="panel-loading" role="status">Loading local catalog…</div>`;
+      Game.AssetLoader.loadGroup(assetGroup).then(report => {
+        if (panel.dataset.active !== panelName || panel.classList.contains('hidden')) return;
+        if (report.status === 'error') {
+          panel.innerHTML = `${closeHtml}<div class="panel-load-error">Catalog unavailable. Close and reopen to retry.</div>`;
+          return;
+        }
+        builder(panel, closeHtml);
+      });
+    } else if (builder) builder(panel, closeHtml);
+    else showNotification(`Unknown panel: ${panelName}`);
   }
 
   function buildBuildPanel(panel, closeHtml) {
@@ -799,14 +868,14 @@ Game.UI = (function() {
       if (!source) return fallbackIcon;
       return `<img class="build-item-sprite" src="${source}" alt="" aria-hidden="true">`;
     };
-    let html = '<div class="dialog-header"><h3>🏗️ Build Mode</h3><button class="close-btn" onclick="Game.UI.togglePanel(\'build\')">&times;</button></div>';
+    let html = '<div class="dialog-header"><h3>🏗️ Build Mode</h3><button class="close-btn" type="button" data-action="close-panel" data-panel="build">&times;</button></div>';
     html += '<div class="dialog-content">';
     // Sell mode toggle
     const sellActive = Game.State.get().ui.mode === 'sell';
     html += '<div class="build-mode-actions">';
-    html += `<button class="sell-mode-btn ${sellActive ? 'active' : ''}" onclick="Game.UI.toggleSellMode()">🗑️ ${sellActive ? 'Exit Sell Mode' : 'Sell Mode'}</button>`;
+    html += `<button class="sell-mode-btn ${sellActive ? 'active' : ''}" data-action="toggle-sell">🗑️ ${sellActive ? 'Exit Sell Mode' : 'Sell Mode'}</button>`;
     const storeActive = Game.State.get().ui.mode === 'store';
-    html += `<button class="store-mode-btn ${storeActive ? 'active' : ''}" data-action="store-mode" onclick="Game.UI.toggleStoreMode()">Storage ${storeActive ? 'ON' : 'Mode'}</button>`;
+    html += `<button class="store-mode-btn ${storeActive ? 'active' : ''}" data-action="toggle-store">Storage ${storeActive ? 'ON' : 'Mode'}</button>`;
     // Sandbox mode toggle
     const sandboxActive = Game.State.get().ui.sandboxMode;
     let growthHtml = '';
@@ -826,10 +895,10 @@ Game.UI = (function() {
       growthHtml += '<div class="floor-controls">';
       for (const floor of floorInfo.floors) {
         const householdFloor = Game.State.get().character.floor || 0;
-        growthHtml += `<button class="${floor.active ? 'active' : ''}" onclick="Game.UI.setBuildFloor(${floor.level})">${floor.label}</button>`;
-        growthHtml += `<button class="travel-floor-btn ${householdFloor === floor.level ? 'active' : ''}" data-travel-floor="${floor.level}" onclick="Game.UI.travelToFloor(${floor.level})">${householdFloor === floor.level ? 'Here' : 'Go'}</button>`;
+        growthHtml += `<button class="${floor.active ? 'active' : ''}" data-action="set-floor" data-floor="${floor.level}">${floor.label}</button>`;
+        growthHtml += `<button class="travel-floor-btn ${householdFloor === floor.level ? 'active' : ''}" data-action="travel-floor" data-floor="${floor.level}">${householdFloor === floor.level ? 'Here' : 'Go'}</button>`;
       }
-      growthHtml += `<button ${floorInfo.canAddFloor ? '' : 'disabled'} title="${floorInfo.addFloorReason || 'Add another story'}" onclick="Game.UI.buyFloor()">+ Floor ${floorInfo.canAddFloor ? '$' + floorInfo.addFloorCost.toLocaleString() : ''}</button>`;
+      growthHtml += `<button data-action="buy-floor" ${floorInfo.canAddFloor ? '' : 'disabled'} title="${floorInfo.addFloorReason || 'Add another story'}">+ Floor ${floorInfo.canAddFloor ? '$' + floorInfo.addFloorCost.toLocaleString() : ''}</button>`;
       growthHtml += '</div>';
       if (Game.HomeGrowth.getLotInfo) {
         const lotInfo = Game.HomeGrowth.getLotInfo();
@@ -838,11 +907,11 @@ Game.UI = (function() {
             <strong>Land</strong>
             <small>${lotInfo.width}x${lotInfo.height} lot</small>
           </div>
-          <button data-action="expand-lot" ${lotInfo.canExpand ? '' : 'disabled'} title="${lotInfo.expandReason || 'Expand buildable land'}" onclick="Game.UI.expandLot()">${lotInfo.canExpand ? `Expand $${lotInfo.expandCost.toLocaleString()}` : lotInfo.expandReason}</button>
+          <button data-action="expand-lot" ${lotInfo.canExpand ? '' : 'disabled'} title="${lotInfo.expandReason || 'Expand buildable land'}">${lotInfo.canExpand ? `Expand $${lotInfo.expandCost.toLocaleString()}` : lotInfo.expandReason}</button>
         </div>`;
       }
     }
-    html += `<button class="sandbox-mode-btn ${sandboxActive ? 'active' : ''}" onclick="Game.UI.toggleSandboxMode()">🏖️ ${sandboxActive ? 'Sandbox ON' : 'Sandbox OFF'}</button>`;
+    html += `<button class="sandbox-mode-btn ${sandboxActive ? 'active' : ''}" data-action="toggle-sandbox">🏖️ ${sandboxActive ? 'Sandbox ON' : 'Sandbox OFF'}</button>`;
     html += '</div>';
     // Broken furniture indicator
     const activeMap = Game.State.getActiveMap();
@@ -864,11 +933,11 @@ Game.UI = (function() {
             <small>${room.w}x${room.h}</small>
           </div>
           <div class="renovation-actions">
-            <button data-renovate-action="w-minus" onclick="Game.UI.resizeRoom('${room.id}', -1, 0)">-W</button>
-            <button data-renovate-action="w-plus" onclick="Game.UI.resizeRoom('${room.id}', 1, 0)">+W</button>
-            <button data-renovate-action="h-minus" onclick="Game.UI.resizeRoom('${room.id}', 0, -1)">-H</button>
-            <button data-renovate-action="h-plus" onclick="Game.UI.resizeRoom('${room.id}', 0, 1)">+H</button>
-            ${furnishingOptions.map(option => `<button data-furnish-preset="${option.key}" ${option.available ? '' : 'disabled'} title="${option.reason || option.label}" onclick="Game.UI.furnishRoom('${room.id}','${option.key}')">${option.available ? `Furnish $${option.cost.toLocaleString()}` : option.label}</button>`).join('')}
+            <button data-action="resize-room" data-room-id="${room.id}" data-width-delta="-1" data-height-delta="0">-W</button>
+            <button data-action="resize-room" data-room-id="${room.id}" data-width-delta="1" data-height-delta="0">+W</button>
+            <button data-action="resize-room" data-room-id="${room.id}" data-width-delta="0" data-height-delta="-1">-H</button>
+            <button data-action="resize-room" data-room-id="${room.id}" data-width-delta="0" data-height-delta="1">+H</button>
+            ${furnishingOptions.map(option => `<button data-action="furnish-room" data-room-id="${room.id}" data-preset="${option.key}" ${option.available ? '' : 'disabled'} title="${option.reason || option.label}">${option.available ? `Furnish $${option.cost.toLocaleString()}` : option.label}</button>`).join('')}
           </div>
         </div>`;
       }
@@ -884,7 +953,7 @@ Game.UI = (function() {
     if (!buildTabs.some(tab => tab.key === buildPanelTab && !tab.disabled)) buildPanelTab = 'rooms';
     html += '<div class="build-tabs" role="tablist" aria-label="Build categories">';
     for (const tab of buildTabs) {
-      html += `<button class="build-tab ${buildPanelTab === tab.key ? 'active' : ''}" role="tab" data-build-tab="${tab.key}" aria-selected="${buildPanelTab === tab.key}" ${tab.disabled ? 'disabled' : ''} onclick="Game.UI.setBuildPanelTab('${tab.key}')">${tab.label}<span>${tab.count}</span></button>`;
+      html += `<button class="build-tab ${buildPanelTab === tab.key ? 'active' : ''}" role="tab" data-action="build-tab" data-tab="${tab.key}" aria-selected="${buildPanelTab === tab.key}" ${tab.disabled ? 'disabled' : ''}>${tab.label}<span>${tab.count}</span></button>`;
     }
     html += '</div>';
 
@@ -893,7 +962,7 @@ Game.UI = (function() {
       for (const [key, room] of Object.entries(Game.Config.ROOMS)) {
         const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isRoomUnlocked(key));
         const lockReason = locked && Game.HomeGrowth.getRoomLockReason ? Game.HomeGrowth.getRoomLockReason(key) : '';
-        html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('room','${key}')"`}>
+        html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `data-action="start-build" data-build-type="room" data-key="${key}"`}>
           <div class="build-item-icon">${room.icon}</div>
           <div class="build-item-name">${room.label}</div>
           <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + room.baseCost)}</div>
@@ -905,7 +974,7 @@ Game.UI = (function() {
       for (const [key, furn] of Object.entries(Game.Config.FURNITURE)) {
         const locked = !!(Game.HomeGrowth && !Game.HomeGrowth.isFurnitureUnlocked(key));
         const lockReason = locked && Game.HomeGrowth.getFurnitureLockReason ? Game.HomeGrowth.getFurnitureLockReason(key) : '';
-        html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `onclick="Game.UI.startBuild('furniture','${key}')"`}>
+        html += `<div class="build-item ${locked ? 'locked' : ''}" ${locked ? `title="${lockReason}"` : `data-action="start-build" data-build-type="furniture" data-key="${key}"`}>
           <div class="build-item-icon">${furniturePreview(key, furn.icon)}</div>
           <div class="build-item-name">${furn.label}</div>
           <div class="build-item-cost">${locked ? lockReason : (sandboxActive ? 'Free' : '$' + furn.cost)}</div>
@@ -917,7 +986,7 @@ Game.UI = (function() {
       for (const object of storedObjects) {
         const furn = Game.Config.FURNITURE[object.type];
         if (!furn) continue;
-        html += `<div class="build-item stored" onclick="Game.UI.startBuild('stored','${object.id}')">
+        html += `<div class="build-item stored" data-action="start-build" data-build-type="stored" data-key="${object.id}">
           <div class="build-item-icon">${furniturePreview(object.type, furn.icon)}</div>
           <div class="build-item-name">${furn.label}</div>
           <div class="build-item-cost">Owned</div>
@@ -940,7 +1009,7 @@ Game.UI = (function() {
     buildPanelTab = tab;
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">✕</button>`);
     }
   }
 
@@ -961,7 +1030,7 @@ Game.UI = (function() {
         <div class="market-item-icon">${furn.icon}</div>
         <div class="market-item-name">${furn.label}</div>
         <div class="market-item-room">${Game.Config.ROOMS[furn.room]?.label || furn.room}</div>
-        <button ${affordable ? '' : 'disabled'} onclick="Game.UI.buyMarketOffer('${offer.id}')">
+        <button data-action="buy-market" data-offer-id="${offer.id}" ${affordable ? '' : 'disabled'}>
           ${affordable ? 'Buy' : 'Need'} $${offer.price.toLocaleString()}
         </button>
       </div>`;
@@ -980,7 +1049,7 @@ Game.UI = (function() {
             <strong>${recipe.label}</strong>
             <small>${recipe.outputLabel} - $${recipe.cost.toLocaleString()} materials</small>
           </div>
-          <button ${recipe.available ? '' : 'disabled'} onclick="Game.UI.craftObject('${recipe.id}')">${recipe.available ? 'Craft' : recipe.reason}</button>
+          <button data-action="craft-object" data-recipe-id="${recipe.id}" ${recipe.available ? '' : 'disabled'}>${recipe.available ? 'Craft' : recipe.reason}</button>
         </div>`;
       }
       html += '</div>';
@@ -994,7 +1063,7 @@ Game.UI = (function() {
     showNotification(result.success ? 'Object added to storage.' : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'market') {
-      buildMarketPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('market')">✕</button>`);
+      buildMarketPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="market">✕</button>`);
     }
   }
 
@@ -1004,7 +1073,7 @@ Game.UI = (function() {
     showNotification(result.success ? 'Crafted object moved to storage.' : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'market') {
-      buildMarketPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('market')">✕</button>`);
+      buildMarketPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="market">✕</button>`);
     }
   }
 
@@ -1030,7 +1099,7 @@ Game.UI = (function() {
         </div>
         <p>${goal.desc}</p>
         <small>$${goal.rewardMoney.toLocaleString()}${rewardNames ? ` + ${rewardNames}` : ''}</small>
-        <button ${goal.complete ? '' : 'disabled'} onclick="Game.UI.claimHomeGoal('${goal.id}')">${goal.complete ? 'Claim' : 'In Progress'}</button>
+        <button data-action="claim-goal" data-goal-id="${goal.id}" ${goal.complete ? '' : 'disabled'}>${goal.complete ? 'Claim' : 'In Progress'}</button>
       </div>`;
     }
     if (!goals.length) html += '<p class="empty-msg">No open goals right now.</p>';
@@ -1044,7 +1113,7 @@ Game.UI = (function() {
     showNotification(result.success ? 'Goal rewards delivered.' : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'goals') {
-      buildGoalsPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('goals')">✕</button>`);
+      buildGoalsPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="goals">✕</button>`);
     }
   }
 
@@ -1077,7 +1146,7 @@ Game.UI = (function() {
           </div>`).join('')}
         </div>
         <small>$${collection.rewardMoney.toLocaleString()}${rewardNames ? ` + ${rewardNames}` : ''}</small>
-        <button ${collection.claimable ? '' : 'disabled'} onclick="Game.UI.claimCollection('${collection.key}')">${collection.claimed ? 'Claimed' : (collection.complete ? 'Claim' : 'In Progress')}</button>
+        <button data-action="claim-collection" data-collection-key="${collection.key}" ${collection.claimable ? '' : 'disabled'}>${collection.claimed ? 'Claimed' : (collection.complete ? 'Claim' : 'In Progress')}</button>
       </div>`;
     }
     if (!collections.length) html += '<p class="empty-msg">No collections are available yet.</p>';
@@ -1091,7 +1160,7 @@ Game.UI = (function() {
     showNotification(result.success ? 'Collection rewards delivered.' : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'collections') {
-      buildCollectionsPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('collections')">&times;</button>`);
+      buildCollectionsPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="collections">&times;</button>`);
     }
   }
 
@@ -1249,7 +1318,7 @@ Game.UI = (function() {
     if (!Game.HomeGrowth || !Game.HomeGrowth.setActiveFloor(floor)) return;
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">&times;</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">&times;</button>`);
     }
   }
 
@@ -1259,7 +1328,7 @@ Game.UI = (function() {
     if (!result.success) showNotification(result.reason || 'Cannot add another floor yet.');
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">&times;</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">&times;</button>`);
     }
   }
 
@@ -1269,7 +1338,7 @@ Game.UI = (function() {
     showNotification(result.success ? `Lot expanded to ${result.width}x${result.height}.` : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">&times;</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">&times;</button>`);
     }
   }
 
@@ -1279,7 +1348,7 @@ Game.UI = (function() {
     showNotification(result.success ? 'Household moved floors.' : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">✕</button>`);
     }
   }
 
@@ -1292,7 +1361,7 @@ Game.UI = (function() {
     showNotification(resized ? 'Room renovated.' : 'Cannot resize room here.');
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">✕</button>`);
     }
   }
 
@@ -1302,20 +1371,9 @@ Game.UI = (function() {
     showNotification(result.success ? 'Room furnished.' : result.reason);
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">&times;</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">&times;</button>`);
     }
   }
-
-  function toggleSellMode() {
-    const ui = Game.State.get().ui;
-    ui.mode = ui.mode === 'sell' ? 'live' : 'sell';
-    ui.buildGhost = null;
-    showNotification(ui.mode === 'sell' ? '🗑️ Sell Mode: Click furniture' : '▶️ Live Mode');
-    const panel = document.getElementById('side-panel');
-    if (panel) buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
-  }
-
-  // [REMOVED] First duplicate buildSkillsPanel — canonical version is below (with trait display + customize button)
 
   function formatNeedDelta(needKey, value) {
     const icon = Game.Config.NEEDS[needKey]?.icon || '';
@@ -1371,7 +1429,7 @@ Game.UI = (function() {
     const available = Game.Character.getAvailableActivities();
     let html = (closeHtml || '') + '<h3>🎯 Activities</h3><div class="activity-list">';
     for (const act of available) {
-      html += `<button class="activity-item" onclick="Game.UI.startActivityFromPanel('${act.key}')">
+      html += `<button class="activity-item" data-action="start-activity" data-activity-key="${act.key}">
         <span class="activity-title">${act.icon} ${act.label}</span>
         <small>${Object.entries(act.needs).map(([k,v]) => formatNeedDelta(k, v)).join(' ')}</small>
         ${act.moodlet ? `<span class="act-moodlet">${act.moodlet.icon} ${act.moodlet.name}</span>` : ''}
@@ -1395,7 +1453,7 @@ Game.UI = (function() {
         <p>Days Worked: ${careerInfo.daysWorked}</p>
         <p>Performance: ${Math.round(careerInfo.performance)}</p>
         ${careerInfo.nextLevel ? `<p>Next: ${careerInfo.nextLevel.title} (need ${skillCfg.label} ${careerInfo.nextLevel.skillReq})</p>` : ''}
-        <button onclick="Game.Economy.quitCareer();Game.UI.togglePanel('career')">Quit Job</button>
+        <button data-action="quit-career">Quit Job</button>
       </div>`;
     } else {
       html += '<div class="panel-intro">No career yet. Choose a path:</div><div class="career-list">';
@@ -1403,7 +1461,7 @@ Game.UI = (function() {
         const skillCfg = Game.Config.SKILLS[career.keySkill] || { label: career.keySkill, icon: '' };
         const firstLevel = career.levels && career.levels[0] ? career.levels[0] : null;
         const careerIcon = career.icon || skillCfg.icon || '💼';
-        html += `<button class="career-item" onclick="Game.Economy.joinCareer('${key}');Game.UI.togglePanel('career')">
+        html += `<button class="career-item" data-action="join-career" data-career-key="${key}">
           <strong>${careerIcon} ${career.label}</strong>
           <small>${skillCfg.icon || ''} ${skillCfg.label}${firstLevel ? ` path - starts ${firstLevel.title} at $${firstLevel.salary}/day` : ''}</small>
         </button>`;
@@ -1471,7 +1529,7 @@ Game.UI = (function() {
         </div>
         <div class="npc-interactions">`;
       for (const int of interactions) {
-        html += `<button class="int-btn" onclick="Game.UI.doSocialInteraction('${npc.id}','${int.key}')">${int.label}${int.cost ? ` ($${int.cost})` : ''}</button>`;
+        html += `<button class="int-btn" data-action="social-interaction" data-npc-id="${npc.id}" data-interaction-key="${int.key}">${int.label}${int.cost ? ` ($${int.cost})` : ''}</button>`;
       }
       html += '</div></div>';
     }
@@ -1495,7 +1553,7 @@ Game.UI = (function() {
           <span>${members.filter(member => member.role !== 'self').length} care targets</span>
         </div>
         <div class="npc-interactions">
-          <button class="int-btn" ${familyCheck.allowed ? 'onclick="Game.UI.startFamily()"' : `disabled title="${familyCheck.reason}"`}>Start Family</button>
+          <button class="int-btn" ${familyCheck.allowed ? 'data-action="start-family"' : `disabled title="${familyCheck.reason}"`}>Start Family</button>
       </div>`;
       for (const member of members.filter(item => item.role !== 'self')) {
         const actions = Game.Family.getCareActions ? Game.Family.getCareActions(member.id) : [];
@@ -1508,12 +1566,12 @@ Game.UI = (function() {
           </div>
           ${buildNeedStrip(member)}
           <div class="npc-interactions">
-            ${actions.map(action => `<button class="int-btn" onclick="Game.UI.doFamilyCare('${member.id}','${action.key}')">${action.label}</button>`).join('')}
+            ${actions.map(action => `<button class="int-btn" data-action="family-care" data-member-id="${member.id}" data-care-key="${action.key}">${action.label}</button>`).join('')}
           </div>
           <div class="family-assignment-list" data-family-member="${member.id}">
             <small>Routine${activeAssignment ? ` - ${activeAssignment.label}` : ''}</small>
             <div class="npc-interactions">
-              ${assignments.map(item => `<button class="int-btn family-assignment-btn ${item.active ? 'active' : ''}" data-routine-key="${item.key}" ${item.available ? `onclick="Game.UI.assignFamilyRoutine('${member.id}','${item.key}')"` : 'disabled'} title="${item.reason || item.desc}">${item.label}</button>`).join('')}
+              ${assignments.map(item => `<button class="int-btn family-assignment-btn ${item.active ? 'active' : ''}" data-action="assign-routine" data-member-id="${member.id}" data-routine-key="${item.key}" ${item.available ? '' : 'disabled'} title="${item.reason || item.desc}">${item.label}</button>`).join('')}
             </div>
           </div>
         </div>`;
@@ -1527,7 +1585,7 @@ Game.UI = (function() {
   function refreshSocialPanel() {
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'social' && !panel.classList.contains('hidden')) {
-      buildSocialPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('social')">&times;</button>`);
+      buildSocialPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="social">&times;</button>`);
       setSidePanelOpen(true);
       return;
     }
@@ -1568,7 +1626,7 @@ Game.UI = (function() {
     let html = (closeHtml || '') + '<h3>📚 Skills</h3>';
     if (traitCfg) {
       html += `<div class="trait-badge">${traitCfg.icon} <strong>${traitCfg.label}</strong> — ${traitCfg.desc}</div>`;
-      html += `<button class="customize-sim-btn" onclick="Game.UI.openEditModal()">✨ Customise Sim</button>`;
+      html += `<button class="customize-sim-btn" data-action="edit-sim">✨ Customise Sim</button>`;
     }
     html += '<div class="skill-list">';
     for (const [key, skill] of Object.entries(Game.Config.SKILLS)) {
@@ -1599,7 +1657,7 @@ Game.UI = (function() {
       </div>`;
 
     if (canP) {
-      html += `<button class="prestige-btn" onclick="if(confirm('Start next generation?'))Game.Prestige.doPrestige()">🔄 New Generation</button>`;
+      html += `<button class="prestige-btn" data-action="prestige">🔄 New Generation</button>`;
     } else {
       html += `<p class="hint">Play ${30 - Game.State.get().time.day} more days to unlock.</p>`;
     }
@@ -1609,7 +1667,7 @@ Game.UI = (function() {
       html += `<div class="upgrade-item">
         <p><strong>${upg.icon || ''} ${upg.label}</strong> (Lv ${upg.currentLevel}/${upg.maxLevel})</p>
         <p class="desc">${upg.desc || upg.description || ''}</p>
-        ${upg.maxed ? '<span class="maxed">MAXED</span>' : `<button ${upg.affordable ? '' : 'disabled'} onclick="Game.Prestige.buyUpgrade('${upg.key}');Game.UI.togglePanel('legacy')">${upg.nextCost} LP</button>`}
+        ${upg.maxed ? '<span class="maxed">MAXED</span>' : `<button data-action="buy-prestige" data-upgrade-key="${upg.key}" ${upg.affordable ? '' : 'disabled'}>${upg.nextCost} LP</button>`}
       </div>`;
     }
     html += '</div>';
@@ -1645,6 +1703,7 @@ Game.UI = (function() {
 
   return {
     init,
+    registerPanel,
     initMainMenu,
     openEditModal,
     updateStatusBars,
@@ -1720,7 +1779,7 @@ Game.UI = (function() {
     // Refresh build panel
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">✕</button>`);
     }
   }
 
@@ -1740,7 +1799,7 @@ Game.UI = (function() {
     updateInteractionHint();
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">✕</button>`);
     }
   }
 
@@ -1750,7 +1809,7 @@ Game.UI = (function() {
     Game.UI.showNotification(ui.sandboxMode ? '🏖️ Sandbox Mode: Free Building Enabled!' : '🏖️ Sandbox Mode Disabled');
     const panel = document.getElementById('side-panel');
     if (panel && panel.dataset.active === 'build') {
-      buildBuildPanel(panel, `<button class="panel-close" onclick="Game.UI.togglePanel('build')">✕</button>`);
+      buildBuildPanel(panel, `<button class="panel-close" data-action="close-panel" data-panel="build">✕</button>`);
     }
   }
 

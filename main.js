@@ -4,6 +4,12 @@ const path = require('path');
 
 if (process.env.SIMLIFE_TEST_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.SIMLIFE_TEST_USER_DATA));
+  // CI and heavily loaded Windows hosts may be unable to spawn Chromium's GPU
+  // process. The game supports Phaser's Canvas fallback, so exercise that path
+  // deterministically in the Electron smoke suite.
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
 } else {
   const appData = process.env.APPDATA;
 

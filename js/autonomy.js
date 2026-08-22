@@ -76,7 +76,8 @@ Game.Autonomy = (function() {
             if (char.autonomy && char.autonomy.thought) {
               if (Game.Character.startActivity(char.autonomy.thought)) {
                 const actCfg = cfg.ACTIVITIES[char.autonomy.thought];
-                Game.UI && Game.UI.showNotification(`🤖 ${char.name} decided to ${actCfg.label.toLowerCase()}`);
+                if (Game.Signals) Game.Signals.emit('notification', { message: `🤖 ${char.name} decided to ${actCfg.label.toLowerCase()}` });
+                else Game.UI?.showNotification?.(`🤖 ${char.name} decided to ${actCfg.label.toLowerCase()}`);
                 char.autonomy.thought = null;
                 return char.targetPosition ? 'navigating' : 'interacting';
               }
@@ -157,7 +158,7 @@ Game.Autonomy = (function() {
       ];
       const available = enrichmentActivities.filter(a => Game.Character.isAvailableActivity(a));
       if (available.length > 0) {
-        const pick = available[Math.floor(Math.random() * available.length)];
+        const pick = available[Game.Random.int(0, available.length - 1)];
         return { activity: pick, need: 'fun', score: 1, urgency: 0 };
       }
     }

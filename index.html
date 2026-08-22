@@ -16,6 +16,14 @@
 </head>
 <body>
 
+<div id="runtime-status" class="runtime-status hidden" role="status" aria-live="polite">
+  <div class="runtime-status-card">
+    <strong id="runtime-status-title">Preparing your world…</strong>
+    <p id="runtime-status-message">Loading local game assets.</p>
+    <button id="btn-runtime-retry" class="hidden" type="button">Retry</button>
+  </div>
+</div>
+
 <!-- Main Menu Screen (Starts visible) -->
 <div id="main-menu-screen" class="fs-screen">
   <div class="menu-content">
@@ -279,37 +287,40 @@
 <!-- Scripts in dependency order -->
 <script src="vendor/navmesh.js"></script>
 <script src="vendor/rexstatemanagerplugin.min.js"></script>
-<script src="js/config.js?v=2"></script>
+<script src="js/random.js?v=1"></script>
+<script src="js/signals.js?v=1"></script>
+<script src="js/config.js?v=3"></script>
 <script src="js/avatar_catalog.js?v=1"></script>
 <script src="js/appearance.js?v=1"></script>
-<script src="js/state.js?v=3"></script>
+<script src="js/state.js?v=4"></script>
 <script src="js/home_growth.js?v=1"></script>
-<script src="js/character.js?v=2"></script>
+<script src="js/character.js?v=3"></script>
 <script src="js/economy.js?v=2"></script>
 <script src="js/object_market.js?v=1"></script>
 <script src="js/home_goals.js?v=1"></script>
 <script src="js/home_collections.js?v=1"></script>
 <script src="js/house.js?v=2"></script>
 <script src="js/object_crafting.js?v=1"></script>
-<script src="js/social.js?v=2"></script>
+<script src="js/social.js?v=3"></script>
 <script src="js/family.js?v=1"></script>
-<script src="js/events.js?v=2"></script>
+<script src="js/events.js?v=3"></script>
 <script src="js/prestige.js?v=2"></script>
 <script src="js/audio.js?v=2"></script>
 <script src="js/assets.js?v=1"></script>
 <script src="js/world_assets.js?v=1"></script>
 <script src="js/avatar_assets.js?v=1"></script>
+<script src="js/asset_loader.js?v=1"></script>
 <script src="js/renderer_math.js?v=1"></script>
 <script src="js/renderer_helpers.js?v=1"></script>
 <script src="js/avatar_renderer.js?v=3"></script>
-<script src="js/renderer.js?v=16"></script>
-<script src="js/autonomy.js?v=2"></script>
-<script src="js/interaction.js?v=2"></script>
+<script src="js/renderer.js?v=17"></script>
+<script src="js/autonomy.js?v=3"></script>
+<script src="js/interaction.js?v=3"></script>
 <script src="js/avatar_editor.js?v=2"></script>
-<script src="js/ui.js?v=5"></script>
-<script src="js/campaign.js?v=1"></script>
+<script src="js/ui.js?v=6"></script>
+<script src="js/campaign.js?v=2"></script>
 <script src="js/shell.js?v=1"></script>
-<script src="js/main.js?v=3"></script>
+<script src="js/main.js?v=4"></script>
 
 </body>
 </html>

@@ -1,6 +1,6 @@
-# 🏡 SimLife — Build Your Dream Life
+# 🏡 SimLife: Hearthbyte Edition
 
-A deep browser-based life simulation game inspired by The Sims. Build your home, grow your career, make friends, and leave a lasting legacy — all from your browser.
+A cozy offline-first life simulation for browsers and Electron. Build an isometric home, guide an autonomous character, grow through eight careers, form relationships, follow the eight-chapter New Roots campaign, and preserve each world in migration-safe local saves.
 
 ![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat&logo=html5&logoColor=white)
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
@@ -13,14 +13,16 @@ A deep browser-based life simulation game inspired by The Sims. Build your home,
 - **📋 Action Queue** — Shift+Click to queue up multiple actions; your Sim executes them in order
 - **😊 Moodlet System** — Stackable mood buffs from activities ("Well Rested", "Home Cooked", "Pumped Up")
 - **🏗️ Build Mode** — Place rooms and furniture on an isometric 2.5D lot
-- **💼 5 Career Tracks** — Business, Tech, Culinary, Science, Creative — each with 5 promotion tiers
-- **📚 8 Trainable Skills** — Cooking, Fitness, Charisma, Tech, Creativity, Logic, Gardening, Handiness
+- **💼 8 Career Tracks** — Dedicated workplaces, activities, requirements, and five promotion tiers per path
+- **📚 9 Trainable Skills** — Cooking, Fitness, Charisma, Tech, Creativity, Logic, Gardening, Handiness, and Language
 - **💬 Social System** — 6 NPCs with relationship levels, interactions, romance, and marriage
 - **🎲 Random Events** — Pipe leaks, party invitations, freelance gigs, stray cats, and more
 - **🌟 Prestige / Legacy** — Reset for Legacy Points, buy permanent upgrades, start a new generation
 - **🌅 Day/Night Cycle** — Dynamic sky, sunset colors, and nighttime overlays
 - **Character Customization** - Edit avatar form, body parts, clothing, accessories, and color sets during creation or any time in-game.
 - **💾 Auto-Save** — Progress saved to localStorage every 30 seconds
+- **📖 New Roots Campaign** — Eight guided chapters with persistent progress and one-time rewards
+- **🛡️ Foundation v2** — Deterministic tests, versioned save migrations, resilient local asset loading, and WebGL/Canvas fallback
 
 ## 🎮 Controls
 
@@ -79,9 +81,9 @@ MIT
 ## Discoverability
 
 - **Project:** SimLife
-- **Summary:** A browser-based life simulation game where players build a home, grow a career, manage relationships, queue actions, and guide autonomous Sims-style characters.
-- **Primary keywords:** browser-game, life-simulation, simulation-game, ai-agents, moodlets, build-mode, javascript, html5, css3, game-dev
-- **Use cases:** Browser life simulation gameplay, Autonomous character AI experiments, 2.5D build and career simulation
+- **Summary:** A cozy offline-first browser and Electron life simulation with isometric home building, autonomous characters, careers, relationships, a story campaign, and migration-safe local saves.
+- **Primary keywords:** browser-game, electron-game, life-simulation, simulation-game, autonomous-characters, moodlets, build-mode, phaser, javascript, offline-first
+- **Use cases:** Offline life-simulation play, autonomous character experiments, isometric home building, career and relationship progression
 <!-- discoverability:end -->
 
 ## Hearthbyte Edition v2.0
