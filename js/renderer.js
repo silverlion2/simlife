@@ -2141,8 +2141,14 @@ function startPhaser(canvasEl) {
 
     // Phaser 4 removed Pipelines. TiltShift is now handled via CSS overlays.
     // Initialize Phaser
+    const requestedRenderer = typeof window.URLSearchParams === 'function'
+      ? new window.URLSearchParams(window.location?.search || '').get('renderer')
+      : null;
+    const rendererType = requestedRenderer === 'canvas' && Phaser.CANVAS !== undefined
+      ? Phaser.CANVAS
+      : (Phaser.AUTO !== undefined ? Phaser.AUTO : Phaser.WEBGL);
     const config = {
-      type: Phaser.AUTO !== undefined ? Phaser.AUTO : Phaser.WEBGL,
+      type: rendererType,
       canvas: canvasEl,
       width: parentEl.clientWidth || window.innerWidth,
       height: parentEl.clientHeight || window.innerHeight,

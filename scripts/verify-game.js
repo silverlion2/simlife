@@ -1984,7 +1984,11 @@ async function checkElectronRuntime() {
     : [root];
   const app = await electron.launch({
     args: electronArgs,
-    env: { ...process.env, SIMLIFE_TEST_USER_DATA: testUserData },
+    env: {
+      ...process.env,
+      SIMLIFE_TEST_USER_DATA: testUserData,
+      ...(process.env.CI ? { SIMLIFE_TEST_RENDERER: 'canvas' } : {}),
+    },
   });
   const electronProcess = app.process();
   electronProcess?.stdout?.on('data', chunk => process.stdout.write(`[electron] ${chunk}`));

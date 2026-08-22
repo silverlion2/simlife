@@ -49,7 +49,9 @@ function createWindow() {
     console.error('Renderer process exited:', details.reason, details.exitCode);
   });
 
-  mainWindow.loadFile('index.html');
+  const testRenderer = process.env.SIMLIFE_TEST_RENDERER;
+  const loadOptions = testRenderer ? { query: { renderer: testRenderer } } : undefined;
+  mainWindow.loadFile('index.html', loadOptions);
 }
 
 app.whenReady().then(() => {
