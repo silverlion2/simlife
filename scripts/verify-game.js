@@ -1504,22 +1504,29 @@ function listPngFiles(dir) {
 }
 
 async function waitForCanvasNonBlank(page) {
-  const handle = await waitForGameFunction(page, 'wait for varied WebGL canvas pixels', () => {
+  const handle = await waitForGameFunction(page, 'wait for varied renderer canvas pixels', () => {
     const canvas = document.getElementById('game-canvas');
     if (!canvas || canvas.width <= 0 || canvas.height <= 0) return false;
 
     const gl = canvas.getContext('webgl2') ||
       canvas.getContext('webgl') ||
       canvas.getContext('experimental-webgl');
-    if (!gl || (gl.isContextLost && gl.isContextLost())) return false;
+    if (gl && gl.isContextLost && gl.isContextLost()) return false;
+    const context2d = gl ? null : canvas.getContext('2d', { willReadFrequently: true });
+    if (!gl && !context2d) return false;
 
-    const width = gl.drawingBufferWidth || canvas.width;
-    const height = gl.drawingBufferHeight || canvas.height;
+    const width = gl ? (gl.drawingBufferWidth || canvas.width) : canvas.width;
+    const height = gl ? (gl.drawingBufferHeight || canvas.height) : canvas.height;
     if (width <= 0 || height <= 0) return false;
 
-    const pixels = new Uint8Array(width * height * 4);
-    gl.finish();
-    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let pixels;
+    if (gl) {
+      pixels = new Uint8Array(width * height * 4);
+      gl.finish();
+      gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    } else {
+      pixels = context2d.getImageData(0, 0, width, height).data;
+    }
 
     const maxSamples = 20000;
     const stride = Math.max(1, Math.floor(Math.sqrt((width * height) / maxSamples)));
@@ -1557,6 +1564,7 @@ async function waitForCanvasNonBlank(page) {
     return {
       width,
       height,
+      renderer: gl ? 'webgl' : 'canvas',
       stride,
       sampledPixels,
       alphaPixels,
