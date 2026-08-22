@@ -1736,18 +1736,18 @@ async function checkBuildRenovationPanel(page) {
   }));
   await click(page, 'open Build panel for renovation controls', '[data-panel="build"]');
   await waitForSelector(page, 'wait for Build panel', '#side-panel:not(.hidden)', { timeout: UI_TIMEOUT });
-  await click(page, 'open Build Renovate tab', '#side-panel [data-build-tab="renovate"]');
+  await click(page, 'open Build Renovate tab', '#side-panel [data-action="build-tab"][data-tab="renovate"]');
   const result = await step('read Build renovation controls', async () => page.evaluate(() => {
     const panel = document.getElementById('side-panel');
     return {
       activePanel: panel && panel.dataset.active,
       title: panel ? panel.textContent : '',
       renovationRows: document.querySelectorAll('#side-panel .renovation-room').length,
-      resizeButtons: document.querySelectorAll('#side-panel [data-renovate-action]').length,
-      furnishButtons: document.querySelectorAll('#side-panel [data-furnish-preset]').length,
-      travelButtons: document.querySelectorAll('#side-panel [data-travel-floor]').length,
+      resizeButtons: document.querySelectorAll('#side-panel [data-action="resize-room"]').length,
+      furnishButtons: document.querySelectorAll('#side-panel [data-action="furnish-room"]').length,
+      travelButtons: document.querySelectorAll('#side-panel [data-action="travel-floor"]').length,
       lotControls: document.querySelectorAll('#side-panel [data-action="expand-lot"]').length,
-      hasStoreMode: Boolean(document.querySelector('#side-panel [data-action="store-mode"]')),
+      hasStoreMode: Boolean(document.querySelector('#side-panel [data-action="toggle-store"]')),
     };
   }));
 
