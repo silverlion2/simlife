@@ -2,8 +2,6 @@
    SimLife — Cozy Stardew Valley Stylesheet
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&family=Nunito:wght@400;600;700&display=swap');
-
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
@@ -56,6 +54,12 @@ body {
 
 .runtime-status-card p { margin: 10px 0 18px; }
 .runtime-status-card button { min-width: 120px; min-height: 40px; }
+
+body.runtime-input-blocked #game-canvas,
+body.runtime-input-blocked #ui-layer {
+  pointer-events: none;
+  user-select: none;
+}
 
 /* ---- Full-Screen Overlays (Menus) ---- */
 .fs-screen {
@@ -3896,8 +3900,8 @@ body.side-panel-open .daily-focus {
 
   #char-creation-screen .cc-field:nth-child(1) { order: 1; }
   #char-creation-screen .cc-field:nth-child(2) { order: 2; }
-  #char-creation-screen .cc-field:nth-child(4) { order: 3; }
-  #char-creation-screen .cc-field:nth-child(3) { order: 4; }
+  #char-creation-screen .cc-field:nth-child(3) { order: 3; }
+  #char-creation-screen .cc-field:nth-child(4) { order: 4; }
 
   #char-creation-screen .trait-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3946,7 +3950,37 @@ body.side-panel-open .daily-focus {
   }
 
   .hud-center {
+    display: block;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: 100%;
+  }
+
+  .hud-left {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .hud-right {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .hud-center .game-title {
     display: none;
+  }
+
+  .hud-center .campaign-chip {
+    width: 100%;
+    max-width: none;
+    min-height: 40px;
+    padding: 5px 8px;
+  }
+
+  .hud-center .campaign-objective {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .hud-box {
@@ -4910,7 +4944,9 @@ body.reduced-motion *::after {
   }
 
   .campaign-chip {
-    display: none;
+    display: grid;
+    width: 100%;
+    min-height: 40px;
   }
 
   .pause-card {

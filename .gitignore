@@ -1,7 +1,10 @@
 node_modules/
 dist/
 output/
+artifacts/*
+!artifacts/.gitkeep
 __pycache__/
+.pytest_cache/
 browser_*.txt
 *.py
 !scripts/extract-furniture-sheet.py

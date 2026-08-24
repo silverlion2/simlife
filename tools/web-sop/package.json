@@ -1,0 +1,8 @@
+{
+  "name": "@rave-index/web-sop",
+  "version": "1.0.0",
+  "private": true,
+  "bin": {
+    "web-sop": "bin/web-sop.js"
+  }
+}

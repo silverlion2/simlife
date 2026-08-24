@@ -37,12 +37,12 @@ Game.Interaction = (function() {
       lockReason: act.lockReason,
       callback: (e) => {
         if (shiftKey || (e && e.shiftKey)) {
-          if (Game.Character.queueActivity(act.key)) {
+          if (Game.Character.queueActivity(act.key, furn.id, { source: 'interaction' })) {
             Game.UI.showNotification(`📋 Queued: ${act.label}`);
             Game.UI.updateQueueDisplay();
           }
         } else {
-          Game.Character.startActivity(act.key, false, furn.id);
+          Game.Character.startActivity(act.key, false, furn.id, { source: 'interaction' });
         }
       }
     }));
@@ -205,20 +205,9 @@ Game.Interaction = (function() {
         if (!act.furniture) return false;
         return furnType.includes(act.furniture) || act.furniture === furnType;
       })
-      .filter(([key]) => Game.Character.isAvailableActivity(key))
       .map(([key, act]) => {
-         let locked = false;
-         let lockReason = '';
-         if (act.requires) {
-            const currentLevel = Game.Character.getSkillLevel(act.requires.skill);
-            if (currentLevel < act.requires.level) {
-               locked = true;
-               const skillDef = Game.Config.SKILLS[act.requires.skill];
-               const skillLabel = skillDef ? skillDef.label : act.requires.skill;
-               lockReason = `Requires Lvl ${act.requires.level} ${skillLabel}`;
-            }
-         }
-         return { key, locked, lockReason, ...act };
+         const availability = Game.Character.getActivityAvailability(key, { source: 'interaction', targetFurnId: furn.id });
+         return { key, locked: !availability.allowed, lockReason: availability.reason, ...act };
       });
 
     // Custom filtering for gardening loop
@@ -240,20 +229,9 @@ Game.Interaction = (function() {
     const activities = Game.Config.ACTIVITIES;
     return Object.entries(activities)
       .filter(([key, act]) => act.room === roomType && !act.furniture)
-      .filter(([key]) => Game.Character.isAvailableActivity(key))
       .map(([key, act]) => {
-         let locked = false;
-         let lockReason = '';
-         if (act.requires) {
-            const currentLevel = Game.Character.getSkillLevel(act.requires.skill);
-            if (currentLevel < act.requires.level) {
-               locked = true;
-               const skillDef = Game.Config.SKILLS[act.requires.skill];
-               const skillLabel = skillDef ? skillDef.label : act.requires.skill;
-               lockReason = `Requires Lvl ${act.requires.level} ${skillLabel}`;
-            }
-         }
-         return { key, locked, lockReason, ...act };
+         const availability = Game.Character.getActivityAvailability(key, { source: 'interaction' });
+         return { key, locked: !availability.allowed, lockReason: availability.reason, ...act };
       });
   }
 

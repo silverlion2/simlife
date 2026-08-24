@@ -11,6 +11,9 @@ Game.AvatarRenderer = (function() {
       layerMap: new Map(),
       layers: [],
       lastSignature: '',
+      lastAppearance: null,
+      lastDirection: '',
+      layerBuildCount: 0,
       layerCount: 0,
       missingTextureKeys: [],
     };
@@ -67,6 +70,8 @@ Game.AvatarRenderer = (function() {
     if (instance.layerMap) instance.layerMap.clear();
     instance.layers = [];
     instance.lastSignature = '';
+    instance.lastAppearance = null;
+    instance.lastDirection = '';
     instance.layerCount = 0;
   }
 
@@ -74,6 +79,12 @@ Game.AvatarRenderer = (function() {
     if (!instance || !instance.scene || !character || !Game.Appearance) return null;
 
     const appearance = character.appearance || Game.Appearance.fromLegacy(character);
+    if (instance.container && appearance === instance.lastAppearance && direction === instance.lastDirection) {
+      instance.container.setPosition(x, y);
+      return instance.container;
+    }
+
+    instance.layerBuildCount += 1;
     const layers = Game.Appearance.getRenderLayers(appearance, direction)
       .slice()
       .sort((a, b) => a.order - b.order);
@@ -115,6 +126,8 @@ Game.AvatarRenderer = (function() {
     }
 
     instance.layers = layers;
+    instance.lastAppearance = appearance;
+    instance.lastDirection = direction;
     instance.layerCount = instance.container.list.length;
     instance.missingTextureKeys = [];
     return instance.container;

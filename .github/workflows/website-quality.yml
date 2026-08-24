@@ -14,4 +14,28 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
-      - run: xvfb-run -a npm run test
+      - run: npm run sop:doctor
+      - run: xvfb-run -a npm run sop:check
+      - run: xvfb-run -a npm run test:browser
+
+  windows-package:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run build:win -- --x64 --publish=never --config.directories.output=artifacts/ci-release-candidate
+      - run: npm run verify:artifact -- artifacts/ci-release-candidate
+      - run: npm run verify:artifact-runtime -- artifacts/ci-release-candidate
+      - uses: actions/upload-artifact@v4
+        with:
+          name: simlife-windows-release-candidate
+          path: |
+            artifacts/ci-release-candidate/SimLife-Hearthbyte-*-Setup.exe
+            artifacts/ci-release-candidate/SimLife-Hearthbyte-*-Setup.exe.blockmap
+            artifacts/ci-release-candidate/latest.yml
+            artifacts/ci-release-candidate/packaged-runtime-smoke.png
+          if-no-files-found: error

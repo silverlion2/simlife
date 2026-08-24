@@ -6,6 +6,7 @@ window.Game = window.Game || {};
 Game.Appearance = (function() {
   const catalog = Game.AvatarCatalog;
   if (!catalog) throw new Error('Game.Appearance requires Game.AvatarCatalog to be loaded first');
+  const validColorChannelsByForm = new Map();
 
   function clone(value) {
     return JSON.parse(JSON.stringify(value));
@@ -137,13 +138,16 @@ Game.Appearance = (function() {
   }
 
   function getValidColorChannels(form) {
+    if (validColorChannelsByForm.has(form)) return validColorChannelsByForm.get(form);
     const channels = new Set(Object.keys((catalog.DEFAULTS[form] && catalog.DEFAULTS[form].colors) || {}));
     for (const item of Object.values(catalog.ITEMS)) {
       if (item.form === form) {
         for (const channel of item.colorChannels || []) channels.add(channel);
       }
     }
-    return Array.from(channels);
+    const result = Object.freeze(Array.from(channels));
+    validColorChannelsByForm.set(form, result);
+    return result;
   }
 
   function isValidColorValue(value) {

@@ -6,6 +6,7 @@ window.Game = window.Game || {};
 Game.State = (function() {
   const SAVE_INDEX_KEY = 'simlife_saves_index';
   const SAVE_VERSION = 2;
+  /** @type {string | null} */
   let activeSlotId = null;
 
   function isMissingColor(color) {
@@ -304,6 +305,7 @@ Game.State = (function() {
           nextRoomId: 1, nextFurnId: 6, brokenFurniture: []
         }
       },
+      pets: [],
       economy: {
         money: cfg.STARTING_STATE.money,
         totalEarned: 0,
@@ -402,8 +404,123 @@ Game.State = (function() {
   let state = createNewState();
 
   // ----- SAVE MANAGER logic -----
+  const SAVE_LIMITS = Object.freeze({
+    serializedCharacters: 2 * 1024 * 1024,
+    maps: 32,
+    roomsPerMap: 2048,
+    furniturePerMap: 5000,
+    floorsPerMap: 16,
+    brokenPerMap: 5000,
+    actionQueue: 6,
+    moodlets: 8,
+    pets: 64,
+    householdMembers: 256,
+    persistentArray: 5000,
+    depth: 32,
+    nodes: 100000,
+    stringLength: 262144,
+  });
+  const UNSAFE_OBJECT_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
   function isPlainObject(value) {
     return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  function isPayloadWithinLimits(value, depth = 0, counter = { nodes: 0 }) {
+    if (depth > SAVE_LIMITS.depth || ++counter.nodes > SAVE_LIMITS.nodes) return false;
+    if (typeof value === 'string') return value.length <= SAVE_LIMITS.stringLength;
+    if (value === null || typeof value === 'boolean' || typeof value === 'number') return true;
+    if (Array.isArray(value)) {
+      if (value.length > SAVE_LIMITS.nodes) return false;
+      return value.every(entry => isPayloadWithinLimits(entry, depth + 1, counter));
+    }
+    if (!isPlainObject(value)) return false;
+    const keys = Object.keys(value);
+    if (keys.some(key => UNSAFE_OBJECT_KEYS.has(key))) return false;
+    return keys.every(key => isPayloadWithinLimits(value[key], depth + 1, counter));
+  }
+
+  function isValidRoomPayload(value) {
+    return isPlainObject(value)
+      && typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 128
+      && typeof value.type === 'string' && value.type.length > 0 && value.type.length <= 128
+      && Number.isFinite(value.x) && Number.isFinite(value.y)
+      && Number.isFinite(value.w) && value.w > 0
+      && Number.isFinite(value.h) && value.h > 0
+      && (value.floor === undefined || Number.isFinite(value.floor));
+  }
+
+  function isValidFurniturePayload(value) {
+    return isPlainObject(value)
+      && typeof value.id === 'string' && value.id.length > 0 && value.id.length <= 128
+      && typeof value.type === 'string' && value.type.length > 0 && value.type.length <= 128
+      && Number.isFinite(value.x) && Number.isFinite(value.y)
+      && (value.floor === undefined || Number.isFinite(value.floor))
+      && (value.roomId === undefined || value.roomId === null || typeof value.roomId === 'string')
+      && (value.config === undefined || isPlainObject(value.config));
+  }
+
+  function isValidFloorPayload(value) {
+    return isPlainObject(value)
+      && Number.isFinite(value.level)
+      && (value.label === undefined || typeof value.label === 'string');
+  }
+
+  function isBoundedArray(value, limit, predicate) {
+    return value === undefined || (Array.isArray(value) && value.length <= limit && value.every(predicate));
+  }
+
+  function isShortString(value) {
+    return typeof value === 'string' && value.length > 0 && value.length <= 128;
+  }
+
+  function isValidPositionPayload(value) {
+    return isPlainObject(value)
+      && Number.isFinite(value.x) && Number.isFinite(value.y)
+      && (value.z === undefined || Number.isFinite(value.z));
+  }
+
+  function isValidActionQueuePayload(value) {
+    return isShortString(value) || (isPlainObject(value)
+      && isShortString(value.key)
+      && (value.targetFurnId === undefined || value.targetFurnId === null || isShortString(value.targetFurnId))
+      && (value.source === undefined || isShortString(value.source)));
+  }
+
+  function isValidMoodletPayload(value) {
+    return isPlainObject(value)
+      && isShortString(value.name)
+      && Number.isFinite(value.value)
+      && Number.isFinite(value.remaining)
+      && Number.isFinite(value.duration)
+      && (value.icon === undefined || (typeof value.icon === 'string' && value.icon.length <= 64));
+  }
+
+  function isValidPetPayload(value) {
+    return isPlainObject(value)
+      && isShortString(value.id) && isShortString(value.type)
+      && (value.active === undefined || typeof value.active === 'boolean')
+      && (value.position === undefined || isValidPositionPayload(value.position))
+      && (value.targetPosition === undefined || value.targetPosition === null || isValidPositionPayload(value.targetPosition))
+      && (value.timer === undefined || Number.isFinite(value.timer));
+  }
+
+  function isValidInventoryObjectPayload(value) {
+    return isPlainObject(value) && isShortString(value.id) && isShortString(value.type);
+  }
+
+  function isValidMarketOfferPayload(value) {
+    return isPlainObject(value) && isShortString(value.id) && isShortString(value.type)
+      && Number.isFinite(value.price) && value.price >= 0;
+  }
+
+  function isValidHomeGoalPayload(value) {
+    return isPlainObject(value) && isShortString(value.id) && isShortString(value.key);
+  }
+
+  function isValidFamilyMemberPayload(value) {
+    return isPlainObject(value) && isShortString(value.id) && isShortString(value.name) && isShortString(value.role)
+      && (value.needs === undefined || isPlainObject(value.needs));
   }
 
   function normalizeSaveMetadata(value) {
@@ -423,7 +540,147 @@ Game.State = (function() {
       && isPlainObject(value.character)
       && isPlainObject(value.economy)
       && isPlainObject(value.time)
-      && isPlainObject(value.maps);
+      && isPlainObject(value.maps)
+      && Object.keys(value.maps).length <= SAVE_LIMITS.maps
+      && Object.values(value.maps).every(isValidMapPayload);
+  }
+
+  function isValidMapPayload(value) {
+    if (!isPlainObject(value)) return false;
+    const arrayFields = ['rooms', 'furniture', 'floors', 'brokenFurniture'];
+    if (!arrayFields.every(field => value[field] === undefined || Array.isArray(value[field]))) return false;
+    if ((value.rooms?.length || 0) > SAVE_LIMITS.roomsPerMap
+      || (value.furniture?.length || 0) > SAVE_LIMITS.furniturePerMap
+      || (value.floors?.length || 0) > SAVE_LIMITS.floorsPerMap
+      || (value.brokenFurniture?.length || 0) > SAVE_LIMITS.brokenPerMap) return false;
+    return (value.rooms === undefined || value.rooms.every(isValidRoomPayload))
+      && (value.furniture === undefined || value.furniture.every(isValidFurniturePayload))
+      && (value.floors === undefined || value.floors.every(isValidFloorPayload))
+      && (value.brokenFurniture === undefined || value.brokenFurniture.every(id => typeof id === 'string' && id.length <= 128))
+      && (value.lotWidth === undefined || (Number.isFinite(value.lotWidth) && value.lotWidth > 0 && value.lotWidth <= 512))
+      && (value.lotHeight === undefined || (Number.isFinite(value.lotHeight) && value.lotHeight > 0 && value.lotHeight <= 512));
+  }
+
+  function isStructurallyCompatiblePayload(value) {
+    if (!isPlainObject(value)) return false;
+    for (const field of ['character', 'economy', 'time', 'maps', 'homeGrowth', 'inventory', 'homeGoals', 'homeCollections', 'family', 'campaign']) {
+      if (value[field] !== undefined && !isPlainObject(value[field])) return false;
+    }
+    const character = value.character;
+    const inventory = value.inventory;
+    if (inventory?.market !== undefined && !isPlainObject(inventory.market)) return false;
+    return isBoundedArray(character?.actionQueue, SAVE_LIMITS.actionQueue, isValidActionQueuePayload)
+      && isBoundedArray(character?.moodlets, SAVE_LIMITS.moodlets, isValidMoodletPayload)
+      && isBoundedArray(character?.achievements, SAVE_LIMITS.persistentArray, isShortString)
+      && isBoundedArray(character?.collection, SAVE_LIMITS.persistentArray, isShortString)
+      && isBoundedArray(character?.visitedMaps, SAVE_LIMITS.maps, isShortString)
+      && isBoundedArray(value.pets, SAVE_LIMITS.pets, isValidPetPayload)
+      && isBoundedArray(value.homeGrowth?.milestones, SAVE_LIMITS.persistentArray, isShortString)
+      && isBoundedArray(inventory?.objects, SAVE_LIMITS.persistentArray, isValidInventoryObjectPayload)
+      && isBoundedArray(inventory?.market?.offers, SAVE_LIMITS.persistentArray, isValidMarketOfferPayload)
+      && isBoundedArray(value.homeGoals?.active, SAVE_LIMITS.householdMembers, isValidHomeGoalPayload)
+      && isBoundedArray(value.homeGoals?.completed, SAVE_LIMITS.persistentArray, isShortString)
+      && isBoundedArray(value.homeCollections?.completed, SAVE_LIMITS.persistentArray, isShortString)
+      && isBoundedArray(value.family?.members, SAVE_LIMITS.householdMembers, isValidFamilyMemberPayload)
+      && isBoundedArray(value.campaign?.completed, SAVE_LIMITS.persistentArray, isShortString)
+      && (value.maps === undefined || (
+      Object.keys(value.maps).length <= SAVE_LIMITS.maps
+      && Object.values(value.maps).every(isValidMapPayload)
+      ));
+  }
+
+  function isValidLoadCandidate(value) {
+    if (!isValidStatePayload(value)) return false;
+    const character = value.character;
+    const position = character.position;
+    const activeMap = typeof character.mapId === 'string' ? value.maps[character.mapId] : null;
+    return isPlainObject(position)
+      && Number.isFinite(position.x)
+      && Number.isFinite(position.y)
+      && isPlainObject(activeMap)
+      && Number.isFinite(value.time.day)
+      && Number.isFinite(value.time.hour)
+      && Number.isFinite(value.time.minute)
+      && Number.isFinite(value.time.totalMinutes)
+      && Number.isFinite(value.economy.money)
+      && Object.values(value.maps).every(map => Number.isFinite(map.lotWidth) && Number.isFinite(map.lotHeight));
+  }
+
+  function resetTransientCharacterState(character) {
+    if (!isPlainObject(character)) return;
+    character.path = null;
+    character.isPathfinding = false;
+    character.wasMoving = false;
+    character.pathRequestId = 0;
+  }
+
+  function createSaveData(sourceState) {
+    const saveData = JSON.parse(JSON.stringify(sourceState));
+    saveData.version = SAVE_VERSION;
+    syncLegacyAppearanceFields(saveData.character);
+    resetTransientCharacterState(saveData.character);
+    delete saveData.ui;
+    delete saveData.events;
+    delete saveData.npcWalkers;
+    return saveData;
+  }
+
+  function ensureDerivedState(targetState) {
+    if (Game.HomeGrowth && Game.HomeGrowth.ensureState) Game.HomeGrowth.ensureState(targetState);
+    if (Game.Family && Game.Family.ensureState) Game.Family.ensureState(targetState);
+    if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState(targetState);
+    if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState(targetState);
+  }
+
+  function prepareLoadCandidate(savedPayload) {
+    if (!isPayloadWithinLimits(savedPayload)) throw new TypeError('Save payload exceeds safety limits');
+    const fresh = createNewState();
+    const migrated = migrateStatePayload(JSON.parse(JSON.stringify(savedPayload)), fresh);
+    if (!isStructurallyCompatiblePayload(migrated)) throw new TypeError('Invalid save state payload');
+    syncLegacyAppearanceFields(migrated.character);
+
+    const candidate = deepMerge(fresh, migrated);
+    candidate.ui = fresh.ui;
+    candidate.events = fresh.events;
+    candidate.npcWalkers = fresh.npcWalkers;
+    if (!Array.isArray(candidate.character.achievements)) candidate.character.achievements = [];
+    if (!Array.isArray(candidate.character.collection)) candidate.character.collection = [];
+    if (!candidate.maps.downtown) candidate.maps.downtown = fresh.maps.downtown;
+    if (!candidate.maps.university) candidate.maps.university = fresh.maps.university;
+    resetTransientCharacterState(candidate.character);
+    syncLegacyAppearanceFields(candidate.character);
+    ensureDerivedState(candidate);
+
+    if (!isValidLoadCandidate(candidate)) throw new TypeError('Save state failed runtime validation');
+    return candidate;
+  }
+
+  function createSlotId() {
+    const base = `save_${Date.now()}`;
+    let slotId = base;
+    let suffix = 1;
+    while (localStorage.getItem(slotId) !== null) {
+      slotId = `${base}_${suffix++}`;
+    }
+    return slotId;
+  }
+
+  function persistNewSlot(slotId, saveData, nextIndex) {
+    let slotWritten = false;
+    try {
+      localStorage.setItem(slotId, JSON.stringify(saveData));
+      slotWritten = true;
+      saveIndex(nextIndex);
+    } catch (error) {
+      if (slotWritten) {
+        try {
+          localStorage.removeItem(slotId);
+        } catch (rollbackError) {
+          console.error('Failed to roll back incomplete save slot:', rollbackError);
+        }
+      }
+      throw error;
+    }
   }
 
   function migrateStatePayload(saved, freshState = createNewState()) {
@@ -464,10 +721,10 @@ Game.State = (function() {
   }
 
   function migrateLegacySaveIfNeeded() {
-    const legacy = localStorage.getItem('simlife_save');
-    const idx = getIndex();
-    if (legacy && idx.length === 0) {
-      try {
+    try {
+      const legacy = localStorage.getItem('simlife_save');
+      const idx = getIndex();
+      if (legacy && idx.length === 0) {
         const stateObj = JSON.parse(legacy);
         if (!isPlainObject(stateObj)) return;
         const slotId = 'save_old_1';
@@ -483,9 +740,9 @@ Game.State = (function() {
         saveIndex(idx);
         localStorage.removeItem('simlife_save');
         console.log('Migrated legacy save to slot:', slotId);
-      } catch (error) {
-        console.warn('Legacy save could not be migrated:', error);
       }
+    } catch (error) {
+      console.warn('Legacy save could not be migrated:', error);
     }
   }
 
@@ -503,17 +760,14 @@ Game.State = (function() {
 
     save: function() {
       if (!activeSlotId) return false;
+      /** @type {string | null} */
+      let previousPayload = null;
+      /** @type {string | null} */
+      let previousIndex = null;
       try {
-        // Create a deep clone for saving so we don't modify the live state
-        const saveData = JSON.parse(JSON.stringify(state));
-        saveData.version = SAVE_VERSION;
-        syncLegacyAppearanceFields(saveData.character);
-        
-        // Strip transient/runtime-only properties from the saved data
-        delete saveData.ui;
-        delete saveData.events;
-        delete saveData.npcWalkers; 
-        
+        previousPayload = localStorage.getItem(activeSlotId);
+        previousIndex = localStorage.getItem(SAVE_INDEX_KEY);
+        const saveData = createSaveData(state);
         localStorage.setItem(activeSlotId, JSON.stringify(saveData));
 
         // Update index metadata
@@ -539,6 +793,14 @@ Game.State = (function() {
         Game.Signals?.emit('save:success', { slotId: activeSlotId, version: SAVE_VERSION });
         return true;
       } catch(e) {
+        try {
+          if (previousPayload === null) localStorage.removeItem(activeSlotId);
+          else localStorage.setItem(activeSlotId, previousPayload);
+          if (previousIndex === null) localStorage.removeItem(SAVE_INDEX_KEY);
+          else localStorage.setItem(SAVE_INDEX_KEY, previousIndex);
+        } catch (rollbackError) {
+          console.error('Failed to restore the previous save transaction:', rollbackError);
+        }
         console.error('Save failed:', e);
         Game.Signals?.emit('save:error', { operation: 'save', error: e });
         return false;
@@ -550,28 +812,10 @@ Game.State = (function() {
       try {
         const data = localStorage.getItem(slotId);
         if (!data) return false;
-        let saved = JSON.parse(data);
-        if (!isPlainObject(saved)) return false;
-        const fresh = createNewState();
-        saved = migrateStatePayload(saved, fresh);
-        syncLegacyAppearanceFields(saved.character);
-
-        state = deepMerge(fresh, saved);
-        state.ui = fresh.ui;
-        state.events = fresh.events;
-        
-        if (!state.character.achievements) state.character.achievements = [];
-        if (!state.character.collection) state.character.collection = [];
-        if (!state.maps.downtown) state.maps.downtown = fresh.maps.downtown;
-        if (!state.maps.university) state.maps.university = fresh.maps.university;
-        
-        // Ensure legacy saves get a color if missing
-        syncLegacyAppearanceFields(state.character);
-        if (Game.HomeGrowth && Game.HomeGrowth.ensureState) Game.HomeGrowth.ensureState(state);
-        if (Game.Family && Game.Family.ensureState) Game.Family.ensureState(state);
-        if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState(state);
-        if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState(state);
-        
+        const saved = JSON.parse(data);
+        if (!isPlainObject(saved)) throw new TypeError('Save payload must be an object');
+        const candidate = prepareLoadCandidate(saved);
+        state = candidate;
         activeSlotId = slotId;
         Game.Signals?.emit('save:loaded', { slotId, version: state.version });
         return true;
@@ -583,42 +827,44 @@ Game.State = (function() {
     },
 
     createSave: function(worldName, characterData) {
-      const fresh = createNewState();
-      // Apply Char Data
-      if (characterData) {
-        fresh.character.name = characterData.name || fresh.character.name;
-        fresh.character.trait = characterData.trait || fresh.character.trait;
+      try {
+        const fresh = createNewState();
+        if (characterData) {
+          fresh.character.name = characterData.name || fresh.character.name;
+          fresh.character.trait = characterData.trait || fresh.character.trait;
 
-        fresh.character.form = characterData.form || fresh.character.form || 'online_witch';
-        fresh.character.color = isMissingColor(characterData.color) ? fresh.character.color : characterData.color;
-        if (characterData.appearance) {
-          fresh.character.appearance = characterData.appearance;
-        } else if (Game.Appearance) {
-          fresh.character.appearance = Game.Appearance.fromLegacy({ form: fresh.character.form, color: fresh.character.color });
+          fresh.character.form = characterData.form || fresh.character.form || 'online_witch';
+          fresh.character.color = isMissingColor(characterData.color) ? fresh.character.color : characterData.color;
+          if (characterData.appearance) {
+            fresh.character.appearance = characterData.appearance;
+          } else if (Game.Appearance) {
+            fresh.character.appearance = Game.Appearance.fromLegacy({ form: fresh.character.form, color: fresh.character.color });
+          }
+          syncLegacyAppearanceFields(fresh.character);
         }
-        syncLegacyAppearanceFields(fresh.character);
+        ensureDerivedState(fresh);
+
+        const slotId = createSlotId();
+        const idx = getIndex();
+        idx.push({
+          id: slotId,
+          name: worldName || 'New World',
+          characterName: fresh.character.name,
+          money: fresh.economy.money,
+          day: fresh.time.day,
+          lastPlayed: Date.now()
+        });
+        persistNewSlot(slotId, createSaveData(fresh), idx);
+
+        state = fresh;
+        activeSlotId = slotId;
+        Game.Signals?.emit('save:success', { slotId, version: SAVE_VERSION });
+        return slotId;
+      } catch (error) {
+        console.error('Create save failed:', error);
+        Game.Signals?.emit('save:error', { operation: 'create', error });
+        return false;
       }
-      state = fresh;
-      if (Game.HomeGrowth && Game.HomeGrowth.ensureState) Game.HomeGrowth.ensureState(state);
-      if (Game.Family && Game.Family.ensureState) Game.Family.ensureState(state);
-      if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState(state);
-      if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState(state);
-      activeSlotId = 'save_' + Date.now();
-      
-      let idx = getIndex();
-      idx.push({
-        id: activeSlotId,
-        name: worldName || 'New World',
-        characterName: fresh.character.name,
-        money: fresh.economy.money,
-        day: fresh.time.day,
-        lastPlayed: Date.now()
-      });
-      saveIndex(idx);
-      
-      // Save it immediately
-      this.save();
-      return activeSlotId;
     },
 
     getSaves: function() {
@@ -632,6 +878,25 @@ Game.State = (function() {
       saveIndex(idx);
       localStorage.removeItem(slotId);
       if (activeSlotId === slotId) activeSlotId = null;
+    },
+
+    deleteAllSaves: function() {
+      try {
+        const slots = getIndex();
+        for (const slot of slots) {
+          if (slot?.id) localStorage.removeItem(slot.id);
+        }
+        localStorage.removeItem(SAVE_INDEX_KEY);
+        localStorage.removeItem('simlife_save');
+        activeSlotId = null;
+        state = createNewState();
+        Game.Signals?.emit('save:reset', { count: slots.length });
+        return true;
+      } catch (error) {
+        console.error('Failed to reset save data:', error);
+        Game.Signals?.emit('save:error', { operation: 'reset', error });
+        return false;
+      }
     },
 
     hasSave: function() {
@@ -670,35 +935,32 @@ Game.State = (function() {
 
     importFromFile: function(fileContent) {
       try {
+        if (typeof fileContent !== 'string' || fileContent.length > SAVE_LIMITS.serializedCharacters) {
+          throw new TypeError('Save file is too large');
+        }
         const importObject = JSON.parse(fileContent);
         if (!isPlainObject(importObject) || !isPlainObject(importObject.metadata) || !isPlainObject(importObject.state)) {
             console.error('Invalid save file format.');
             return false;
         }
 
-        // Validate the fully migrated copy before changing the slot index. This
-        // keeps legacy v1 imports compatible and makes malformed imports atomic.
-        const migratedState = migrateStatePayload(importObject.state);
-        if (!isValidStatePayload(migratedState)) {
-          console.error('Invalid save state payload.');
-          return false;
-        }
+        const candidate = prepareLoadCandidate(importObject.state);
+        const saveData = createSaveData(candidate);
         
         let idx = getIndex();
         // Generate a new slot ID to avoid collisions
-        const newSlotId = 'save_' + Date.now();
+        const newSlotId = createSlotId();
         const metadata = normalizeSaveMetadata({
           ...importObject.metadata,
           id: newSlotId,
+          characterName: candidate.character.name,
+          money: candidate.economy.money,
+          day: candidate.time.day,
           lastPlayed: Date.now(),
         });
         
-        // Add to index
         idx.push(metadata);
-        saveIndex(idx);
-        
-        // Save state payload
-        localStorage.setItem(newSlotId, JSON.stringify(migratedState));
+        persistNewSlot(newSlotId, saveData, idx);
         Game.Signals?.emit('save:imported', { slotId: newSlotId, metadata });
         return true;
       } catch (e) {
@@ -728,6 +990,7 @@ Game.State = (function() {
   function deepMerge(target, source) {
     const result = { ...target };
     for (const key of Object.keys(source)) {
+      if (UNSAFE_OBJECT_KEYS.has(key)) throw new TypeError(`Unsafe save key: ${key}`);
       if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
         result[key] = deepMerge(target[key] || {}, source[key]);
       } else {

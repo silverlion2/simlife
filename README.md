@@ -20,7 +20,7 @@ A cozy offline-first life simulation for browsers and Electron. Build an isometr
 - **🌟 Prestige / Legacy** — Reset for Legacy Points, buy permanent upgrades, start a new generation
 - **🌅 Day/Night Cycle** — Dynamic sky, sunset colors, and nighttime overlays
 - **Character Customization** - Edit avatar form, body parts, clothing, accessories, and color sets during creation or any time in-game.
-- **💾 Auto-Save** — Progress saved to localStorage every 30 seconds
+- **💾 Auto-Save** — Progress saved to localStorage every 30 seconds and when the active page is hidden or left
 - **📖 New Roots Campaign** — Eight guided chapters with persistent progress and one-time rewards
 - **🛡️ Foundation v2** — Deterministic tests, versioned save migrations, resilient local asset loading, and WebGL/Canvas fallback
 
@@ -34,7 +34,7 @@ A cozy offline-first life simulation for browsers and Electron. Build an isometr
 | **1 / 2 / 3** | Set game speed (1×, 3×, 10×) |
 | **Space** | Pause / Resume |
 | **WASD / Arrows** | Pan camera |
-| **Escape** | Cancel activity & clear queue |
+| **Escape** | Close the current surface or open the pause menu |
 
 ## 🚀 Play
 
@@ -55,23 +55,22 @@ Or host it on any static file server (GitHub Pages, Netlify, Vercel, etc.)
 
 ```
 simlife/
-├── index.html          # Entry point
-├── css/
-│   └── main.css        # All styles (dark theme, pie menus, animations)
-└── js/
-    ├── config.js       # Game data (needs, furniture, careers, events)
-    ├── state.js        # State management & save/load
-    ├── character.js    # Needs, mood, skills, activities, action queue
-    ├── economy.js      # Money, careers, bills, promotions
-    ├── house.js        # Room building, furniture placement
-    ├── social.js       # NPC relationships & interactions
-    ├── events.js       # Random event system
-    ├── prestige.js     # Legacy points & generational upgrades
-    ├── renderer.js     # 2.5D isometric canvas renderer
-    ├── autonomy.js     # AI decision-making engine
-    ├── ui.js           # Status bars, panels, notifications
-    └── main.js         # Game loop, input handling, pie menus
+├── index.html          # Browser/runtime composition root
+├── main.js             # Electron main process
+├── preload.js          # Electron preload boundary
+├── js/                 # Game modules exposed through window.Game
+├── css/                # Shared shell, HUD, panel, and responsive styles
+├── assets/             # Runtime sprites and reproducible source art
+├── vendor/             # Pinned offline browser dependencies
+├── scripts/            # Verification and asset-generation automation
+├── tests/              # Pure, real-browser, and Electron verification entry points
+├── tools/web-sop/      # Pinned local workspace-governance CLI
+├── artifacts/          # Ignored local screenshots and generated evidence
+├── docs/               # Product, architecture, design, test, and release decisions
+└── .github/workflows/  # Continuous integration
 ```
+
+The browser and Electron entry points intentionally remain at the repository root. See [`docs/workspace-layout.md`](docs/workspace-layout.md) for ownership rules and [`docs/improvement-proposals.md`](docs/improvement-proposals.md) for the reviewed migration map.
 
 ## 📜 License
 

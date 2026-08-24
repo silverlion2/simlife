@@ -16,6 +16,12 @@ Game.Renderer = (function() {
   let easyStar = null;
   let currentGrid = null;
   let signalsBound = false;
+  let initPromise = null;
+  let contextListenersBound = false;
+  let runtimeInputBlocked = false;
+  let runtimePreviousSpeed = null;
+  let runtimePreviousFocus = null;
+  let pendingPartialStatus = null;
   
   // Grid metrics
   const TILE_W = RendererMath.TILE_W;
@@ -41,7 +47,7 @@ Game.Renderer = (function() {
   function getDefaultCameraZoom(width, height) {
     const viewportWidth = Number(width) || window.innerWidth || 1280;
     const viewportHeight = Number(height) || window.innerHeight || 720;
-    if (viewportWidth <= 620 || viewportHeight <= 560) return 1.12;
+    if (viewportWidth <= 620 || viewportHeight <= 560) return 0.96;
     if (viewportWidth >= 1500) return 1.78;
     if (viewportWidth >= 1100) return 1.65;
     return 1.42;
@@ -209,6 +215,8 @@ Game.Renderer = (function() {
       // Draw static grid representing the house rooms/lot
       this.drawHouseGrid();
       this.cameras.main.setZoom(getDefaultCameraZoom(this.scale.width, this.scale.height));
+      this._furnitureDirty = true;
+      this._furnitureSyncElapsed = 0;
       this.centerCameraOnCharacter();
     }
 
@@ -704,7 +712,12 @@ Game.Renderer = (function() {
 
       this.syncCharacter(state.character);
       this.updateCharacterCamera();
-      this.syncFurniture(Game.State.getActiveMap());
+      this._furnitureSyncElapsed = (this._furnitureSyncElapsed || 0) + Math.max(0, Number(delta) || 0);
+      if (this._furnitureDirty || this._furnitureSyncElapsed >= 100) {
+        this.syncFurniture(Game.State.getActiveMap());
+        this._furnitureDirty = false;
+        this._furnitureSyncElapsed = 0;
+      }
       this.syncBuildGhost(state.ui.buildGhost);
       this.syncPets(state.pets);
       this.syncFamilyMembers(Game.Family && Game.Family.getRenderableMembers ? Game.Family.getRenderableMembers() : []);
@@ -1773,7 +1786,11 @@ Game.Renderer = (function() {
       if(!houseObj || !houseObj.furniture) return;
       const charPos = Game.State.get().character && Game.State.get().character.position ? Game.State.get().character.position : {x: 0, y: 0};
       const activeFloor = Game.HomeGrowth && Game.HomeGrowth.getActiveFloor ? Game.HomeGrowth.getActiveFloor(houseObj) : (houseObj.activeFloor || 0);
-      const visibleFurniture = houseObj.furniture.filter(furn => (furn.floor || 0) === activeFloor);
+      const visibleFurniture = houseObj.furniture.filter(furn => (
+        (furn.floor || 0) === activeFloor
+        && Math.abs(furn.x - charPos.x) <= 40
+        && Math.abs(furn.y - charPos.y) <= 40
+      ));
       
       // Sprite Leak Prevention: destroy sprites for furniture that no longer exists
       const activeFurnIds = new Set(visibleFurniture.map(f => f.id));
@@ -1789,9 +1806,6 @@ Game.Renderer = (function() {
       }
 
       visibleFurniture.forEach(furn => {
-        // Data-Level Culling: Off-world chunks (>40 tiles away from active bounds) are entirely skipped
-        if (Math.abs(furn.x - charPos.x) > 40 || Math.abs(furn.y - charPos.y) > 40) return;
-
         let sprite = spriteMap.get(furn.id);
         const fc = Game.Config.FURNITURE[furn.type];
         const textureKey = this.getTextureForFurn(furn.type, furn);
@@ -2021,6 +2035,12 @@ Game.Renderer = (function() {
           mainScene.cameras.main.setZoom(getDefaultCameraZoom(mainScene.scale.width, mainScene.scale.height));
         }
         if (mainScene.drawHouseGrid) mainScene.drawHouseGrid();
+        mainScene._furnitureDirty = true;
+        if (mainScene.syncFurniture) {
+          mainScene.syncFurniture(Game.State.getActiveMap());
+          mainScene._furnitureDirty = false;
+          mainScene._furnitureSyncElapsed = 0;
+        }
         if (mainScene.terrainBackdrop) {
           mainScene.terrainBackdrop.setSize(mainScene.scale.width, mainScene.scale.height);
         }
@@ -2050,32 +2070,37 @@ Game.Renderer = (function() {
   }
 
   function init(canvasEl) {
+    if (phaserGame) return Promise.resolve(true);
+    if (initPromise) return initPromise;
+
     bindSignals();
     window.SIM_PRELOADED_IMAGES = window.SIM_PRELOADED_IMAGES || {};
     window.SIM_PRELOADED_AVATAR_IMAGES = window.SIM_PRELOADED_AVATAR_IMAGES || {};
 
     if (Game.AssetLoader) {
       setRuntimeStatus('loading', 'Preparing your world…', 'Loading local world and avatar assets.');
-      Promise.all([
+      initPromise = Promise.all([
         Game.AssetLoader.loadGroup('starterWorld'),
         Game.AssetLoader.loadGroup('avatars'),
       ]).then(([worldReport, avatarReport]) => {
         if (worldReport.status === 'error') {
           setRuntimeStatus('error', 'World assets could not load', `${worldReport.failed} required assets failed. Retry to continue.`);
-          return;
+          return false;
         }
         if (avatarReport.status === 'partial') {
-          setRuntimeStatus('partial', 'World ready with limited avatars', `${avatarReport.failed} optional avatar layers were unavailable.`);
-          window.setTimeout(() => setRuntimeStatus('success'), 2200);
-        } else {
-          setRuntimeStatus('success');
+          pendingPartialStatus = {
+            title: 'World ready with limited avatars',
+            message: `${avatarReport.failed} optional avatar layers were unavailable.`,
+          };
+          setRuntimeStatus('partial', pendingPartialStatus.title, pendingPartialStatus.message);
         }
-        startPhaser(canvasEl);
+        return startPhaser(canvasEl);
       }).catch(error => {
         console.error('Asset startup failed:', error);
         setRuntimeStatus('error', 'The game could not start', error.message || 'Asset loading failed.');
+        return false;
       });
-      return;
+      return initPromise;
     }
 
     const entries = [
@@ -2083,34 +2108,34 @@ Game.Renderer = (function() {
       ...Object.entries(window.SIM_AVATAR_ASSETS || {}).map(([key, src]) => ({ key, src, target: window.SIM_PRELOADED_AVATAR_IMAGES, isAvatar: true })),
     ];
 
-    if (entries.length === 0) {
-        startPhaser(canvasEl);
+    initPromise = new Promise(resolve => {
+      if (entries.length === 0) {
+        resolve(startPhaser(canvasEl));
         return;
-    }
-    let loadedCount = 0;
-    for (const entry of entries) {
-        let img = new Image();
+      }
+
+      let loadedCount = 0;
+      const finishEntry = () => {
+        loadedCount++;
+        if (loadedCount === entries.length) resolve(startPhaser(canvasEl));
+      };
+
+      for (const entry of entries) {
+        const img = new Image();
         img.onload = () => {
-            entry.target[entry.key] = img;
-            loadedCount++;
-            if (loadedCount === entries.length) {
-                startPhaser(canvasEl);
-            }
+          entry.target[entry.key] = img;
+          finishEntry();
         };
         img.onerror = () => {
-            console.error('Failed to load image for key:', entry.key);
-            if (!entry.isAvatar) {
-              entry.target[entry.key] = new Image();
-            } else {
-              delete entry.target[entry.key];
-            }
-            loadedCount++;
-            if (loadedCount === entries.length) {
-                startPhaser(canvasEl);
-            }
+          console.error('Failed to load image for key:', entry.key);
+          if (!entry.isAvatar) entry.target[entry.key] = new Image();
+          else delete entry.target[entry.key];
+          finishEntry();
         };
         img.src = entry.src;
-    }
+      }
+    });
+    return initPromise;
 }
 
   function bindSignals() {
@@ -2130,6 +2155,7 @@ Game.Renderer = (function() {
   }
 
 function startPhaser(canvasEl) {
+    if (phaserGame) return true;
     canvasEl = canvasEl || document.getElementById('game-canvas');
     if (typeof EasyStar !== 'undefined') {
       easyStar = new EasyStar.js();
@@ -2144,45 +2170,71 @@ function startPhaser(canvasEl) {
     const requestedRenderer = typeof window.URLSearchParams === 'function'
       ? new window.URLSearchParams(window.location?.search || '').get('renderer')
       : null;
-    const rendererType = requestedRenderer === 'canvas' && Phaser.CANVAS !== undefined
+    const preferredType = requestedRenderer === 'canvas' && Phaser.CANVAS !== undefined
       ? Phaser.CANVAS
-      : (Phaser.AUTO !== undefined ? Phaser.AUTO : Phaser.WEBGL);
-    const config = {
-      type: rendererType,
-      canvas: canvasEl,
-      width: parentEl.clientWidth || window.innerWidth,
-      height: parentEl.clientHeight || window.innerHeight,
-      parent: parentEl, // .canvas-area
-      scene: MainScene,
-      transparent: true,
-      antialias: false,
-      pixelArt: true,
-      roundPixels: true,
-      scale: {
-        mode: Phaser.Scale.RESIZE,
-        autoCenter: Phaser.Scale.CENTER_BOTH
-      },
-      plugins: {
-        global: [{
-          key: 'rexState',
-          plugin: typeof rexstatemanagerplugin !== 'undefined' ? rexstatemanagerplugin : undefined,
-          start: true
-        }]
+      : Phaser.WEBGL;
+    const rendererTypes = [preferredType];
+    if (preferredType !== Phaser.CANVAS && Phaser.CANVAS !== undefined) rendererTypes.push(Phaser.CANVAS);
+
+    let lastError = null;
+    for (const rendererType of rendererTypes) {
+      const config = {
+        // A supplied canvas is a Phaser custom environment. Phaser 4 rejects AUTO here.
+        type: rendererType,
+        canvas: canvasEl,
+        width: parentEl.clientWidth || window.innerWidth,
+        height: parentEl.clientHeight || window.innerHeight,
+        parent: parentEl, // .canvas-area
+        scene: MainScene,
+        transparent: true,
+        antialias: false,
+        pixelArt: true,
+        roundPixels: true,
+        scale: {
+          mode: Phaser.Scale.RESIZE,
+          autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        plugins: {
+          global: [{
+            key: 'rexState',
+            plugin: typeof rexstatemanagerplugin !== 'undefined' ? rexstatemanagerplugin : undefined,
+            start: true
+          }]
+        }
+      };
+
+      try {
+        phaserGame = new Phaser.Game(config);
+        if (!contextListenersBound && canvasEl && canvasEl.addEventListener) {
+          contextListenersBound = true;
+          canvasEl.addEventListener('webglcontextlost', event => {
+            event.preventDefault();
+            setRuntimeStatus('error', 'Graphics context was lost', 'Retry will save the active world when possible and reload the renderer.');
+          });
+          canvasEl.addEventListener('webglcontextrestored', () => setRuntimeStatus('success'));
+        }
+        if (pendingPartialStatus) {
+          setRuntimeStatus('partial', pendingPartialStatus.title, pendingPartialStatus.message);
+          window.setTimeout(() => {
+            pendingPartialStatus = null;
+            setRuntimeStatus('success');
+          }, 2200);
+        } else {
+          setRuntimeStatus('success');
+        }
+        return true;
+      } catch (error) {
+        lastError = error;
+        phaserGame = null;
+        if (rendererType !== rendererTypes[rendererTypes.length - 1]) {
+          console.warn('WebGL renderer unavailable; retrying with Canvas.', error);
+        }
       }
-    };
-    try {
-      phaserGame = new Phaser.Game(config);
-      if (canvasEl && canvasEl.addEventListener) {
-        canvasEl.addEventListener('webglcontextlost', event => {
-          event.preventDefault();
-          setRuntimeStatus('error', 'Graphics context was lost', 'Save your world if possible, then retry the renderer.');
-        });
-        canvasEl.addEventListener('webglcontextrestored', () => setRuntimeStatus('success'));
-      }
-    } catch (error) {
-      console.error('Renderer initialization failed:', error);
-      setRuntimeStatus('error', 'Graphics could not initialize', 'Neither WebGL nor Canvas could start on this device.');
     }
+
+    console.error('Renderer initialization failed:', lastError);
+    setRuntimeStatus('error', 'Graphics could not initialize', 'Neither WebGL nor Canvas could start on this device.');
+    return false;
   }
 
   function setRuntimeStatus(status, title = '', message = '') {
@@ -2191,15 +2243,65 @@ function startPhaser(canvasEl) {
     const titleEl = document.getElementById('runtime-status-title');
     const messageEl = document.getElementById('runtime-status-message');
     const retry = document.getElementById('btn-runtime-retry');
+    const isError = status === 'error';
     overlay.dataset.status = status;
     overlay.classList.toggle('hidden', status === 'success');
+    overlay.setAttribute('role', isError ? 'alertdialog' : 'status');
+    overlay.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+    if (isError) overlay.setAttribute('aria-modal', 'true');
+    else overlay.removeAttribute('aria-modal');
     if (titleEl && title) titleEl.textContent = title;
     if (messageEl && message) messageEl.textContent = message;
     if (retry) {
       retry.classList.toggle('hidden', status !== 'error');
-      retry.onclick = status === 'error' ? () => window.location.reload() : null;
+      retry.onclick = status === 'error' ? () => {
+        Game.State?.save?.();
+        window.location.reload();
+      } : null;
     }
+    setRuntimeInputBlocked(isError, retry);
     Game.Signals?.emit('runtime:status', { status, title, message });
+  }
+
+  function setRuntimeInputBlocked(blocked, retryButton) {
+    const nextBlocked = Boolean(blocked);
+    const ui = document.getElementById('ui-layer');
+    if (nextBlocked && !runtimeInputBlocked) {
+      runtimePreviousFocus = document.activeElement || null;
+      Game.UI?.hideEvent?.();
+      Game.Shell?.close?.();
+      Game.UI?.closeEditModal?.();
+      runtimePreviousSpeed = Game.Main?.getSpeed?.() ?? null;
+      Game.Main?.setSpeed?.(0, { silent: true });
+      Game.Interaction?.closePieMenu?.();
+      const sidePanel = document.getElementById('side-panel');
+      if (sidePanel) {
+        sidePanel.classList.add('hidden');
+        sidePanel.dataset.active = '';
+      }
+      document.body.classList.remove('side-panel-open', 'mobile-panel-menu-open');
+    }
+
+    runtimeInputBlocked = nextBlocked;
+    document.body.classList.toggle('runtime-input-blocked', nextBlocked);
+    if (ui) {
+      if (nextBlocked) {
+        ui.setAttribute('inert', '');
+        ui.setAttribute('aria-hidden', 'true');
+      } else {
+        ui.removeAttribute('inert');
+        ui.removeAttribute('aria-hidden');
+      }
+    }
+
+    if (nextBlocked) {
+      window.setTimeout(() => retryButton?.focus?.(), 0);
+    } else if (runtimePreviousSpeed !== null) {
+      Game.Main?.setSpeed?.(runtimePreviousSpeed, { silent: true });
+      runtimePreviousSpeed = null;
+      runtimePreviousFocus?.focus?.();
+      runtimePreviousFocus = null;
+    }
   }
 
   // render() removed — Phaser handles rendering automatically
@@ -2312,6 +2414,7 @@ function startPhaser(canvasEl) {
     // Redraw room grid when rooms change
     if (mainScene && mainScene.drawHouseGrid) {
       mainScene.drawHouseGrid();
+      mainScene._furnitureDirty = true;
     }
     updatePathGrid();
   }
@@ -2427,6 +2530,7 @@ function startPhaser(canvasEl) {
       tint: parseInt(color.replace('#', '0x'))
     });
     emitter.depth = 99999;
+    destroyEmitterAfter(emitter, 1300);
   }
 
   function spawnExplosion(x, y, scale = 1) {
@@ -2444,6 +2548,37 @@ function startPhaser(canvasEl) {
     // Ensure we trigger it:
     emitter.explode(10);
     emitter.depth = 99999;
+    destroyEmitterAfter(emitter, 1000);
+  }
+
+  function getFurnitureDebug() {
+    const activeMap = Game.State.getActiveMap();
+    if (!mainScene || !activeMap) return { spriteCount: 0, missingSprites: 0, positionMismatches: 0 };
+    const activeFloor = Game.HomeGrowth?.getActiveFloor?.(activeMap) ?? (activeMap.activeFloor || 0);
+    const visibleFurniture = (activeMap.furniture || []).filter(furn => (furn.floor || 0) === activeFloor);
+    let missingSprites = 0;
+    let positionMismatches = 0;
+    for (const furn of visibleFurniture) {
+      const sprite = spriteMap.get(furn.id);
+      if (!sprite || !sprite.active || !sprite.visible) {
+        missingSprites += 1;
+        continue;
+      }
+      const config = Game.Config.FURNITURE[furn.type] || { w: 1, h: 1 };
+      const width = furn.rotated ? (config.h || 1) : (config.w || 1);
+      const height = furn.rotated ? (config.w || 1) : (config.h || 1);
+      const expected = isoProject(furn.x + width / 2 - 0.5, furn.y + height / 2 - 0.5);
+      if (Math.abs(sprite.x - expected.x) > 1 || Math.abs(sprite.y - expected.y) > 1) positionMismatches += 1;
+    }
+    return { spriteCount: spriteMap.size, expectedSprites: visibleFurniture.length, missingSprites, positionMismatches };
+  }
+
+  function destroyEmitterAfter(emitter, delay) {
+    const destroy = () => {
+      if (emitter && typeof emitter.destroy === 'function') emitter.destroy();
+    };
+    if (mainScene?.time?.delayedCall) mainScene.time.delayedCall(delay, destroy);
+    else window.setTimeout(destroy, delay);
   }
 
   function spawnFloatingBubble(x, y, text, color = '#FFFFFF', icon = '') {
@@ -2515,6 +2650,9 @@ function startPhaser(canvasEl) {
         ids: Array.from(familySpriteMap.keys()),
       };
     },
+    getFurnitureDebug,
     getFurnitureTextureReport,
+    isInputBlocked: () => runtimeInputBlocked,
+    isReady: () => Boolean(phaserGame),
   };
 })();

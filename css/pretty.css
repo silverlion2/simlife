@@ -33,6 +33,21 @@ body {
 .runtime-status[data-status="partial"] .runtime-status-card { border-color: var(--pretty-gold); }
 .runtime-status[data-status="error"] .runtime-status-card { border-color: var(--pretty-coral-dark); }
 
+#btn-runtime-retry {
+  padding: 10px 22px;
+  color: var(--pretty-white);
+  background: var(--pretty-coral-dark);
+  border: 2px solid #873b38;
+  border-radius: 6px;
+  box-shadow: 0 3px 0 #873b38;
+  font: 800 14px/1 var(--font-sans);
+  cursor: pointer;
+}
+
+#btn-runtime-retry:hover {
+  background: var(--pretty-coral);
+}
+
 #game-canvas {
   filter: saturate(1.16) brightness(1.06) contrast(0.98);
 }
@@ -392,6 +407,10 @@ select:focus-visible {
 .cc-scroll-fields > .cc-field:nth-child(3) { grid-area: appearance; }
 .cc-scroll-fields > .cc-field:nth-child(4) { grid-area: trait; }
 
+.creator-scroll-cue {
+  display: none;
+}
+
 .cc-field {
   min-width: 0;
   color: var(--pretty-ink);
@@ -471,6 +490,8 @@ select:focus-visible {
   height: 168px;
   bottom: -14px;
   image-rendering: pixelated;
+  transform: translateX(-50%) scale(1.45);
+  transform-origin: 50% 100%;
 }
 
 .avatar-preview-name,
@@ -525,6 +546,15 @@ select:focus-visible {
   display: block;
   min-width: 300px;
   margin: 22px auto 0;
+}
+
+.creator-start-error {
+  margin: 0 auto 8px;
+  color: #7d1d24;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
 }
 
 .back-btn {
@@ -961,7 +991,7 @@ body:has(#pause-overlay:not(.hidden)) #hover-tooltip {
   }
 
   .menu-kicker {
-    font-size: 9px;
+    font-size: 12px;
   }
 
   .menu-brand h1,
@@ -990,9 +1020,15 @@ body:has(#pause-overlay:not(.hidden)) #hover-tooltip {
     min-height: 43px;
   }
 
+  #main-menu-screen .menu-btn-group button small {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
   .menu-footer {
     padding-top: 18px;
-    font-size: 8px;
+    font-size: 11px;
+    line-height: 1.4;
   }
 
   #char-creation-screen .menu-content.wide,
@@ -1002,14 +1038,42 @@ body:has(#pause-overlay:not(.hidden)) #hover-tooltip {
     padding: 66px 14px 22px;
   }
 
+  #char-creation-screen .menu-content.wide {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    margin: 0 auto;
+    overflow: hidden;
+  }
+
   #char-creation-screen .cc-form {
-    overflow: visible;
+    min-height: 0;
+    overflow: hidden;
   }
 
   #char-creation-screen .cc-scroll-fields {
+    flex: 1 1 auto;
+    min-height: 0;
     max-height: none;
-    overflow: visible;
-    scrollbar-gutter: auto;
+    overflow-y: auto;
+    padding-bottom: 12px;
+    scrollbar-gutter: stable;
+  }
+
+  #char-creation-screen .creator-scroll-cue {
+    display: block;
+    flex: 0 0 22px;
+    min-height: 22px;
+    margin: 4px 0 0;
+    color: var(--pretty-teal-dark);
+    font-size: 12px;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    line-height: 18px;
+    text-align: center;
+  }
+
+  #char-creation-screen .creator-scroll-cue.is-complete {
+    display: none;
   }
 
   #char-creation-screen .trait-grid {
@@ -1027,6 +1091,21 @@ body:has(#pause-overlay:not(.hidden)) #hover-tooltip {
 
   .trait-grid {
     grid-template-columns: 1fr;
+  }
+
+  #char-creation-screen .cc-field > label {
+    font-size: 13px;
+  }
+
+  #char-creation-screen .trait-card-desc {
+    color: #566b65;
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  #char-creation-screen .trait-card.selected .trait-card-desc,
+  #char-creation-screen .trait-option.selected .trait-card-desc {
+    color: #f4fff8;
   }
 
   .avatar-editor {
@@ -1050,9 +1129,21 @@ body:has(#pause-overlay:not(.hidden)) #hover-tooltip {
     grid-template-columns: 108px 1fr;
   }
 
+  #char-creation-screen .creator-action-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 24;
+    margin: 18px -14px -22px;
+    padding: 16px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+    background: linear-gradient(180deg, rgba(255, 250, 240, 0), var(--pretty-paper) 16px);
+    border-top: 1px solid rgba(63, 145, 133, 0.24);
+  }
+
   #btn-cc-start {
     width: 100%;
     min-width: 0;
+    min-height: 52px;
+    margin: 0;
   }
 
   .rpg-hud-top {
@@ -1338,6 +1429,27 @@ body.reduced-motion *::after {
   border-color: #d2d8d1 !important;
   box-shadow: none !important;
   opacity: 0.72;
+}
+
+#side-panel .crafting-item.locked {
+  color: #52625f !important;
+  background: #f1f3ed !important;
+  opacity: 1;
+}
+
+#side-panel .crafting-item.locked strong {
+  color: #465955 !important;
+}
+
+#side-panel .crafting-item.locked small {
+  color: #5d706b !important;
+}
+
+#side-panel .crafting-item.locked button:disabled {
+  color: #566762 !important;
+  background: #e1e7df !important;
+  border-color: #bdc9bf !important;
+  opacity: 1;
 }
 
 #side-panel .build-item.locked {
@@ -1798,6 +1910,16 @@ body.reduced-motion *::after {
     max-height: calc(100vh - 12px);
   }
 
+  .panel-close,
+  #side-panel .close-btn {
+    top: 8px;
+    right: 10px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
   #side-panel .activity-list,
   #side-panel .skill-list,
   #side-panel .career-list {
@@ -1809,12 +1931,12 @@ body.reduced-motion *::after {
   }
 
   .notifications {
-    top: 148px;
+    top: 206px;
     right: 7px;
   }
 
   #announcer-overlay {
-    top: 148px;
+    top: 206px;
   }
 
   #announcer-text {

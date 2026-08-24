@@ -7,6 +7,7 @@ Game.Campaign = (function() {
   const CAMPAIGN_ID = 'new_roots_v1';
   const XP_PER_LEVEL = 200;
   let updateAccumulator = 0;
+  let signalsBound = false;
 
   const CHAPTERS = [
     {
@@ -26,7 +27,7 @@ Game.Campaign = (function() {
       number: 2,
       title: 'A Place in the World',
       objective: 'Choose a career path.',
-      hint: 'Open Career, compare the five tracks, and pick the future that fits your Sim.',
+      hint: 'Open Career, compare the eight tracks, and pick the future that fits your Sim.',
       target: 'career',
       xp: 100,
       money: 100,
@@ -186,8 +187,7 @@ Game.Campaign = (function() {
 
   function evaluateCurrent() {
     const state = Game.State.get();
-    const campaign = ensureState();
-    if (state.character?.currentActivity) campaign.flags.activityStarted = true;
+    ensureState();
 
     const chapter = getCurrentChapter();
     if (!chapter) return false;
@@ -212,7 +212,7 @@ Game.Campaign = (function() {
     const chapter = getCurrentChapter();
     const kicker = chip.querySelector('.campaign-chip-kicker');
     const objective = chip.querySelector('.campaign-objective');
-    const bar = chip.querySelector('.campaign-progress i');
+    const bar = /** @type {HTMLElement|null} */ (chip.querySelector('.campaign-progress i'));
 
     if (!chapter) {
       if (kicker) kicker.textContent = `NEW ROOTS // COMPLETE · LV ${campaign.level}`;
@@ -289,6 +289,14 @@ Game.Campaign = (function() {
 
   function init() {
     ensureState();
+    if (!signalsBound && Game.Signals) {
+      signalsBound = true;
+      Game.Signals.on('activity:started', payload => {
+        if (payload?.source !== 'do') return;
+        ensureState().flags.activityStarted = true;
+        evaluateCurrent();
+      });
+    }
     updateHud();
   }
 

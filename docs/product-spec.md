@@ -17,7 +17,7 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 - Browser/Electron runtime using the existing static files.
 - Character creation, local saves, needs, activities, careers, social, home goals, collections, build, storage, renovation, and first-day guidance.
 - Desktop and mobile-width HUD layouts.
-- Automated smoke coverage through `npm test`.
+- Automated pure/Electron coverage through `npm test` plus a maintained real-Chrome desktop/mobile smoke through `npm run test:browser`.
 
 ### Excluded
 
@@ -36,10 +36,10 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 
 | Metric | Baseline | Target | Measurement |
 |---|---:|---:|---|
-| Electron boot smoke | Passing | Passing on every PR | `npm test` |
-| Rendered canvas | Nonblank | Colored pixels, 4+ buckets, no missing avatar textures | `scripts/verify-game.js` |
+| Electron boot smoke | Clean-host gate | Passing on every PR/release host | `npm test` |
+| Rendered canvas | Passing in real Chrome | One nonblank canvas, no page/console errors, WebGL with Canvas fallback | `npm run test:browser` and Electron smoke |
 | Mobile menu weight | 10 persistent buttons | 5 persistent buttons, rest in More drawer | Visual check |
-| Mobile HUD height | 315px at 390×844 | 270px or less with all seven needs visible | Automated layout check and screenshot |
+| Mobile HUD | Campaign context could disappear | Chapter context, seven needs, five primary actions, and no horizontal overflow at 390×844 | Real-browser assertions and screenshot |
 | First activity feedback | Delayed/implicit | HUD updates immediately after click | Visual and DOM check |
 
 ## Decisions
@@ -61,6 +61,11 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 - 2026-08-09: Harden save import/export and legacy migration against malformed storage, and invalidate stale asynchronous paths across cancellations and map transitions.
 - 2026-08-22: Preserve the static module facade while adding deterministic services, save schema v2, registered UI panels, grouped asset readiness, Canvas fallback, and independently runnable pure/Electron verification gates.
 - 2026-08-22: Keep campaign objectives in the top campaign chip; reserve Daily Focus for urgent needs, current activity, queue state, rewards, and contextual next actions.
+- 2026-08-23: Keep the browser and Electron composition roots at repository root, declare `js/` and `css/` as source roots, and isolate generated evidence under `artifacts/`. Any relocation of legacy files requires the move map in `docs/improvement-proposals.md` to be reviewed first.
+- 2026-08-24: Use one target-aware activity availability contract for manual play, interaction menus, queues, and autonomy; failed paths and invalid targets never award effects.
+- 2026-08-24: Make save creation, import, and existing-slot updates rollback-safe; validate nested map data, persistent collections, and file resource limits before changing the live world.
+- 2026-08-24: Treat events, Sim Makeover, pause, and renderer recovery as input-isolating surfaces that preserve the previous simulation speed and keyboard focus.
+- 2026-08-24: Keep Appearance ahead of Traits on mobile creation and retain a compact persistent campaign chip above the mobile playfield.
 
 ## Hearthbyte Edition release loop
 
@@ -71,5 +76,6 @@ The release is considered fully playable when:
 - A new player can start, understand the next action, complete activities, pause, save, and return to the main menu without external instructions.
 - The campaign persists across local saves and migrates old saves without data loss.
 - Keyboard, pointer, and mobile-width layouts preserve access to primary actions.
+- Closing, backgrounding, or retrying renderer recovery makes a best-effort save without leaving a partial slot/index transaction.
 - The Electron runtime boots and renders with network access disabled.
 - Desktop and mobile screenshots show a readable world, objective, needs, and controls without blocking the central playfield.

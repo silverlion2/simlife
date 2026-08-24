@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
+if (process.env.SIMLIFE_TEST_RENDERER === 'canvas') {
+  app.disableHardwareAcceleration();
+}
+
 if (process.env.SIMLIFE_TEST_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.SIMLIFE_TEST_USER_DATA));
 } else {
@@ -24,6 +28,7 @@ if (process.env.SIMLIFE_TEST_USER_DATA) {
   }
 }
 
+/** @type {ReturnType<typeof import('steamworks.js').init> | null} */
 let client = null;
 const steamAppId = Number.parseInt(process.env.SIMLIFE_STEAM_APP_ID || '', 10);
 if (Number.isInteger(steamAppId) && steamAppId > 0) {
@@ -42,8 +47,14 @@ function createWindow() {
     height: 720,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     }
   });
+
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  mainWindow.webContents.on('will-navigate', event => event.preventDefault());
 
   mainWindow.webContents.on('render-process-gone', (event, details) => {
     console.error('Renderer process exited:', details.reason, details.exitCode);
@@ -59,7 +70,8 @@ app.whenReady().then(() => {
     return client ? client.localplayer.getName() : 'Guest';
   });
   ipcMain.handle('steam-activate-achievement', (event, achId) => {
-    if (client) {
+    const safeAchievementId = typeof achId === 'string' && /^[A-Za-z0-9_]{1,128}$/.test(achId);
+    if (client && safeAchievementId) {
       try {
         client.achievement.activate(achId);
         return true;

@@ -1,15 +1,24 @@
 {
-  "dependencies": {},
   "name": "simlife-hearthbyte-edition",
   "productName": "SimLife: Hearthbyte Edition",
   "version": "2.0.0",
   "description": "A cozy offline-first browser and Electron life simulation with isometric home building, autonomous characters, careers, relationships, and migration-safe local saves.",
   "main": "main.js",
   "scripts": {
-    "test": "npm run test:pure && npm run test:electron",
-    "test:pure": "node scripts/verify-game.js --scope=pure",
-    "test:electron": "node scripts/verify-game.js --scope=electron",
+    "test": "npm run verify:structure && npm run verify:assets && npm run verify:generated && npm run lint && npm run typecheck && npm run test:pure && npm run test:electron",
+    "test:pure": "node tests/pure/run.js",
+    "test:electron": "node tests/electron/run.js",
+    "test:browser": "node tests/browser/run.js",
     "test:visual": "node scripts/capture-visuals.js",
+    "lint": "node scripts/check-javascript-syntax.js",
+    "typecheck": "tsc --project tsconfig.typecheck.json --pretty false",
+    "build": "npm run build:verify",
+    "build:verify": "node scripts/verify-static-build.js",
+    "verify:artifact": "node scripts/verify-packaged-artifact.js",
+    "verify:artifact-runtime": "node scripts/verify-packaged-runtime.js",
+    "verify:structure": "node scripts/verify-workspace-structure.js",
+    "verify:assets": "node scripts/verify-asset-provenance.js",
+    "verify:generated": "node scripts/generate-world-assets.js --check && node scripts/generate-avatar-assets.js --check",
     "generate:avatars": "node scripts/generate-avatar-assets.js",
     "generate:world": "node scripts/generate-world-assets.js",
     "generate:world:extract": "python scripts/extract-furniture-sheet.py",
@@ -49,10 +58,15 @@
       "preload.js",
       "css/**/*",
       "js/**/*",
-      "!js/renderer_utf8.js",
+      "!js/**/*.py",
       "vendor/**/*",
       "assets/**/*",
       "!assets/**/*.zip",
+      "!assets/isokennynl/**/*",
+      "!assets/kenney_dungeon/**/*",
+      "!assets/kenney_library/**/*",
+      "!assets/kenney_minifarm/**/*",
+      "!assets/kenney_pack_temp/**/*",
       "!assets/**/Samples/**/*",
       "!assets/**/Sample.png",
       "!assets/**/Preview.png",
@@ -79,6 +93,7 @@
     }
   },
   "devDependencies": {
+    "@rave-index/web-sop": "file:tools/web-sop",
     "easystarjs": "^0.4.4",
     "electron": "^41.10.4",
     "electron-builder": "^26.15.3",
@@ -86,6 +101,7 @@
     "phaser": "^4.0.0",
     "phaser4-rex-plugins": "^4.2.0",
     "playwright": "^1.59.1",
-    "steamworks.js": "^0.4.0"
+    "steamworks.js": "^0.4.0",
+    "typescript": "7.0.2"
   }
 }

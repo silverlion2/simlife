@@ -5,19 +5,21 @@ project:
   profile: static
   packageManager: npm
   workspaceKind: single
-  sourceRoots: []
+  sourceRoots:
+    - js
+    - css
 commands:
   install: npm ci
   dev: null
-  lint: null
-  typecheck: null
+  lint: npm run lint
+  typecheck: npm run typecheck
   test: npm run test
-  build: npm run test
-  e2e: null
+  build: npm run build
+  e2e: npm run test:browser
   audit: npm audit --audit-level=high
-  verify: null
+  verify: npm run verify:structure
 quality:
-  enforcement: warn
+  enforcement: hard
   requiredDocs:
     - docs/product-spec.md
     - docs/architecture.md

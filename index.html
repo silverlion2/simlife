@@ -17,7 +17,7 @@
 <body>
 
 <div id="runtime-status" class="runtime-status hidden" role="status" aria-live="polite">
-  <div class="runtime-status-card">
+  <div class="runtime-status-card" tabindex="-1" aria-labelledby="runtime-status-title" aria-describedby="runtime-status-message">
     <strong id="runtime-status-title">Preparing your world…</strong>
     <p id="runtime-status-message">Loading local game assets.</p>
     <button id="btn-runtime-retry" class="hidden" type="button">Retry</button>
@@ -80,12 +80,12 @@
     <div class="cc-form">
       <div class="cc-scroll-fields">
         <div class="cc-field">
-          <label>World Name</label>
+          <label for="cc-world-name">World Name</label>
           <input type="text" id="cc-world-name" value="My New Life" maxlength="20">
         </div>
 
         <div class="cc-field">
-          <label>Sim Name</label>
+          <label for="cc-sim-name">Sim Name</label>
           <input type="text" id="cc-sim-name" value="Alex" maxlength="15">
         </div>
 
@@ -99,8 +99,11 @@
           <div id="cc-trait-grid" class="trait-grid"></div>
         </div>
       </div>
+      <p id="cc-scroll-cue" class="creator-scroll-cue" aria-hidden="true">More appearance and trait options below ↓</p>
       
-      <button id="btn-cc-start" class="primary-btn">▶ Start Your Life</button>
+      <div class="creator-action-bar">
+        <button id="btn-cc-start" class="primary-btn" type="button">▶ Start Your Life</button>
+      </div>
     </div>
   </div>
 </div>
@@ -115,10 +118,10 @@
 </div>
 
 <!-- Edit Character Modal (In-game) -->
-<div id="edit-char-modal" class="rpg-dialog hidden" style="z-index: 151;">
+<div id="edit-char-modal" class="rpg-dialog hidden" style="z-index: 151;" role="dialog" aria-modal="true" aria-labelledby="edit-char-title">
   <div class="dialog-header">
-    <h3>Sim Makeover</h3>
-    <button class="close-btn" id="btn-ec-close">×</button>
+    <h3 id="edit-char-title">Sim Makeover</h3>
+    <button class="close-btn" id="btn-ec-close" type="button" aria-label="Close Sim Makeover">×</button>
   </div>
   <div class="dialog-content">
     <div class="cc-field">
@@ -189,7 +192,7 @@
   </div>
 </div>
 
-<div class="game-container">
+<div id="ui-layer" class="game-container">
   
   <!-- Content -->
   <div class="canvas-area">
@@ -215,9 +218,9 @@
       </div>
       <div class="hud-box zoom-controls" style="margin-top: 10px;">
         <button id="btn-center-camera" class="speed-btn" title="Center Camera On Character (C / Home)" aria-label="Center camera on character">⌖</button>
-        <button id="btn-zoom-out" class="speed-btn" title="Zoom Out (Mouse Wheel Down)">➖</button>
-        <button id="btn-zoom-in" class="speed-btn" title="Zoom In (Mouse Wheel Up)">➕</button>
-        <button id="btn-toggle-graphics" class="speed-btn" title="Toggle Graphics (L)">🔆</button>
+        <button id="btn-zoom-out" class="speed-btn" title="Zoom Out (Mouse Wheel Down)" aria-label="Zoom out">➖</button>
+        <button id="btn-zoom-in" class="speed-btn" title="Zoom In (Mouse Wheel Up)" aria-label="Zoom in">➕</button>
+        <button id="btn-toggle-graphics" class="speed-btn" title="Toggle Graphics (L)" aria-label="Toggle enhanced graphics" aria-pressed="true">🔆</button>
       </div>
     </div>
     
@@ -273,7 +276,7 @@
   </div>
 
   <!-- Detail Dialogs (Replaces side panel) -->
-  <div id="side-panel" class="rpg-dialog hidden"></div>
+  <div id="side-panel" class="rpg-dialog hidden" role="dialog" aria-modal="false" aria-label="Game panel" tabindex="-1"></div>
   
   <!-- Hover Tooltip -->
   <div id="hover-tooltip" class="hidden" style="position: absolute; pointer-events: none; z-index: 9999; background: rgba(0,0,0,0.85); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 10px; border-radius: 6px; font-family: 'Nunito', sans-serif; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.5); transform: translate(-50%, -120%); white-space: nowrap;"></div>

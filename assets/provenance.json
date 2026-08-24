@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "policy": "Third-party source packs retain a colocated license and checksum. Raw packs and archives are source-only; generated runtime outputs are packaged separately.",
+  "sources": [
+    {
+      "id": "kenney-library-2.1",
+      "path": "assets/kenney_library",
+      "title": "Library Pack",
+      "version": "2.1",
+      "creator": "Kenney",
+      "license": "CC0-1.0",
+      "licenseFile": "assets/kenney_library/License.txt",
+      "licenseSha256": "048C648B26495B7AC334B9B832C497EBEB35A8D52CF8D1472029267D4435D1FE",
+      "sourceArchive": {
+        "path": "assets/library.zip",
+        "sha256": "E8AC573B289E04D06AE2FEB174C526AEB6456C0655663CC4B3820942C8BD128F"
+      },
+      "distribution": "source-only"
+    },
+    {
+      "id": "kenney-isometric-miniature-farm-2.0",
+      "path": "assets/kenney_minifarm",
+      "title": "Isometric Miniature Farm",
+      "version": "2.0",
+      "creator": "Kenney",
+      "license": "CC0-1.0",
+      "licenseFile": "assets/kenney_minifarm/License.txt",
+      "licenseSha256": "16BF6A7B8C67A2A1E494FB3F7557AF25E5DF2221DB16D77F19F484DA39D97189",
+      "sourceArchive": {
+        "path": "assets/kenney_pack.zip",
+        "sha256": "6DD0DB7D26CB2999FD4A7A28E25B4727E61DAFAF1662CAC364EB97172A027268"
+      },
+      "distribution": "source-only"
+    },
+    {
+      "id": "kenney-dungeon-2.3",
+      "path": "assets/kenney_dungeon",
+      "title": "Dungeon Pack",
+      "version": "2.3",
+      "creator": "Kenney",
+      "license": "CC0-1.0",
+      "licenseFile": "assets/kenney_dungeon/License.txt",
+      "licenseSha256": "B8CCBA95D4AD747B96D8824868B5417A1DC05BA8DBF4A36946D59C5049AEB3BC",
+      "sourceArchive": {
+        "path": "assets/dungeon.zip",
+        "sha256": "187A0888451317FE47CAAC5F26E984BB79C5DDCE9B8630926F0F5D9C0247D343"
+      },
+      "distribution": "source-only"
+    },
+    {
+      "id": "kenney-isometric-miniature-farm-2.0-staging-copy",
+      "path": "assets/kenney_pack_temp",
+      "title": "Isometric Miniature Farm staging copy",
+      "version": "2.0",
+      "creator": "Kenney",
+      "license": "CC0-1.0",
+      "licenseFile": "assets/kenney_pack_temp/License.txt",
+      "licenseSha256": "16BF6A7B8C67A2A1E494FB3F7557AF25E5DF2221DB16D77F19F484DA39D97189",
+      "duplicateOf": "kenney-isometric-miniature-farm-2.0",
+      "distribution": "source-only"
+    }
+  ],
+  "generatedOutputs": [
+    {
+      "path": "assets/avatar_layers",
+      "generator": "scripts/generate-avatar-assets.js",
+      "inputs": ["js/avatar_catalog.js"],
+      "runtimeCatalog": "js/avatar_assets.js"
+    },
+    {
+      "path": "assets/custom/generated_furniture",
+      "generator": "scripts/extract-furniture-sheet.py",
+      "inputs": ["assets/custom/generated-furniture-sheet-alpha-v2.png"],
+      "runtimeCatalog": "js/world_assets.js"
+    },
+    {
+      "path": "js/world_assets.js",
+      "generator": "scripts/generate-world-assets.js",
+      "inputs": [
+        "assets/custom/generated_furniture",
+        "assets/kenney_library",
+        "assets/kenney_minifarm",
+        "assets/kenney_dungeon"
+      ]
+    }
+  ],
+  "unresolvedSources": [
+    {
+      "path": "assets/isokennynl",
+      "distribution": "source-only",
+      "reason": "No colocated license or source metadata was found during the 2026-08-23 workspace audit."
+    }
+  ]
+}

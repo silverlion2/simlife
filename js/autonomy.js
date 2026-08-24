@@ -74,7 +74,7 @@ Game.Autonomy = (function() {
           next: function() {
             const char = Game.Character.getState();
             if (char.autonomy && char.autonomy.thought) {
-              if (Game.Character.startActivity(char.autonomy.thought)) {
+              if (Game.Character.startActivity(char.autonomy.thought, false, null, { source: 'autonomy' })) {
                 const actCfg = cfg.ACTIVITIES[char.autonomy.thought];
                 if (Game.Signals) Game.Signals.emit('notification', { message: `🤖 ${char.name} decided to ${actCfg.label.toLowerCase()}` });
                 else Game.UI?.showNotification?.(`🤖 ${char.name} decided to ${actCfg.label.toLowerCase()}`);
@@ -132,7 +132,7 @@ Game.Autonomy = (function() {
       if (needValue === undefined) continue;
       if (needValue >= mapping.threshold) continue;
       if (!mapping.activity) continue;
-      if (!Game.Character.isAvailableActivity(mapping.activity)) continue;
+      if (!Game.Character.isAvailableActivity(mapping.activity, { source: 'autonomy' })) continue;
 
       const urgency = (mapping.threshold - needValue) / mapping.threshold;
       let score = mapping.priority * (1 + urgency * 2);
@@ -156,7 +156,7 @@ Game.Autonomy = (function() {
         'read', 'use_computer', 'listen_music', 'play_games', 'paint',
         'exercise', 'stargaze', 'tinker', 'sit_garden', 'light_candle'
       ];
-      const available = enrichmentActivities.filter(a => Game.Character.isAvailableActivity(a));
+      const available = enrichmentActivities.filter(a => Game.Character.isAvailableActivity(a, { source: 'autonomy' }));
       if (available.length > 0) {
         const pick = available[Game.Random.int(0, available.length - 1)];
         return { activity: pick, need: 'fun', score: 1, urgency: 0 };

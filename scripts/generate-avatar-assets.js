@@ -1,4 +1,5 @@
 const fs = require('fs');
+const crypto = require('crypto');
 const path = require('path');
 const vm = require('vm');
 const { chromium } = require('playwright');
@@ -7,6 +8,7 @@ const root = path.resolve(__dirname, '..');
 const catalogPath = path.join(root, 'js', 'avatar_catalog.js');
 const outputDir = path.join(root, 'assets', 'avatar_layers');
 const outputJs = path.join(root, 'js', 'avatar_assets.js');
+const checkMode = process.argv.includes('--check');
 const WIDTH = 96;
 const HEIGHT = 128;
 const ART_SCALE = 0.62;
@@ -188,7 +190,7 @@ async function writePngs(entries) {
   }
 }
 
-function writeAssetModule(entries) {
+function buildAssetModule(entries) {
   const lines = [
     '// ============================================================',
     '// SimLife - Generated Avatar Layer Assets',
@@ -202,12 +204,51 @@ function writeAssetModule(entries) {
   }
   lines.push('};');
   lines.push('');
-  fs.writeFileSync(outputJs, lines.join('\n'));
+  return lines.join('\n');
+}
+
+function normalizeGeneratedModule(source) {
+  return source.replace(/\r\n/g, '\n');
+}
+
+function writeAssetModule(entries) {
+  fs.writeFileSync(outputJs, buildAssetModule(entries));
+}
+
+function verifyGeneratedAssets(entries) {
+  if (!fs.existsSync(outputDir)) throw new Error(`Missing generated avatar directory: ${outputDir}`);
+  const expectedFiles = entries.map(entry => `${entry.key}.png`).sort();
+  const actualFiles = fs.readdirSync(outputDir).filter(file => file.endsWith('.png')).sort();
+  const expectedSet = new Set(expectedFiles);
+  const actualSet = new Set(actualFiles);
+  const missing = expectedFiles.filter(file => !actualSet.has(file));
+  const extra = actualFiles.filter(file => !expectedSet.has(file));
+  if (missing.length || extra.length) {
+    throw new Error(`Generated avatar file set mismatch: ${JSON.stringify({ missing, extra })}`);
+  }
+
+  const generatedModule = buildAssetModule(entries);
+  const currentModule = fs.readFileSync(outputJs, 'utf8');
+  if (normalizeGeneratedModule(currentModule) !== generatedModule) {
+    throw new Error('js/avatar_assets.js is out of date; run npm run generate:avatars');
+  }
+  console.log(JSON.stringify({
+    ok: true,
+    mode: 'check',
+    entries: entries.length,
+    pngFiles: actualFiles.length,
+    bytes: Buffer.byteLength(generatedModule),
+    sha256: crypto.createHash('sha256').update(generatedModule).digest('hex'),
+  }, null, 2));
 }
 
 async function main() {
   const catalog = loadCatalog();
   const entries = textureEntries(catalog);
+  if (checkMode) {
+    verifyGeneratedAssets(entries);
+    return;
+  }
   await writePngs(entries);
   writeAssetModule(entries);
   console.log(JSON.stringify({ ok: true, count: entries.length }, null, 2));

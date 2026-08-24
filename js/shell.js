@@ -15,6 +15,7 @@ Game.Shell = (function() {
 
   let initialized = false;
   let previousSpeed = 1;
+  let previousFocus = null;
   let settings = loadSettings();
 
   function loadSettings() {
@@ -27,7 +28,13 @@ Game.Shell = (function() {
   }
 
   function saveSettings() {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      return true;
+    } catch (error) {
+      console.warn('Unable to persist SimLife settings:', error);
+      return false;
+    }
   }
 
   function applySettings() {
@@ -76,11 +83,17 @@ Game.Shell = (function() {
 
   function open() {
     const overlay = document.getElementById('pause-overlay');
-    if (!overlay || isOpen()) return;
-    previousSpeed = Math.max(1, Game.Main?.getSpeed?.() || 1);
+    if (!overlay || isOpen() || Game.Renderer?.isInputBlocked?.()
+      || document.body.classList.contains('event-open') || document.body.classList.contains('edit-modal-open')) return;
+    const currentSpeed = Game.Main?.getSpeed?.();
+    previousSpeed = Number.isFinite(currentSpeed) ? currentSpeed : 1;
+    previousFocus = document.activeElement || null;
     if (Game.Main?.setSpeed) Game.Main.setSpeed(0, { silent: true });
     overlay.classList.remove('hidden');
     document.body.classList.add('game-paused');
+    const ui = document.getElementById('ui-layer');
+    ui?.setAttribute('inert', '');
+    ui?.setAttribute('aria-hidden', 'true');
     setDrawer(null);
     document.getElementById('btn-pause-resume')?.focus();
   }
@@ -90,7 +103,15 @@ Game.Shell = (function() {
     if (!overlay || !isOpen()) return;
     overlay.classList.add('hidden');
     document.body.classList.remove('game-paused');
+    const ui = document.getElementById('ui-layer');
+    if (!document.body.classList.contains('runtime-input-blocked') && !document.body.classList.contains('event-open')) {
+      ui?.removeAttribute('inert');
+      ui?.removeAttribute('aria-hidden');
+    }
     if (Game.Main?.setSpeed) Game.Main.setSpeed(previousSpeed, { silent: true });
+    const focusTarget = previousFocus;
+    previousFocus = null;
+    window.setTimeout(() => focusTarget?.focus?.(), 0);
   }
 
   function toggle() {
@@ -128,7 +149,10 @@ Game.Shell = (function() {
     document.getElementById('btn-pause-controls')?.addEventListener('click', () => setDrawer('controls'));
     document.getElementById('btn-pause-settings')?.addEventListener('click', () => setDrawer('settings'));
     document.getElementById('btn-pause-menu')?.addEventListener('click', () => {
-      Game.State.save();
+      if (!Game.State.save()) {
+        Game.UI?.showNotification?.('Save failed. Staying in the current world so no progress is lost.');
+        return;
+      }
       window.location.reload();
     });
     menuButton?.addEventListener('click', event => {

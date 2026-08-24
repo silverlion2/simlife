@@ -4,7 +4,11 @@ const path = require('path');
 const { _electron: electron } = require('playwright');
 
 const root = path.resolve(__dirname, '..');
-const output = path.join(root, 'output', 'playwright');
+const outputArg = process.argv.find(argument => argument.startsWith('--output='));
+const requestedOutput = outputArg
+  ? outputArg.slice('--output='.length)
+  : process.env.SIMLIFE_ARTIFACT_DIR || path.join('artifacts', new Date().toISOString().slice(0, 10), 'visual-review');
+const output = path.resolve(root, requestedOutput);
 
 async function waitForGame(page) {
   await page.waitForFunction(() => {
@@ -55,18 +59,20 @@ async function closePanel(page) {
 (async () => {
   fs.mkdirSync(output, { recursive: true });
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'simlife-visual-'));
-  const app = await electron.launch({
-    args: [root],
-    env: { ...process.env, SIMLIFE_TEST_USER_DATA: userData },
-  });
-  const page = await app.firstWindow({ timeout: 60000 });
   const errors = [];
-  page.on('pageerror', error => errors.push(String(error.message || error)));
-  page.on('console', message => {
-    if (message.type() === 'error') errors.push(message.text());
-  });
+  let app = null;
 
   try {
+    app = await electron.launch({
+      args: [root],
+      env: { ...process.env, SIMLIFE_TEST_USER_DATA: userData },
+    });
+    const page = await app.firstWindow({ timeout: 60000 });
+    page.on('pageerror', error => errors.push(String(error.message || error)));
+    page.on('console', message => {
+      if (message.type() === 'error') errors.push(message.text());
+    });
+
     await page.waitForLoadState('domcontentloaded');
     await page.setViewportSize({ width: 1440, height: 900 });
     await capture(page, 'menu-desktop');
@@ -182,8 +188,11 @@ async function closePanel(page) {
     await page.waitForSelector('#pause-overlay:not(.hidden)');
     await capture(page, 'pause-mobile');
   } finally {
-    await app.close();
-    fs.rmSync(userData, { recursive: true, force: true });
+    try {
+      await app?.close();
+    } finally {
+      fs.rmSync(userData, { recursive: true, force: true, maxRetries: 6, retryDelay: 150 });
+    }
   }
 
   if (errors.length) {

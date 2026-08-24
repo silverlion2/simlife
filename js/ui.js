@@ -13,6 +13,12 @@ Game.UI = (function() {
   const panelBuilders = new Map();
   const panelAssetGroups = Object.freeze({ build: 'buildCatalog', market: 'buildCatalog', career: 'careers' });
   let signalsBound = false;
+  let gameStartPromise = null;
+  let eventPreviousSpeed = null;
+  let eventPreviousFocus = null;
+  let panelPreviousFocus = null;
+  let editPreviousSpeed = null;
+  let editPreviousFocus = null;
 
   function init() {
     registerDefaultPanels();
@@ -93,6 +99,15 @@ Game.UI = (function() {
     populateTraitGrid('cc-trait-grid');
     populateTraitGrid('ec-trait-grid');
     createAvatarEditor = Game.AvatarEditor.mount('cc-avatar-editor', Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF }));
+    const creatorScrollFields = cc.querySelector('.cc-scroll-fields');
+    const creatorScrollCue = document.getElementById('cc-scroll-cue');
+    const syncCreatorScrollCue = () => {
+      if (!creatorScrollFields || !creatorScrollCue) return;
+      const atEnd = creatorScrollFields.scrollTop + creatorScrollFields.clientHeight >= creatorScrollFields.scrollHeight - 8;
+      creatorScrollCue.classList.toggle('is-complete', atEnd);
+    };
+    creatorScrollFields?.addEventListener('scroll', syncCreatorScrollCue, { passive: true });
+    window.addEventListener('resize', () => window.requestAnimationFrame(syncCreatorScrollCue), { passive: true });
 
     // Make sure we are at Main Menu
     mm.classList.remove('hidden');
@@ -104,6 +119,7 @@ Game.UI = (function() {
     document.getElementById('btn-mm-new').addEventListener('click', () => {
       mm.classList.add('hidden');
       cc.classList.remove('hidden');
+      window.requestAnimationFrame(syncCreatorScrollCue);
     });
 
     document.getElementById('btn-mm-load').addEventListener('click', () => {
@@ -128,6 +144,11 @@ Game.UI = (function() {
     document.getElementById('file-import').addEventListener('change', (e) => {
       const file = e.target.files[0];
       if (!file) return;
+      if (file.size > 2 * 1024 * 1024) {
+        alert('That save is too large to import. SimLife save files must be 2 MB or smaller.');
+        e.target.value = '';
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (ev) => {
          const success = Game.State.importFromFile(ev.target.result);
@@ -138,14 +159,21 @@ Game.UI = (function() {
             alert('Failed to import save. The file may be corrupted.');
          }
       };
+      reader.onerror = () => {
+        alert('The selected save file could not be read.');
+        e.target.value = '';
+      };
       reader.readAsText(file);
     });
 
     document.getElementById('btn-mm-wipe').addEventListener('click', () => {
       if (confirm('WARNING: This will permanently delete ALL active saves. Are you sure you want to wipe the slate clean?')) {
-        localStorage.clear();
-        alert('All saves wiped! The game will now launch fresh.');
-        window.location.reload();
+        if (Game.State.deleteAllSaves()) {
+          alert('All SimLife saves were removed. Your settings were kept.');
+          window.location.reload();
+        } else {
+          alert('SimLife could not remove every save. No unrelated browser data was touched.');
+        }
       }
     });
 
@@ -159,6 +187,8 @@ Game.UI = (function() {
       const startButton = event.currentTarget;
       if (startButton.disabled) return;
       startButton.disabled = true;
+      startButton.setAttribute('aria-busy', 'true');
+      document.getElementById('cc-start-error')?.remove();
       const worldName = document.getElementById('cc-world-name').value || 'My World';
       const simName = document.getElementById('cc-sim-name').value || 'Player';
       const appearance = createAvatarEditor ? createAvatarEditor.getAppearance() : Game.Appearance.fromLegacy({ form: 'online_witch', color: 0x88CCFF });
@@ -167,7 +197,19 @@ Game.UI = (function() {
       const selectedTraitCard = document.querySelector('#cc-trait-grid .trait-card.selected');
       const traitKey = selectedTraitCard ? selectedTraitCard.dataset.key : 'neat';
 
-      Game.State.createSave(worldName, { name: simName, trait: traitKey, color: color, form: form, appearance: appearance });
+      const slotId = Game.State.createSave(worldName, { name: simName, trait: traitKey, color: color, form: form, appearance: appearance });
+      if (!slotId) {
+        startButton.disabled = false;
+        startButton.removeAttribute('aria-busy');
+        const error = document.createElement('p');
+        error.id = 'cc-start-error';
+        error.className = 'creator-start-error';
+        error.setAttribute('role', 'alert');
+        error.textContent = 'Your world could not be saved, so the game did not start. Check storage access and try again.';
+        startButton.closest('.creator-action-bar')?.prepend(error);
+        startButton.focus();
+        return;
+      }
       setTimeout(() => startGameLoop(cc), 0);
     });
 
@@ -214,24 +256,46 @@ Game.UI = (function() {
     });
 
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
       const editModal = document.getElementById('edit-char-modal');
-      if (editModal && !editModal.classList.contains('hidden')) {
+      if (!editModal || editModal.classList.contains('hidden')) return;
+      if (e.key === 'Escape') {
         e.preventDefault();
         e.stopImmediatePropagation();
         closeEditModal();
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusable = [...editModal.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+          .filter(element => element.getClientRects().length > 0);
+        if (!focusable.length) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
       }
     });
   }
 
   function startGameLoop(hideScreen) {
+    if (gameStartPromise) return gameStartPromise;
     if (hideScreen) hideScreen.classList.add('hidden');
     const ui = document.getElementById('ui-layer');
     if (ui) ui.style.display = 'block';
-    
-    // Now trigger main loop init
-    if (Game.Main.init) Game.Main.init();
-    Game.UI.playAnnouncer('Welcome to SimLife!');
+
+    gameStartPromise = Promise.resolve(Game.Main.init ? Game.Main.init() : false).then(started => {
+      if (started) Game.UI.playAnnouncer('Welcome to SimLife!');
+      return started;
+    }).catch(error => {
+      gameStartPromise = null;
+      console.error('Game startup failed:', error);
+      return false;
+    });
+    return gameStartPromise;
   }
 
   function populateTraitGrid(containerId) {
@@ -270,9 +334,9 @@ Game.UI = (function() {
       slot.className = 'save-slot';
       slot.innerHTML = `
         <div class="save-info">
-          <h4>${save.name}</h4>
-          <p>Sim: ${save.characterName} | Day ${save.day} | 💰$${save.money}</p>
-          <p style="font-size:10px; opacity:0.6;">Last played: ${d}</p>
+          <h4></h4>
+          <p class="save-summary"></p>
+          <p class="save-last-played" style="font-size:10px; opacity:0.6;"></p>
         </div>
         <div class="save-actions">
           <button class="btn-load">Load</button>
@@ -280,11 +344,24 @@ Game.UI = (function() {
           <button class="btn-delete">X</button>
         </div>
       `;
+      slot.querySelector('h4').textContent = save.name || 'Unnamed World';
+      slot.querySelector('.save-summary').textContent = `Sim: ${save.characterName || 'Unknown'} | Day ${Number(save.day) || 1} | 💰$${Number(save.money) || 0}`;
+      slot.querySelector('.save-last-played').textContent = `Last played: ${d}`;
       
-      slot.querySelector('.btn-load').addEventListener('click', () => {
-        if(Game.State.loadSlot(save.id)) {
-          startGameLoop(document.getElementById('load-game-screen'));
+      slot.querySelector('.btn-load').addEventListener('click', async event => {
+        const button = event.currentTarget;
+        if (button.disabled) return;
+        button.disabled = true;
+        button.setAttribute('aria-busy', 'true');
+        button.textContent = 'Loading…';
+        if (Game.State.loadSlot(save.id)) {
+          const started = await startGameLoop(document.getElementById('load-game-screen'));
+          if (started) return;
         }
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.textContent = 'Retry load';
+        showNotification(`Couldn't load ${save.name || 'that world'}. The save was not changed.`);
       });
       slot.querySelector('.btn-export').addEventListener('click', () => {
         Game.State.exportToFile(save.id);
@@ -302,7 +379,16 @@ Game.UI = (function() {
 
   function openEditModal() {
     const modal = document.getElementById('edit-char-modal');
-    if(!modal) return;
+    if (!modal || !modal.classList.contains('hidden') || Game.Renderer?.isInputBlocked?.()
+      || Game.Shell?.isOpen?.() || document.body.classList.contains('event-open')) return;
+    editPreviousFocus = document.activeElement || null;
+    const currentSpeed = Game.Main?.getSpeed?.();
+    editPreviousSpeed = Number.isFinite(currentSpeed) ? currentSpeed : 1;
+    Game.Main?.setSpeed?.(0, { silent: true });
+    document.body.classList.add('edit-modal-open');
+    const ui = document.getElementById('ui-layer');
+    ui?.setAttribute('inert', '');
+    ui?.setAttribute('aria-hidden', 'true');
     const char = Game.State.get().character;
     document.getElementById('ec-sim-name').value = char.name;
     const startingAppearance = char.appearance || Game.Appearance.fromLegacy(char);
@@ -323,14 +409,29 @@ Game.UI = (function() {
     
     modal.classList.remove('hidden');
     modal.style.display = 'block';
+    document.getElementById('ec-sim-name')?.focus();
   }
 
   function closeEditModal() {
     const modal = document.getElementById('edit-char-modal');
-    if(modal) {
-      modal.classList.add('hidden');
-      modal.style.display = 'none';
+    if (!modal || modal.classList.contains('hidden')) return;
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+    document.body.classList.remove('edit-modal-open');
+    const ui = document.getElementById('ui-layer');
+    if (!document.body.classList.contains('runtime-input-blocked')
+      && !document.body.classList.contains('game-paused')
+      && !document.body.classList.contains('event-open')) {
+      ui?.removeAttribute('inert');
+      ui?.removeAttribute('aria-hidden');
     }
+    if (editPreviousSpeed !== null && !document.body.classList.contains('runtime-input-blocked')) {
+      Game.Main?.setSpeed?.(editPreviousSpeed, { silent: true });
+    }
+    editPreviousSpeed = null;
+    const focusTarget = editPreviousFocus;
+    editPreviousFocus = null;
+    window.setTimeout(() => focusTarget?.focus?.(), 0);
     editDraftAppearance = null;
   }
 
@@ -625,7 +726,8 @@ Game.UI = (function() {
     label.textContent = '📋 Queue:';
     bar.appendChild(label);
 
-    queue.forEach((actKey, idx) => {
+    queue.forEach((entry, idx) => {
+      const actKey = typeof entry === 'string' ? entry : entry?.key;
       const actCfg = Game.Config.ACTIVITIES[actKey];
       if (!actCfg) return;
       const item = document.createElement('div');
@@ -702,6 +804,21 @@ Game.UI = (function() {
       modal.className = 'event-modal';
       document.body.appendChild(modal);
     }
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.setAttribute('aria-label', event.title || 'Story event');
+    if (eventPreviousSpeed === null) {
+      Game.Shell?.close?.();
+      const panel = document.getElementById('side-panel');
+      if (panel?.dataset.active && !panel.classList.contains('hidden')) togglePanel(panel.dataset.active);
+      eventPreviousFocus = document.activeElement || null;
+      eventPreviousSpeed = Game.Main?.getSpeed?.() ?? 1;
+      Game.Main?.setSpeed?.(0, { silent: true });
+    }
+    document.body.classList.add('event-open');
+    const ui = document.getElementById('ui-layer');
+    ui?.setAttribute('inert', '');
+    ui?.setAttribute('aria-hidden', 'true');
 
     let visualHtml = '';
     if (event.visual) {
@@ -727,15 +844,19 @@ Game.UI = (function() {
         ${dialogueHtml}
         ${descHtml}
         <div class="event-choices">
-          ${event.choices.map((c, i) => `
-            <button class="event-choice" data-idx="${i}">
-              ${c.label}
+          ${event.choices.map((c, i) => {
+            const availability = Game.Events?.getChoiceAvailability?.(c, event) || { allowed: true, reason: '' };
+            return `
+            <button class="event-choice" data-idx="${i}" ${availability.allowed ? '' : 'disabled'} title="${availability.reason || ''}">
+              ${c.label}${availability.allowed ? '' : ` · ${availability.reason}`}
             </button>
-          `).join('')}
+          `;
+          }).join('')}
         </div>
       </div>
     `;
     modal.style.display = 'flex';
+    modal.querySelector('.event-choice:not(:disabled)')?.focus();
 
     modal.querySelectorAll('.event-choice').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -747,6 +868,19 @@ Game.UI = (function() {
   function hideEvent() {
     const modal = document.getElementById('event-modal');
     if (modal) modal.style.display = 'none';
+    document.body.classList.remove('event-open');
+    const ui = document.getElementById('ui-layer');
+    if (!document.body.classList.contains('runtime-input-blocked') && !document.body.classList.contains('game-paused')) {
+      ui?.removeAttribute('inert');
+      ui?.removeAttribute('aria-hidden');
+    }
+    if (eventPreviousSpeed !== null) {
+      Game.Main?.setSpeed?.(eventPreviousSpeed, { silent: true });
+      eventPreviousSpeed = null;
+    }
+    const focusTarget = eventPreviousFocus;
+    eventPreviousFocus = null;
+    window.setTimeout(() => focusTarget?.focus?.(), 0);
   }
 
   // ---- Side Panels ----
@@ -810,6 +944,7 @@ Game.UI = (function() {
     else if (action === 'prestige' && window.confirm('Start next generation?')) Game.Prestige.doPrestige();
     else if (action === 'buy-prestige') { Game.Prestige.buyUpgrade(control.dataset.upgradeKey); togglePanel('legacy'); }
     else if (action === 'campaign-go') Game.Campaign.goToObjective(control.dataset.targetPanel);
+    window.setTimeout(() => enhanceSidePanel(document.getElementById('side-panel')), 0);
   }
 
   function setSidePanelOpen(isOpen) {
@@ -826,7 +961,16 @@ Game.UI = (function() {
     }
   }
 
+  function enhanceSidePanel(panel, focusPanel = false) {
+    if (!panel) return;
+    panel.querySelectorAll('.panel-close, .close-btn').forEach(button => {
+      if (!button.getAttribute('aria-label')) button.setAttribute('aria-label', 'Close panel');
+    });
+    if (focusPanel) (panel.querySelector('.panel-close, .close-btn') || panel).focus?.();
+  }
+
   function togglePanel(panelName) {
+    if (Game.Renderer?.isInputBlocked?.()) return;
     const panel = document.getElementById('side-panel');
     if (!panel) return;
 
@@ -834,11 +978,16 @@ Game.UI = (function() {
       panel.classList.add('hidden');
       panel.dataset.active = '';
       setSidePanelOpen(false);
+      const focusTarget = panelPreviousFocus;
+      panelPreviousFocus = null;
+      window.setTimeout(() => focusTarget?.focus?.(), 0);
       return;
     }
 
+    if (panel.classList.contains('hidden')) panelPreviousFocus = document.activeElement || null;
     panel.dataset.active = panelName;
     panel.classList.remove('hidden');
+    panel.setAttribute('aria-label', `${String(panelName || 'game').replace(/_/g, ' ')} panel`);
     setSidePanelOpen(true);
 
     const closeHtml = `<button class="panel-close" type="button" data-action="close-panel" data-panel="${panelName}">✕</button>`;
@@ -846,15 +995,21 @@ Game.UI = (function() {
     const assetGroup = panelAssetGroups[panelName];
     if (builder && assetGroup && Game.AssetLoader && !Game.AssetLoader.isLoaded(assetGroup)) {
       panel.innerHTML = `${closeHtml}<div class="panel-loading" role="status">Loading local catalog…</div>`;
+      enhanceSidePanel(panel, true);
       Game.AssetLoader.loadGroup(assetGroup).then(report => {
         if (panel.dataset.active !== panelName || panel.classList.contains('hidden')) return;
         if (report.status === 'error') {
           panel.innerHTML = `${closeHtml}<div class="panel-load-error">Catalog unavailable. Close and reopen to retry.</div>`;
+          enhanceSidePanel(panel, true);
           return;
         }
         builder(panel, closeHtml);
+        enhanceSidePanel(panel, true);
       });
-    } else if (builder) builder(panel, closeHtml);
+    } else if (builder) {
+      builder(panel, closeHtml);
+      enhanceSidePanel(panel, true);
+    }
     else showNotification(`Unknown panel: ${panelName}`);
   }
 
@@ -1395,11 +1550,10 @@ Game.UI = (function() {
     const char = Game.State.get().character;
     const isBusy = !!(char.currentActivity);
     const success = isBusy
-      ? Game.Character.queueActivity(activityKey)
-      : Game.Character.startActivity(activityKey);
+      ? Game.Character.queueActivity(activityKey, null, { source: 'do' })
+      : Game.Character.startActivity(activityKey, false, null, { source: 'do' });
 
     if (!success) {
-      showNotification(`Can't start ${actCfg ? actCfg.label : activityKey} yet.`);
       return false;
     }
 
@@ -1706,6 +1860,7 @@ Game.UI = (function() {
     registerPanel,
     initMainMenu,
     openEditModal,
+    closeEditModal,
     updateStatusBars,
     updateMoodletDisplay,
     updateQueueDisplay,

@@ -15,50 +15,87 @@ Game.Main = (function() {
   let npcSpawnTimer = 30; // First NPC after 30 seconds
   let uiThrottleAccum = 0; // Throttle DOM updates
   let autoSaveAccum = 0;  // Auto-save counter
+  let initPromise = null;
+  let controllersInitialized = false;
+  let lifecyclePersistenceBound = false;
 
   function init() {
+    if (initPromise) return initPromise;
     const canvas = document.getElementById('game-canvas');
-    applyGraphicsMode(readGraphicsMode(), { persist: false, notify: false });
-    Game.Renderer.init(canvas);
-    Game.UI.init();
-    if (Game.Campaign?.init) Game.Campaign.init();
-    if (Game.Shell?.init) Game.Shell.init();
+    if (!controllersInitialized) {
+      controllersInitialized = true;
+      applyGraphicsMode(readGraphicsMode(), { persist: false, notify: false });
+      Game.UI.init();
+      if (Game.Campaign?.init) Game.Campaign.init();
+      if (Game.Shell?.init) Game.Shell.init();
 
-    // Announcer overlay starts hidden via HTML class + CSS;
-    // playAnnouncer() in ui.js handles showing/hiding it properly.
+      // Announcer overlay starts hidden via HTML class + CSS;
+      // playAnnouncer() in ui.js handles showing/hiding it properly.
 
-    // Time fix: ensure minute is exactly 0 at start
-    const time = Game.State.get().time;
-    if (time.minute < 0) time.minute = 0;
-    time.totalMinutes = time.day * 1440 + time.hour * 60 + time.minute;
+      const time = Game.State.get().time;
+      time.minute = Math.max(0, Number(time.minute) || 0);
+      // totalMinutes is elapsed play time from the Day 1 06:00 start. Preserve
+      // valid saved values so loading never rewinds the simulation clock.
+      if (!Number.isFinite(time.totalMinutes) || time.totalMinutes < 0) {
+        time.totalMinutes = Math.max(0, (Math.max(1, time.day) - 1) * 1440 + time.hour * 60 + time.minute - 360);
+      }
 
-    // Ensure character has new fields
-    const char = Game.State.get().character;
-    if (!char.actionQueue) char.actionQueue = [];
-    if (!char.moodlets) char.moodlets = [];
-    if (!char.autonomy) char.autonomy = { thought: null, lastAutoTime: 0, enabled: true };
-    if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState();
-    if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState();
-    if (Game.HomeCollections && Game.HomeCollections.ensureState) Game.HomeCollections.ensureState();
+      // Ensure character has new fields
+      const char = Game.State.get().character;
+      if (!char.actionQueue) char.actionQueue = [];
+      if (!char.moodlets) char.moodlets = [];
+      if (!char.autonomy) char.autonomy = { thought: null, lastAutoTime: 0, enabled: true };
+      if (Game.ObjectMarket && Game.ObjectMarket.ensureState) Game.ObjectMarket.ensureState();
+      if (Game.HomeGoals && Game.HomeGoals.ensureState) Game.HomeGoals.ensureState();
+      if (Game.HomeCollections && Game.HomeCollections.ensureState) Game.HomeCollections.ensureState();
 
-    setupCanvasEvents(canvas);
-    setupKeyboardShortcuts();
-    setupSpeedControls();
+      setupCanvasEvents(canvas);
+      setupKeyboardShortcuts();
+      setupSpeedControls();
+      setupLifecyclePersistence();
+      setSpeed(time.speed, { silent: true });
+    }
 
-    showTutorial();
+    initPromise = Promise.resolve(Game.Renderer.init(canvas)).then(rendererReady => {
+      if (!rendererReady) return false;
+      Game.UI.updateStatusBars?.();
+      Game.UI.updateMoodletDisplay?.();
+      Game.UI.updateQueueDisplay?.();
+      showTutorial();
+      return true;
+    }).catch(error => {
+      initPromise = null;
+      throw error;
+    });
+    return initPromise;
+  }
+
+  function setupLifecyclePersistence() {
+    if (lifecyclePersistenceBound) return;
+    lifecyclePersistenceBound = true;
+
+    const saveActiveWorld = () => {
+      if (Game.State?.getActiveSlotId?.()) Game.State.save();
+    };
+    window.addEventListener('pagehide', saveActiveWorld);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') saveActiveWorld();
+    });
   }
 
   function tick(time, deltaMs) {
-    const rawDelta = deltaMs / 1000;
-    const delta = Math.min(rawDelta, 0.1);
+    const rawDelta = Math.max(0, Number(deltaMs) || 0) / 1000;
+    const simDelta = Math.min(rawDelta, 0.1);
+    const wallDelta = Math.min(rawDelta, 60);
     const state = Game.State.get();
 
     // ---- Time progression ----
     const minutesPerSecond = Game.Config.TIME.MINUTES_PER_SECOND * gameSpeed;
-    const deltaMinutes = delta * minutesPerSecond;
+    const deltaMinutes = simDelta * minutesPerSecond;
     tickAccumulator += deltaMinutes;
 
-    // Process all accumulated minutes to ensure time catches up correctly after lag/backgrounding
+    // Simulation intentionally advances with a bounded frame delta after stalls.
+    // Wall-clock duties such as autosave use wallDelta below.
     while (tickAccumulator >= 1) {
       tickAccumulator -= 1;
       updateTime(1);
@@ -71,17 +108,17 @@ Game.Main = (function() {
     }
 
     // ---- Character Movement ----
-    Game.Character.updatePosition(delta * gameSpeed);
+    Game.Character.updatePosition(simDelta * gameSpeed);
 
     // ---- Autonomy AI ----
     if (Game.Autonomy) {
-      Game.Autonomy.update(delta * gameSpeed);
+      Game.Autonomy.update(simDelta * gameSpeed);
     }
 
     // ---- Idle Wandering (when no autonomy decision) ----
     const char = state.character;
     if (!char.currentActivity && !char.targetPosition && !char.autonomy.thought && char.actionQueue.length === 0) {
-      idleTimer += delta;
+      idleTimer += simDelta;
       if (idleTimer >= IDLE_WANDER_INTERVAL) {
         idleTimer = 0;
         const pos = Game.Renderer.getRandomRoomPosition();
@@ -92,10 +129,10 @@ Game.Main = (function() {
     }
 
     // ---- NPC Walkers ----
-    updateNPCWalkers(delta * gameSpeed);
+    updateNPCWalkers(simDelta * gameSpeed);
 
     // ---- UI Updates (throttled to ~4fps for DOM performance) ----
-    uiThrottleAccum += delta;
+    uiThrottleAccum += wallDelta;
     if (uiThrottleAccum >= 0.25) {
       uiThrottleAccum = 0;
       Game.UI.updateStatusBars();
@@ -104,13 +141,13 @@ Game.Main = (function() {
     }
 
     if (Game.Campaign?.update) {
-      Game.Campaign.update(delta * gameSpeed);
+      Game.Campaign.update(simDelta * gameSpeed);
     }
 
     // ---- Auto-save (every 30 seconds of wall time) ----
-    autoSaveAccum += delta;
+    autoSaveAccum += wallDelta;
     if (autoSaveAccum >= 30) {
-      autoSaveAccum = 0;
+      autoSaveAccum %= 30;
       Game.State.save();
     }
   }
@@ -169,6 +206,7 @@ Game.Main = (function() {
     // Shift Start
     if (newHour === career.levelConfig.scheduleStart) {
       const char = Game.State.get().character;
+      const careerState = Game.Economy.getCareer();
       char.mapId = career.config.mapId;
       char.position.x = 4;
       char.position.y = 8;
@@ -177,14 +215,29 @@ Game.Main = (function() {
       if (Game.Renderer && Game.Renderer.transitionMap) Game.Renderer.transitionMap();
       
       Game.Character.cancelActivity();
-      setTimeout(() => Game.Character.startActivity(career.config.actionKey, true), 1000);
-      Game.UI && Game.UI.showNotification(`🏢 Time for work! Commuting to ${career.config.label}...`);
+      const started = Game.Character.startActivity(career.config.actionKey, true, null, { source: 'work' });
+      if (careerState) {
+        careerState.activeShift = {
+          day: Game.State.get().time.day,
+          actionKey: career.config.actionKey,
+          started,
+        };
+      }
+      Game.UI && Game.UI.showNotification(started
+        ? `🏢 Time for work! Commuting to ${career.config.label}...`
+        : `⚠️ The ${career.config.label} shift could not start. Check the workplace setup.`);
     }
     
     // Shift End
     if (newHour === career.levelConfig.scheduleEnd || (newHour === 0 && career.levelConfig.scheduleEnd === 24)) {
-      Game.Economy.processWorkDay();
       const char = Game.State.get().character;
+      const careerState = Game.Economy.getCareer();
+      const shift = careerState?.activeShift;
+      const attended = Boolean(shift?.started && shift.day === Game.State.get().time.day && shift.actionKey === career.config.actionKey);
+      const completed = attended && Game.Character.finishCurrentActivity(career.config.actionKey);
+      if (completed) Game.Economy.processWorkDay();
+      else Game.UI && Game.UI.showNotification('⚠️ Shift missed or interrupted. No pay or performance was awarded.');
+      if (careerState) delete careerState.activeShift;
       char.mapId = 'house';
       char.position.x = 5;
       char.position.y = 9;
@@ -456,6 +509,7 @@ Game.Main = (function() {
   function setupKeyboardShortcuts() {
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (Game.Renderer?.isInputBlocked?.()) return;
       if (Game.Shell?.isOpen?.() && e.key !== 'Escape') return;
       const configuredSpeed = Game.Config.TIME.SPEED_KEYS[e.key];
       if (configuredSpeed !== undefined) {
@@ -592,12 +646,14 @@ Game.Main = (function() {
 
   return {
     init,
+    isReady: () => Boolean(initPromise && Game.Renderer?.isReady?.()),
     getSpeed: () => gameSpeed,
     setSpeed,
     getGraphicsMode: () => window.GRAPHICS_QUALITY || 'high',
     setGraphicsMode: (mode) => applyGraphicsMode(mode, { persist: true, notify: false }),
     hitTestNPCWalker,
     spawnNPCWalker,
+    checkWorkSchedule,
     tick,
   };
 })();

@@ -30,13 +30,40 @@ Game.Events = (function() {
     else Game.UI?.showEvent?.(event);
   }
 
+  function getChoiceAvailability(choiceOrIndex, eventOverride = null) {
+    const event = eventOverride || getEvents().activeEvent;
+    const choice = typeof choiceOrIndex === 'number' ? event?.choices?.[choiceOrIndex] : choiceOrIndex;
+    if (!choice) return { allowed: false, reason: 'Choice unavailable.', cost: 0 };
+
+    let cost = Math.max(0, -(Number(choice.effects?.money) || 0));
+    if (choice.skillCheck) {
+      let skill = choice.skillCheck.skill;
+      let level = choice.skillCheck.level;
+      if (!skill) {
+        const entry = Object.entries(choice.skillCheck).find(([key]) => key !== 'failCost');
+        if (entry) [skill, level] = entry;
+      }
+      const willFail = skill && Game.Character.getSkillLevel(skill) < Number(level || 0);
+      if (willFail) cost += Math.max(0, -(Number(choice.skillCheck.failCost) || 0));
+    }
+    if (cost > 0 && !Game.Economy.canAfford(cost)) {
+      return { allowed: false, reason: `Need $${cost} for this choice.`, cost };
+    }
+    return { allowed: true, reason: '', cost };
+  }
+
   function handleChoice(choiceIndex) {
     const events = getEvents();
-    if (!events.activeEvent) return;
+    if (!events.activeEvent) return false;
 
     const event = events.activeEvent;
     const choice = event.choices[choiceIndex];
-    if (!choice) return;
+    if (!choice) return false;
+    const availability = getChoiceAvailability(choice, event);
+    if (!availability.allowed) {
+      Game.Signals?.emit('notification', { message: availability.reason });
+      return false;
+    }
 
     const char = Game.Character.getState();
 
@@ -44,7 +71,8 @@ Game.Events = (function() {
     if (choice.effects) {
       for (const [key, value] of Object.entries(choice.effects)) {
         if (key === 'money') {
-          Game.Economy.addMoney(value);
+          if (value < 0) Game.Economy.spend(Math.abs(value));
+          else Game.Economy.addMoney(value);
         } else if (char.needs[key] !== undefined) {
           char.needs[key] = Math.max(0, Math.min(100, char.needs[key] + value));
         }
@@ -66,7 +94,9 @@ Game.Events = (function() {
         const playerLevel = Game.Character.getSkillLevel(skill);
         if (playerLevel < reqLevel) {
           if (choice.skillCheck.failCost) {
-            Game.Economy.addMoney(choice.skillCheck.failCost);
+            const failCost = Number(choice.skillCheck.failCost) || 0;
+            if (failCost < 0) Game.Economy.spend(Math.abs(failCost));
+            else Game.Economy.addMoney(failCost);
             Game.Signals?.emit('notification', { message: `❌ Skill check failed! Lost $${Math.abs(choice.skillCheck.failCost)}` });
           }
         } else {
@@ -103,12 +133,14 @@ Game.Events = (function() {
     events.activeEvent = null;
     if (Game.Signals) Game.Signals.emit('event:hide');
     else Game.UI?.hideEvent?.();
+    return true;
   }
 
   return {
     update,
     triggerRandomEvent,
     handleChoice,
+    getChoiceAvailability,
     getEvents,
   };
 })();

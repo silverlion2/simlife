@@ -1,0 +1,40 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"]
+  },
+  "files": [
+    "tools/typecheck/simlife-globals.d.ts",
+    "main.js",
+    "preload.js",
+    "js/appearance.js",
+    "js/asset_loader.js",
+    "js/avatar_renderer.js",
+    "js/random.js",
+    "js/signals.js",
+    "js/renderer_math.js",
+    "js/config.js",
+    "js/campaign.js",
+    "js/events.js",
+    "js/interaction.js",
+    "js/state.js",
+    "scripts/check-javascript-syntax.js",
+    "scripts/generate-avatar-assets.js",
+    "scripts/generate-world-assets.js",
+    "scripts/verify-asset-provenance.js",
+    "scripts/verify-packaged-artifact.js",
+    "scripts/verify-packaged-runtime.js",
+    "scripts/verify-static-build.js",
+    "scripts/verify-workspace-structure.js"
+  ]
+}

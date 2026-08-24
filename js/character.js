@@ -166,12 +166,122 @@ Game.Character = (function() {
     return getState().skills[skillKey] || 0;
   }
 
-  // ---- Action Queue ----
-  function queueActivity(activityKey) {
+  function getTargetStateFailure(activityKey, actCfg, furn) {
+    if (!actCfg.targetState) return '';
+    if (!furn) return `Choose a target for ${actCfg.label}.`;
+
+    if (actCfg.targetState === 'broken') {
+      return isFurnitureBroken(furn.id) ? '' : 'Choose a broken object to repair.';
+    }
+    if (actCfg.targetState === 'crop_empty') {
+      return (!furn.cropState || furn.cropState === 'empty') ? '' : 'Choose an empty garden plot.';
+    }
+    if (actCfg.targetState === 'crop_thirsty') {
+      return furn.cropState === 'growing' && furn.needsWater ? '' : 'Choose a growing crop that needs water.';
+    }
+    if (actCfg.targetState === 'crop_ready') {
+      return furn.cropState === 'ready' || Number(furn.growth) >= 100 ? '' : 'Choose a crop that is ready to harvest.';
+    }
+    if (actCfg.targetState === 'destination') {
+      return furn.config?.targetMap ? '' : 'Choose a destination first.';
+    }
+    if (actCfg.targetState === 'bowl_empty') {
+      return furn.isFull ? 'That pet bowl is already full.' : '';
+    }
+    return '';
+  }
+
+  function furnitureMatchesActivity(furn, actCfg) {
+    if (!furn) return false;
+    if (actCfg.targetState === 'broken') return isFurnitureBroken(furn.id);
+    if (!actCfg.furniture) return false;
+    return furn.type.includes(actCfg.furniture) || actCfg.furniture === furn.type;
+  }
+
+  function getActivityAvailability(activityKey, options = {}) {
     const char = getState();
-    if (char.actionQueue.length >= 6) return false;
-    if (!isAvailableActivity(activityKey)) return false;
-    char.actionQueue.push(activityKey);
+    const actCfg = cfg.ACTIVITIES[activityKey];
+    if (!actCfg) return { allowed: false, reason: 'Unknown activity.', targetFurnId: null };
+
+    const activeMap = Game.State.getActiveMap();
+    if (!activeMap) return { allowed: false, reason: 'No active location is available.', targetFurnId: null };
+
+    if (actCfg.requires) {
+      const currentLevel = getSkillLevel(actCfg.requires.skill);
+      if (currentLevel < actCfg.requires.level) {
+        const skill = cfg.SKILLS[actCfg.requires.skill];
+        return {
+          allowed: false,
+          reason: `Requires ${skill?.label || actCfg.requires.skill} level ${actCfg.requires.level}.`,
+          targetFurnId: null,
+        };
+      }
+    }
+
+    const energyCost = getEffectiveEnergyCost(actCfg);
+    if (energyCost && char.needs.energy < energyCost) {
+      return { allowed: false, reason: `Need ${Math.ceil(energyCost)} energy for ${actCfg.label}.`, targetFurnId: null };
+    }
+    if (actCfg.cost && !Game.Economy.canAfford(actCfg.cost)) {
+      return { allowed: false, reason: `Need $${actCfg.cost} for ${actCfg.label}.`, targetFurnId: null };
+    }
+
+    let room = null;
+    // A usable furniture target is authoritative for hybrid rooms such as the
+    // starter kitchen/living space. Room-only activities still require their room.
+    if (actCfg.room && actCfg.room !== '*' && !actCfg.furniture) {
+      room = activeMap.rooms.find(item => item.type === actCfg.room);
+      if (!room) {
+        const roomCfg = cfg.ROOMS[actCfg.room];
+        return { allowed: false, reason: `Need a ${roomCfg?.label || actCfg.room}.`, targetFurnId: null };
+      }
+    }
+
+    const needsTarget = Boolean(actCfg.furniture || actCfg.targetState);
+    let target = null;
+    if (needsTarget) {
+      if (options.targetFurnId) {
+        target = activeMap.furniture.find(furn => furn.id === options.targetFurnId) || null;
+        if (!target) return { allowed: false, reason: 'That target is no longer available.', targetFurnId: null };
+        if (!furnitureMatchesActivity(target, actCfg)) {
+          return { allowed: false, reason: `${actCfg.label} cannot be used on that object.`, targetFurnId: null };
+        }
+        const targetStateFailure = getTargetStateFailure(activityKey, actCfg, target);
+        if (targetStateFailure) return { allowed: false, reason: targetStateFailure, targetFurnId: target.id };
+      } else {
+        target = activeMap.furniture.find(furn => {
+          if (!furnitureMatchesActivity(furn, actCfg)) return false;
+          if (actCfg.targetState !== 'broken' && isFurnitureBroken(furn.id)) return false;
+          return !getTargetStateFailure(activityKey, actCfg, furn);
+        }) || null;
+        if (!target) {
+          const stateReason = getTargetStateFailure(activityKey, actCfg, null);
+          const itemLabel = actCfg.furniture ? actCfg.furniture.replaceAll('_', ' ') : 'valid target';
+          return { allowed: false, reason: stateReason || `Need an available ${itemLabel} for ${actCfg.label}.`, targetFurnId: null };
+        }
+      }
+    }
+
+    return { allowed: true, reason: '', targetFurnId: target?.id || null, roomId: room?.id || null };
+  }
+
+  // ---- Action Queue ----
+  function queueActivity(activityKey, targetFurnId = null, options = {}) {
+    const char = getState();
+    if (char.actionQueue.length >= 6) {
+      notify('The action queue is full.');
+      return false;
+    }
+    const availability = getActivityAvailability(activityKey, { ...options, targetFurnId });
+    if (!availability.allowed) {
+      notify(availability.reason);
+      return false;
+    }
+    char.actionQueue.push({
+      key: activityKey,
+      targetFurnId: availability.targetFurnId,
+      source: options.source || 'queue',
+    });
     Game.Signals?.emit('activity:queued', { activityKey, queueLength: char.actionQueue.length });
     return true;
   }
@@ -181,11 +291,11 @@ Game.Character = (function() {
     if (char.currentActivity) return; // Still doing something
     if (char.actionQueue.length === 0) return false;
     const next = char.actionQueue.shift();
-    // Queue stores plain activity key strings, not objects
+    // Legacy saves may still contain plain activity key strings.
     if (typeof next === 'string') {
-      return startActivity(next, true);
+      return startActivity(next, true, null, { source: 'legacy-queue' });
     }
-    return startActivity(next.key, true, next.targetFurnId); // true = from queue
+    return startActivity(next.key, true, next.targetFurnId, { source: next.source || 'queue' });
   }
 
   function clearQueue() {
@@ -193,32 +303,33 @@ Game.Character = (function() {
   }
 
   // ---- Activity System ----
-  function startActivity(activityKey, fromQueue, targetFurnId = null) {
+  function startActivity(activityKey, fromQueue, targetFurnId = null, options = {}) {
     const char = getState();
     const actCfg = cfg.ACTIVITIES[activityKey];
-    if (!actCfg) return false;
-    const activeMap = Game.State.getActiveMap();
-
-    // Check energy cost
-    const energyCost = getEffectiveEnergyCost(actCfg);
-    if (energyCost && char.needs.energy < energyCost) return false;
-
-    // Check money cost
-    if (actCfg.cost && !Game.Economy.canAfford(actCfg.cost)) {
-        notify(`Not enough money for ${actCfg.label}!`);
-        return false;
+    const availability = getActivityAvailability(activityKey, { ...options, targetFurnId });
+    if (!availability.allowed) {
+      notify(availability.reason);
+      return false;
     }
+    const activeMap = Game.State.getActiveMap();
+    const resolvedTargetFurnId = availability.targetFurnId;
 
     char.currentActivity = {
       type: activityKey,
-      targetFurnId: targetFurnId,
+      targetFurnId: resolvedTargetFurnId,
       startTime: Game.State.get().time.totalMinutes,
       duration: actCfg.duration,
       elapsed: 0,
       isAutonomous: !fromQueue && char.autonomy?.thought === activityKey,
+      source: options.source || (fromQueue ? 'queue' : 'direct'),
     };
     char.activityProgress = 0;
-    Game.Signals?.emit('activity:started', { activityKey, fromQueue: !!fromQueue, targetFurnId });
+    Game.Signals?.emit('activity:started', {
+      activityKey,
+      fromQueue: !!fromQueue,
+      targetFurnId: resolvedTargetFurnId,
+      source: char.currentActivity.source,
+    });
 
     // Move to room
     if (actCfg.room) {
@@ -229,8 +340,8 @@ Game.Character = (function() {
         // Find the specific furniture if activity requires it
         if (actCfg.furniture) {
           let furn = null;
-          if (targetFurnId) {
-             furn = activeMap.furniture.find(f => f.id === targetFurnId);
+          if (resolvedTargetFurnId) {
+             furn = activeMap.furniture.find(f => f.id === resolvedTargetFurnId);
           } else {
              furn = activeMap.furniture.find(f => f.type.includes(actCfg.furniture));
           }
@@ -244,6 +355,10 @@ Game.Character = (function() {
           char.targetPosition = { x: room.x + 1, y: room.y + 1 };
         }
       }
+    }
+    if (!char.targetPosition && resolvedTargetFurnId) {
+      const furn = activeMap.furniture.find(item => item.id === resolvedTargetFurnId);
+      if (furn) char.targetPosition = { x: furn.x + 0.5, y: furn.y + 0.5 };
     }
     return true;
   }
@@ -278,6 +393,12 @@ Game.Character = (function() {
 
   function completeActivity(type, actCfg, targetFurnId) {
     const char = getState();
+
+    if (actCfg.targetState === 'broken' && (!targetFurnId || !isFurnitureBroken(targetFurnId))) {
+      notify('That object no longer needs repair.');
+      Game.Signals?.emit('activity:failed', { activityKey: type, targetFurnId, reason: 'target-invalid' });
+      return false;
+    }
 
     // Apply need bonuses
     if (actCfg.needs) {
@@ -341,7 +462,9 @@ Game.Character = (function() {
       const activeMap = Game.State.getActiveMap();
       const furn = activeMap.furniture.find(f => f.id === targetFurnId);
       if (furn) {
-        if (type.startsWith('plant_')) {
+        if (type === 'repair') {
+          repairFurniture(furn.id);
+        } else if (type.startsWith('plant_')) {
           furn.cropState = 'growing';
           furn.cropType = type.split('_')[1];
           furn.growth = 0;
@@ -447,6 +570,7 @@ Game.Character = (function() {
     }
     notify(`✅ ${actCfg.label} complete!`);
     Game.Signals?.emit('activity:completed', { activityKey: type, targetFurnId });
+    return true;
   }
 
   function getEffectiveEnergyCost(activityConfig) {
@@ -465,34 +589,25 @@ Game.Character = (function() {
     char.pathRequestId = (char.pathRequestId || 0) + 1;
   }
 
-  function isAvailableActivity(activityKey) {
-    const actCfg = cfg.ACTIVITIES[activityKey];
-    if (!actCfg) return false;
-    const activeMap = Game.State.getActiveMap();
-    if (!activeMap) return false;
-
-    if (actCfg.room && actCfg.room !== '*') {
-      if (!activeMap.rooms.some(r => r.type === actCfg.room)) return false;
-      if (actCfg.furniture) {
-        // Check for non-broken furniture. We use includes() because activity required-type (e.g. 'bed')
-        // matches specific furniture IDs (e.g. 'basic_bed', 'luxury_bed').
-        if (!activeMap.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
-      }
-    } else if (actCfg.room === '*') {
-      if (actCfg.furniture) {
-        if (!activeMap.furniture.some(f => f.type.includes(actCfg.furniture) && !isFurnitureBroken(f.id))) return false;
-      }
-    }
-    if (actCfg.energyCost) {
-      if (getState().needs.energy < actCfg.energyCost) return false;
-    }
-    return true;
+  function finishCurrentActivity(expectedType = null) {
+    const char = getState();
+    const current = char.currentActivity;
+    if (!current || (expectedType && current.type !== expectedType)) return false;
+    const actCfg = cfg.ACTIVITIES[current.type];
+    const completed = Boolean(actCfg && completeActivity(current.type, actCfg, current.targetFurnId));
+    cancelActivity();
+    return completed;
   }
 
-  function getAvailableActivities() {
+  function isAvailableActivity(activityKey, options = {}) {
+    return getActivityAvailability(activityKey, options).allowed;
+  }
+
+  function getAvailableActivities(options = {}) {
     return Object.entries(cfg.ACTIVITIES)
-      .filter(([key]) => isAvailableActivity(key))
-      .map(([key, act]) => ({ key, ...act }));
+      .map(([key, act]) => ({ key, act, availability: getActivityAvailability(key, options) }))
+      .filter(item => item.availability.allowed)
+      .map(({ key, act, availability }) => ({ key, ...act, targetFurnId: availability.targetFurnId }));
   }
 
   // ---- Life Stage ----
@@ -545,15 +660,21 @@ Game.Character = (function() {
         const requestId = (char.pathRequestId || 0) + 1;
         char.pathRequestId = requestId;
         char.isPathfinding = true;
+        const activity = char.currentActivity;
         const receivePath = (path) => {
           if (char.pathRequestId !== requestId) return;
+          if (char.currentActivity !== activity) return;
           char.isPathfinding = false;
           char.path = path;
           // EasyStar might return null if unreachable
           if (!path || path.length === 0) {
-             char.targetPosition = null; 
-             char.path = null;
-             notify("🚫 I can't reach that!");
+             if (activity) {
+               failActivity("I can't reach that target.", 'unreachable');
+             } else {
+               char.targetPosition = null;
+               char.path = null;
+               notify("🚫 I can't reach that target.");
+             }
           }
         };
         const handled = Game.Signals.emit('path:find', { startX: rx, startY: ry, endX: tx, endY: ty, callback: receivePath });
@@ -627,6 +748,21 @@ Game.Character = (function() {
     return true;
   }
 
+  function failActivity(message, reason = 'failed') {
+    const char = getState();
+    const activity = char.currentActivity;
+    if (!activity) return false;
+    const payload = {
+      activityKey: activity.type,
+      targetFurnId: activity.targetFurnId || null,
+      reason,
+    };
+    cancelActivity();
+    notify(`🚫 ${message}`);
+    Game.Signals?.emit('activity:failed', payload);
+    return true;
+  }
+
   // ---- Achievements & Collections ----
   function unlockAchievement(id) {
     const char = getState();
@@ -669,8 +805,10 @@ Game.Character = (function() {
     getMoodletsBonus,
     addSkillXp,
     getSkillLevel,
+    getActivityAvailability,
     startActivity,
     updateActivity,
+    finishCurrentActivity,
     cancelActivity,
     queueActivity,
     processQueue,

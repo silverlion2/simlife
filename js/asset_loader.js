@@ -22,6 +22,7 @@ Game.AssetManifest = (function() {
 
 Game.AssetLoader = (function() {
   const DEFAULT_TIMEOUT_MS = 30000;
+  const DEFAULT_CONCURRENCY = 24;
   const loadedGroups = new Set(['shell']);
   const inflight = new Map();
 
@@ -61,6 +62,20 @@ Game.AssetLoader = (function() {
     });
   }
 
+  async function loadEntries(entries, timeoutMs, concurrency) {
+    const results = new Array(entries.length);
+    let nextIndex = 0;
+    const workerCount = Math.min(entries.length, concurrency);
+    const workers = Array.from({ length: workerCount }, async () => {
+      while (nextIndex < entries.length) {
+        const index = nextIndex++;
+        results[index] = await loadImage(entries[index], timeoutMs);
+      }
+    });
+    await Promise.all(workers);
+    return results;
+  }
+
   async function loadGroup(groupName, options = {}) {
     if (loadedGroups.has(groupName) && !options.retry) {
       return { group: groupName, status: 'loaded', total: 0, loaded: 0, failed: 0, failures: [] };
@@ -69,8 +84,9 @@ Game.AssetLoader = (function() {
 
     const promise = (async () => {
       const timeoutMs = Math.max(1000, Number(options.timeoutMs) || DEFAULT_TIMEOUT_MS);
+      const concurrency = Math.max(1, Math.min(128, Number(options.concurrency) || DEFAULT_CONCURRENCY));
       const entries = entriesForGroup(groupName);
-      const results = await Promise.all(entries.map(entry => loadImage(entry, timeoutMs)));
+      const results = await loadEntries(entries, timeoutMs, concurrency);
       const failures = results.filter(result => result.status === 'failed' || result.status === 'timeout');
       const requiredFailures = failures.filter(result => result.required);
       const report = {

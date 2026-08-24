@@ -4,6 +4,7 @@
 
 - Visual tone: warm isometric life-sim with readable, game-like controls.
 - Typography: existing serif display for HUD/buttons, sans-serif for dense panel content.
+- Font delivery: use the existing local/system font stacks; do not import remote web fonts so browser and Electron presentation remains offline-safe.
 - Color tokens: warm ivory surfaces, forest ink, teal/green active states, gold primary actions, and coral destructive or urgent states.
 - Spacing: compact HUD spacing; panels use 8px gaps and touch-safe controls.
 - Radius and elevation: cards and controls use 8px radius or less; panel shadows should clarify layering without hiding the playfield.
@@ -23,6 +24,7 @@
 - Tablet: bottom HUD becomes two columns with action panel spanning the row.
 - Mobile: needs use a compact four-column/two-row grid; menu shows Build, Goals, Do, Menu, More in one row; secondary menu buttons appear only when More is open.
 - Mobile panels: full-height dialog with sticky controls and two-column Build tabs.
+- Mobile creator: keep Start pinned below the scrollable fields and show a short scroll cue until the appearance/trait list reaches its end; recalculate the cue after viewport resize or rotation.
 
 ## Interaction states
 
