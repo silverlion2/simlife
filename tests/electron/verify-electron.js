@@ -6,8 +6,6 @@ const net = require("net");
 const path = require("path");
 const os = require("os");
 const { spawn, spawnSync } = require("child_process");
-const electronExecutable = require("electron");
-const { chromium } = require("playwright");
 
 const root = path.resolve(__dirname, "..", "..");
 const UI_TIMEOUT = 20000;
@@ -662,13 +660,27 @@ async function checkLoadSlotJourney(page) {
   };
 }
 
+function buildElectronLaunchArguments(port, softwareRendering, options = {}) {
+  const platform = options.platform || process.platform;
+  const ci = options.ci ?? Boolean(process.env.CI);
+  return [
+    // Hosted Linux runners do not configure Electron's SUID helper. Keep this
+    // bypass confined to the isolated test process instead of production code.
+    ...(platform === 'linux' && ci ? ['--no-sandbox'] : []),
+    `--remote-debugging-port=${port}`,
+    '--remote-debugging-address=127.0.0.1',
+    ...(softwareRendering ? ['--disable-gpu', '--enable-unsafe-swiftshader'] : []),
+    root,
+  ];
+}
+
 async function checkElectronRuntime() {
+  const electronExecutable = require("electron");
+  const { chromium } = require("playwright");
   const softwareRendering = process.env.SIMLIFE_ELECTRON_GPU !== '1';
   const port = await getFreePort();
   const testUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'simlife-test-'));
-  const electronArgs = softwareRendering
-    ? [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', '--disable-gpu', '--enable-unsafe-swiftshader', root]
-    : [`--remote-debugging-port=${port}`, '--remote-debugging-address=127.0.0.1', root];
+  const electronArgs = buildElectronLaunchArguments(port, softwareRendering);
   const electronEnvironment = { ...process.env };
   delete electronEnvironment.SIMLIFE_TEST_RENDERER;
   delete electronEnvironment.SIMLIFE_TEST_USER_DATA;
@@ -943,4 +955,4 @@ async function checkElectronRuntime() {
   }
 }
 
-module.exports = { checkElectronRuntime };
+module.exports = { buildElectronLaunchArguments, checkElectronRuntime };

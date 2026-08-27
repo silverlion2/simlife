@@ -43,6 +43,20 @@ function checkElectronSecurityBoundary() {
   ]) {
     if (!source.includes(contract)) fail(`Expected Electron security contract: ${contract}`);
   }
+
+  const { buildElectronLaunchArguments } = require('../electron/verify-electron');
+  const linuxCiArgs = buildElectronLaunchArguments(9222, true, { platform: 'linux', ci: true });
+  const linuxLocalArgs = buildElectronLaunchArguments(9222, true, { platform: 'linux', ci: false });
+  const windowsCiArgs = buildElectronLaunchArguments(9222, true, { platform: 'win32', ci: true });
+  if (!linuxCiArgs.includes('--no-sandbox')) {
+    fail('Expected the isolated Linux CI Electron test process to disable the unavailable SUID sandbox');
+  }
+  if (linuxLocalArgs.includes('--no-sandbox') || windowsCiArgs.includes('--no-sandbox')) {
+    fail('Expected Electron sandbox bypass to remain scoped to Linux CI');
+  }
+  for (const contract of ['--disable-gpu', '--enable-unsafe-swiftshader', root]) {
+    if (!linuxCiArgs.includes(contract)) fail(`Expected Electron test launch argument: ${contract}`);
+  }
 }
 
 function loadBrowserGlobals(files, globals = {}) {
