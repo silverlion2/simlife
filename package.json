@@ -95,12 +95,12 @@
   "devDependencies": {
     "@rave-index/web-sop": "file:tools/web-sop",
     "easystarjs": "^0.4.4",
-    "electron": "^41.10.4",
+    "electron": "^41.10.7",
     "electron-builder": "^26.15.3",
     "navmesh": "^2.3.1",
     "phaser": "^4.0.0",
     "phaser4-rex-plugins": "^4.2.0",
-    "playwright": "^1.59.1",
+    "playwright": "^1.63.0",
     "steamworks.js": "^0.4.0",
     "typescript": "7.0.2"
   }
