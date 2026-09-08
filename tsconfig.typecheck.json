@@ -34,7 +34,10 @@
     "scripts/verify-asset-provenance.js",
     "scripts/verify-packaged-artifact.js",
     "scripts/verify-packaged-runtime.js",
+    "scripts/lib/installer-lifecycle.js",
+    "scripts/verify-installed-lifecycle.js",
     "scripts/verify-static-build.js",
-    "scripts/verify-workspace-structure.js"
+    "scripts/verify-workspace-structure.js",
+    "tests/pure/verify-installer-lifecycle.js"
   ]
 }

@@ -36,7 +36,7 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 
 | Metric | Baseline | Target | Measurement |
 |---|---:|---:|---|
-| Electron boot smoke | Clean-host gate | Passing on every PR/release host | `npm test` |
+| Electron boot smoke | Clean-host gate | Passing on every PR/release host, including the installed NSIS executable on Windows CI | `npm test` and Windows installer lifecycle evidence |
 | Rendered canvas | Passing in real Chrome | One nonblank canvas, no page/console errors, WebGL with Canvas fallback | `npm run test:browser` and Electron smoke |
 | Mobile menu weight | 10 persistent buttons | 5 persistent buttons, rest in More drawer | Visual check |
 | Mobile HUD | Campaign context could disappear | Chapter context, seven needs, five primary actions, and no horizontal overflow at 390×844 | Real-browser assertions and screenshot |
@@ -66,6 +66,7 @@ Make a single-player life-sim that is readable at a glance, pleasant to play in 
 - 2026-08-24: Make save creation, import, and existing-slot updates rollback-safe; validate nested map data, persistent collections, and file resource limits before changing the live world.
 - 2026-08-24: Treat events, Sim Makeover, pause, and renderer recovery as input-isolating surfaces that preserve the previous simulation speed and keyboard focus.
 - 2026-08-24: Keep Appearance ahead of Traits on mobile creation and retain a compact persistent campaign chip above the mobile playfield.
+- 2026-09-09: Treat unpacked package smoke and installed lifecycle verification as separate release gates. Windows CI must install the NSIS candidate for the current user, launch that installed executable through the full offline save/load journey, silently uninstall it, and retain machine-readable cleanup evidence without claiming signing or production approval.
 
 ## Hearthbyte Edition release loop
 

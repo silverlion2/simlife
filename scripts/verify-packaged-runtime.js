@@ -9,14 +9,31 @@ const { spawn, spawnSync } = require("node:child_process");
 const { chromium } = require("playwright");
 
 const root = path.resolve(__dirname, "..");
-const candidateArgument = process.argv.slice(2).find(argument => !argument.startsWith("--")) || "dist";
-const softwareRendering = process.argv.includes("--software-rendering") || process.env.SIMLIFE_PACKAGED_SOFTWARE === "1";
+const argumentsList = process.argv.slice(2);
+function optionValue(name) {
+  const index = argumentsList.indexOf(name);
+  if (index === -1) return null;
+  const value = argumentsList[index + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${name} requires a value`);
+  return value;
+}
+const optionValueIndexes = new Set(["--executable", "--screenshot", "--report"]
+  .map(name => argumentsList.indexOf(name))
+  .filter(index => index !== -1)
+  .map(index => index + 1));
+const candidateArgument = argumentsList.find((argument, index) => !argument.startsWith("--") && !optionValueIndexes.has(index)) || "dist";
+const softwareRendering = argumentsList.includes("--software-rendering") || process.env.SIMLIFE_PACKAGED_SOFTWARE === "1";
 const candidateDir = path.resolve(root, candidateArgument);
-const executablePath = path.join(candidateDir, "win-unpacked", "SimLife Hearthbyte Edition.exe");
-const screenshotPath = path.join(
-  candidateDir,
-  softwareRendering ? "packaged-runtime-smoke-software.png" : "packaged-runtime-smoke.png",
-);
+const executableOption = optionValue("--executable");
+const screenshotOption = optionValue("--screenshot");
+const reportOption = optionValue("--report");
+const executablePath = executableOption
+  ? path.resolve(root, executableOption)
+  : path.join(candidateDir, "win-unpacked", "SimLife Hearthbyte Edition.exe");
+const screenshotPath = screenshotOption
+  ? path.resolve(root, screenshotOption)
+  : path.join(candidateDir, softwareRendering ? "packaged-runtime-smoke-software.png" : "packaged-runtime-smoke.png");
+const reportPath = reportOption ? path.resolve(root, reportOption) : null;
 
 function delay(milliseconds) {
   return new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -425,7 +442,7 @@ async function main() {
       throw new Error(`packaged runtime diagnostics failed: ${JSON.stringify({ consoleErrors, pageErrors, externalRequests })}`);
     }
 
-    process.stdout.write(`${JSON.stringify({
+    const result = {
       ok: true,
       executablePath,
       renderingMode: softwareRendering ? "Canvas with Chromium GPU disabled/SwiftShader allowed" : "production default",
@@ -438,7 +455,12 @@ async function main() {
       pageErrors,
       externalRequests,
       screenshotPath,
-    }, null, 2)}\n`);
+    };
+    if (reportPath) {
+      fs.mkdirSync(path.dirname(reportPath), { recursive: true });
+      fs.writeFileSync(reportPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
+    }
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   } catch (error) {
     if (stderr.length) process.stderr.write(`Packaged Electron stderr:\n${stderr.join("")}\n`);
     throw error;

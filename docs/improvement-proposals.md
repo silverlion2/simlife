@@ -39,7 +39,7 @@ Deleted files remain recoverable from Git history.
 
 ### P1: clean-host Electron publication verification
 
-The development Electron integration suite now launches the source tree directly and connects over CDP, avoiding false failures from Playwright's Electron launcher on constrained Windows sessions. It passes in a GUI-capable session, and the current packaged candidate passes both production-default and software-rendered offline CDP journeys through create/save/reload/load, the documented keyboard controls, and settings rehydration with zero external requests. A separate clean Windows host must still install/uninstall the NSIS candidate and provide publication evidence before release.
+The development Electron integration suite now launches the source tree directly and connects over CDP, avoiding false failures from Playwright's Electron launcher on constrained Windows sessions. It passes in a GUI-capable session, and the current packaged candidate passes both production-default and software-rendered offline CDP journeys through create/save/reload/load, the documented keyboard controls, and settings rehydration with zero external requests. Windows CI now owns a guarded installed-lifecycle gate that requires a clean runner, installs the NSIS candidate for the current user, runs that same offline journey from the installed executable, silently uninstalls it, and uploads structured failure/cleanup evidence. The checklist remains open until the first main-branch run passes; trusted signing, owner/license decisions, previous-artifact selection, and real production smoke remain separate gates.
 
 ### P1: unresolved source-only asset provenance
 

@@ -30,7 +30,11 @@ jobs:
       - run: npm run build:win -- --x64 --publish=never --config.directories.output=artifacts/ci-release-candidate
       - run: npm run verify:artifact -- artifacts/ci-release-candidate
       - run: npm run verify:artifact-runtime -- artifacts/ci-release-candidate
+      - run: npm run verify:installer-lifecycle -- artifacts/ci-release-candidate
+        env:
+          SIMLIFE_INSTALLER_LIFECYCLE: "1"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: simlife-windows-release-candidate
           path: |
@@ -38,4 +42,5 @@ jobs:
             artifacts/ci-release-candidate/SimLife-Hearthbyte-*-Setup.exe.blockmap
             artifacts/ci-release-candidate/latest.yml
             artifacts/ci-release-candidate/packaged-runtime-smoke.png
-          if-no-files-found: error
+            artifacts/ci-release-candidate/lifecycle-evidence/**
+          if-no-files-found: warn

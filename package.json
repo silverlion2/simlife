@@ -16,6 +16,7 @@
     "build:verify": "node scripts/verify-static-build.js",
     "verify:artifact": "node scripts/verify-packaged-artifact.js",
     "verify:artifact-runtime": "node scripts/verify-packaged-runtime.js",
+    "verify:installer-lifecycle": "node scripts/verify-installed-lifecycle.js",
     "verify:structure": "node scripts/verify-workspace-structure.js",
     "verify:assets": "node scripts/verify-asset-provenance.js",
     "verify:generated": "node scripts/generate-world-assets.js --check && node scripts/generate-avatar-assets.js --check",

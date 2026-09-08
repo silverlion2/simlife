@@ -13,6 +13,7 @@
 - [x] `git diff --check` passes for the current source set.
 - [x] Static package contract passes through `npm run build:verify`; product identity and runtime file globs are valid.
 - [x] Rebuilt a current isolated Windows candidate and verified its sibling unpacked payload through menu → create → render → save → reload → Load World with external host resolution blocked. Clean-host installer install/uninstall remains a publication gate.
+- [ ] The current GitHub `windows-latest` run installs the NSIS candidate for the current user, launches the installed executable through the offline save/load journey, then silently uninstalls it with install-directory, shortcut, and HKCU registry cleanup recorded in uploaded JSON. This remains unchecked until the new main-branch run passes.
 - [ ] Resolve the repository license mismatch (ISC in `package.json`, MIT in README, no root `LICENSE`) through an owner decision.
 
 ## Human verification
@@ -20,7 +21,7 @@
 - [x] Critical journeys verified
 - [x] Loading, empty, error, success, and partial states verified through the real-browser empty/recovery checks and the 2026-08-24 30-state Electron visual capture
 - [x] Mobile and desktop layouts verified
-- [ ] Electron desktop install/launch re-verified on a separate clean host (development integration and the packaged candidate both pass on this host when launched from a GUI-capable session)
+- [ ] Electron desktop install/launch re-verified on a separate clean host (the new Windows CI lifecycle qualifies only after its main-branch run and uploaded evidence pass)
 - [x] Packaged Electron launch verified with Chromium external host resolution blocked; the page issued zero HTTP(S) requests
 - [x] New Roots campaign advances and rewards only once
 - [x] Event and pause surfaces preserve speed, isolate underlying input, focus their primary action, and restore the UI in real Chrome
@@ -36,7 +37,7 @@
 - [x] `npm run test:visual` recaptured all 30 desktop/mobile and transient Electron states; no page/console errors or temporary process/profile residue remained
 - [x] Camera centers correctly at responsive zoom levels and the starter landscaping remains visible around the HUD
 - [x] Expanded 130-texture world bundle and 32 distinct household sprites verified by assets/pure checks and fresh desktop/mobile Chrome screenshots
-- [ ] Rollback procedure verified
+- [ ] Rollback cleanup procedure verified by the new Windows CI lifecycle; selecting and installing the previous known-good artifact remains a publication-time step
 - [ ] Production smoke test completed if a hosted build is released
 
 ## Release record
@@ -56,3 +57,4 @@ Record version, owner, timestamp, artifact path or PR URL, evidence, and rollbac
 - Historical artifact: `dist/SimLife-Hearthbyte-2.0.0-Setup.exe`, SHA-256 `845104626FADA875E974C8F66FFDB74F06E848AFF17FFFD88860D2EB5B70C4F4`, remains the 2026-08-07 build and was not overwritten.
 - Distribution hold: apply a trusted Windows code-signing certificate before broad public distribution. Configure `SIMLIFE_STEAM_APP_ID` only for a Steam-specific build.
 - Rollback version: set at publication time.
+- Installer lifecycle evidence: pending the first main-branch run of `.github/workflows/website-quality.yml`; the gate must upload `lifecycle-evidence/installer-lifecycle.json`, `installed-runtime.json`, and `installed-runtime-smoke.png` and must not be treated as Authenticode, license, production-smoke, or public-release approval.

@@ -25,6 +25,7 @@ const requiredPaths = [
   path.join("tests", "electron", "run.js"),
   path.join("scripts", "verify-packaged-artifact.js"),
   path.join("scripts", "verify-packaged-runtime.js"),
+  path.join("scripts", "verify-installed-lifecycle.js"),
   path.join("scripts", "generate-avatar-assets.js"),
   path.join("scripts", "generate-world-assets.js"),
   path.join("tools", "web-sop", "package.json"),
@@ -132,7 +133,7 @@ const packageJson = JSON.parse(fs.readFileSync(path.join(root, "package.json"), 
 if (packageJson.devDependencies?.["@rave-index/web-sop"] !== "file:tools/web-sop") {
   errors.push("package.json must pin @rave-index/web-sop to file:tools/web-sop");
 }
-for (const script of ["lint", "typecheck", "build", "verify:structure", "verify:assets", "verify:generated", "verify:artifact", "verify:artifact-runtime", "sop:doctor", "sop:check"]) {
+for (const script of ["lint", "typecheck", "build", "verify:structure", "verify:assets", "verify:generated", "verify:artifact", "verify:artifact-runtime", "verify:installer-lifecycle", "sop:doctor", "sop:check"]) {
   if (!packageJson.scripts?.[script]) errors.push(`missing package script: ${script}`);
 }
 if (packageJson.devDependencies?.typescript !== "7.0.2") {

@@ -72,6 +72,8 @@ simlife/
 
 The browser and Electron entry points intentionally remain at the repository root. See [`docs/workspace-layout.md`](docs/workspace-layout.md) for ownership rules and [`docs/improvement-proposals.md`](docs/improvement-proposals.md) for the reviewed migration map.
 
+Windows release candidates are checked in three distinct layers: static/ASAR contents, the unpacked packaged runtime, and the real installed NSIS lifecycle. `npm run verify:installer-lifecycle -- <candidate-dir> --dry-run` prints the install/launch/uninstall plan without changing the host. The mutating lifecycle is restricted to the repository's GitHub Actions Windows runner and writes uploadable JSON plus an installed-runtime screenshot under the candidate directory.
+
 ## 📜 License
 
 MIT
