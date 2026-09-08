@@ -37,9 +37,9 @@ Deleted files remain recoverable from Git history.
 
 `package.json` says ISC, `README.md` says MIT, and no root `LICENSE` exists. The project owner must select the intended license and confirm rights for project-owned branding/custom art. Then align all three locations. This is a release blocker and must not be guessed by tooling.
 
-### P1: clean-host Electron publication verification
+### Completed: clean-host Electron technical verification
 
-The development Electron integration suite now launches the source tree directly and connects over CDP, avoiding false failures from Playwright's Electron launcher on constrained Windows sessions. It passes in a GUI-capable session, and the current packaged candidate passes both production-default and software-rendered offline CDP journeys through create/save/reload/load, the documented keyboard controls, and settings rehydration with zero external requests. Windows CI now owns a guarded installed-lifecycle gate that requires a clean runner, installs the NSIS candidate for the current user, runs that same offline journey from the installed executable, silently uninstalls it, and uploads structured failure/cleanup evidence. The checklist remains open until the first main-branch run passes; trusted signing, owner/license decisions, previous-artifact selection, and real production smoke remain separate gates.
+The development Electron integration suite launches the source tree directly and connects over CDP, avoiding false failures from Playwright's Electron launcher on constrained Windows sessions. The packaged candidate passes the production-default offline CDP journey through create/save/reload/load, the documented keyboard controls, and settings rehydration with zero external requests. GitHub `windows-latest` run `34285288606` closed the clean-runner technical gap for final commit `ddc1f07`: it installed the NSIS candidate for the current user, ran the same offline journey from the installed executable, silently uninstalled it, verified the install directory, shortcuts, executable, uninstaller, and both exact HKCU registry keys were absent, and uploaded structured lifecycle evidence. This technical closure is not publication approval; trusted signing, owner/license decisions, previous-artifact selection, and real production smoke remain separate gates.
 
 ### P1: unresolved source-only asset provenance
 
@@ -57,4 +57,4 @@ The development Electron integration suite now launches the source tree directly
 
 ## Completion criteria
 
-The technical quality pass is complete when lint, pure tests, browser and packaged-runtime smoke, structure/assets/static/ASAR verification, and the fast SOP gate pass with no material audit findings. Public release additionally requires the owner license decision, clean-host installer verification, trusted signing for broad distribution, and a recorded rollback artifact.
+The technical quality pass is complete: lint, pure tests, browser and packaged-runtime smoke, structure/assets/static/ASAR verification, the fast SOP gate, and clean-host installed lifecycle pass with no material audit findings. Public release still requires the owner license decision, trusted signing for broad distribution, selection and validation of the previous known-good rollback artifact, and production smoke evidence.
