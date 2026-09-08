@@ -13,7 +13,7 @@
 - [x] `git diff --check` passes for the current source set.
 - [x] Static package contract passes through `npm run build:verify`; product identity and runtime file globs are valid.
 - [x] Rebuilt a current isolated Windows candidate and verified its sibling unpacked payload through menu → create → render → save → reload → Load World with external host resolution blocked. Clean-host installer install/uninstall remains a publication gate.
-- [ ] The current GitHub `windows-latest` run installs the NSIS candidate for the current user, launches the installed executable through the offline save/load journey, then silently uninstalls it with install-directory, shortcut, and HKCU registry cleanup recorded in uploaded JSON. This remains unchecked until the new main-branch run passes.
+- [x] GitHub `windows-latest` run [34284635811](https://github.com/silverlion2/simlife/actions/runs/34284635811) installed the NSIS candidate for the current user, launched the installed executable through the offline save/load journey, then silently uninstalled it with install-directory, shortcut, and both exact HKCU registry-key cleanups recorded in uploaded JSON.
 - [ ] Resolve the repository license mismatch (ISC in `package.json`, MIT in README, no root `LICENSE`) through an owner decision.
 
 ## Human verification
@@ -21,7 +21,7 @@
 - [x] Critical journeys verified
 - [x] Loading, empty, error, success, and partial states verified through the real-browser empty/recovery checks and the 2026-08-24 30-state Electron visual capture
 - [x] Mobile and desktop layouts verified
-- [ ] Electron desktop install/launch re-verified on a separate clean host (the new Windows CI lifecycle qualifies only after its main-branch run and uploaded evidence pass)
+- [x] Electron desktop install/launch re-verified on a separate clean GitHub `windows-latest` runner; this is automated clean-runner evidence, not a signed/public production install.
 - [x] Packaged Electron launch verified with Chromium external host resolution blocked; the page issued zero HTTP(S) requests
 - [x] New Roots campaign advances and rewards only once
 - [x] Event and pause surfaces preserve speed, isolate underlying input, focus their primary action, and restore the UI in real Chrome
@@ -37,7 +37,8 @@
 - [x] `npm run test:visual` recaptured all 30 desktop/mobile and transient Electron states; no page/console errors or temporary process/profile residue remained
 - [x] Camera centers correctly at responsive zoom levels and the starter landscaping remains visible around the HUD
 - [x] Expanded 130-texture world bundle and 32 distinct household sprites verified by assets/pure checks and fresh desktop/mobile Chrome screenshots
-- [ ] Rollback cleanup procedure verified by the new Windows CI lifecycle; selecting and installing the previous known-good artifact remains a publication-time step
+- [x] Current-candidate rollback cleanup verified by uninstalling it and checking the install directory, executable, uninstaller, shortcuts, uninstall entry, install metadata entry, and both recorded HKCU keys are absent.
+- [ ] Previous known-good rollback artifact selected and installed; this remains a publication-time owner/release-manager step.
 - [ ] Production smoke test completed if a hosted build is released
 
 ## Release record
@@ -57,4 +58,4 @@ Record version, owner, timestamp, artifact path or PR URL, evidence, and rollbac
 - Historical artifact: `dist/SimLife-Hearthbyte-2.0.0-Setup.exe`, SHA-256 `845104626FADA875E974C8F66FFDB74F06E848AFF17FFFD88860D2EB5B70C4F4`, remains the 2026-08-07 build and was not overwritten.
 - Distribution hold: apply a trusted Windows code-signing certificate before broad public distribution. Configure `SIMLIFE_STEAM_APP_ID` only for a Steam-specific build.
 - Rollback version: set at publication time.
-- Installer lifecycle evidence: pending the first main-branch run of `.github/workflows/website-quality.yml`; the gate must upload `lifecycle-evidence/installer-lifecycle.json`, `installed-runtime.json`, and `installed-runtime-smoke.png` and must not be treated as Authenticode, license, production-smoke, or public-release approval.
+- Installer lifecycle evidence: run [34284635811](https://github.com/silverlion2/simlife/actions/runs/34284635811), artifact `simlife-windows-release-candidate` (artifact ID `10079081661`). Candidate SHA-256 `F5F1A302BA6804D705E903793045546E1FB1E12A9C958D1836C1CBD024512657`; 118,292,105-byte installer; 26,365,693-byte ASAR with 1,108 entries, zero forbidden entries, and zero remote runtime dependencies. The lifecycle report recorded installed footprint/runtime/cleanup success and intentionally recorded `previousArtifactInstallAttempted: false` and `productionRollbackClaim: false`. It is not Authenticode, license, production-smoke, or public-release approval.

@@ -56,10 +56,14 @@ function run(command, args, options = {}) {
 function getAuthenticodeState(filePath) {
   const escapedPath = filePath.replace(/'/g, "''");
   const powershell = String.raw`
-$signature = Get-AuthenticodeSignature -LiteralPath '${escapedPath}'
+$signatures = @(Get-AuthenticodeSignature -LiteralPath '${escapedPath}')
+$signature = if ($signatures.Count -eq 1) { $signatures[0] } else { $null }
+$status = if ($signature -and -not [string]::IsNullOrWhiteSpace([string]$signature.Status)) { [string]$signature.Status } else { 'Unknown' }
 [pscustomobject]@{
-  status = [string]$signature.Status
-  statusMessage = [string]$signature.StatusMessage
+  measurementAvailable = [bool]($signature -and $status -ne 'Unknown')
+  returnedSignatures = $signatures.Count
+  status = $status
+  statusMessage = if ($signature) { [string]$signature.StatusMessage } else { 'Get-AuthenticodeSignature returned no result' }
   signerSubject = if ($signature.SignerCertificate) { [string]$signature.SignerCertificate.Subject } else { $null }
 } | ConvertTo-Json -Compress
 `;
@@ -152,7 +156,7 @@ const report = {
     installerBytes: fs.statSync(plan.installerPath).size,
     installerSha256: sha256(plan.installerPath),
     authenticode,
-    signingGateSatisfied: authenticode.status === "Valid",
+    signingGateSatisfied: authenticode.measurementAvailable === true && authenticode.status === "Valid",
   },
   stages: {},
   rollback: {
